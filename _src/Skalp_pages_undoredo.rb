@@ -21,19 +21,23 @@ module Skalp
       @redostack = []
     end
 
+    # DEPRECATED SU2026: Custom undo stack no longer used
+    # Native SketchUp undo now handles scene state
     def add_status(status)
-      @redostack = []
-      @undostack << status
-      @undostack.shift
+      # @redostack = []
+      # @undostack << status
+      # @undostack.shift
       #puts "ADD status"
       #puts status
     end
 
+    # DEPRECATED SU2026: Custom undo stack no longer used
     def stack_undo
-      return unless @skpModel.get_attribute('Skalp', 'page_undo')
-
-      time = @skpModel.get_attribute('Skalp', 'page_undo').to_i
-      memory_time = @model.get_memory_attribute(@skpModel, 'Skalp', 'page_undo').to_i
+      return nil  # Native undo handles this now
+      # Original code below for reference:
+      # return unless @skpModel.get_attribute('Skalp', 'page_undo')
+      # time = @skpModel.get_attribute('Skalp', 'page_undo').to_i
+      # memory_time = @model.get_memory_attribute(@skpModel, 'Skalp', 'page_undo').to_i
 
       while time != memory_time
         status = @undostack.pop
@@ -47,11 +51,13 @@ module Skalp
       return @undostack.last
     end
 
+    # DEPRECATED SU2026: Custom undo stack no longer used
     def stack_redo
-      return unless @skpModel.get_attribute('Skalp', 'page_undo')
-
-      time = @skpModel.get_attribute('Skalp', 'page_undo').to_i
-      memory_time = @model.get_memory_attribute(@skpModel, 'Skalp', 'page_undo').to_i
+      return nil  # Native redo handles this now
+      # Original code below for reference:
+      # return unless @skpModel.get_attribute('Skalp', 'page_undo')
+      # time = @skpModel.get_attribute('Skalp', 'page_undo').to_i
+      # memory_time = @model.get_memory_attribute(@skpModel, 'Skalp', 'page_undo').to_i
 
       while time != memory_time
         status = @redostack.pop

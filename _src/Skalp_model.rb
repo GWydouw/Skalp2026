@@ -361,7 +361,7 @@ module Skalp
         @observer_active = true
         @operation = 0
 
-        create_status_on_undo_stack unless @place_timestamp
+        # MIGRATION SU2026: Removed create_status_on_undo_stack - native undo handles this
         load_commit if @load
       elsif @operation > 1
         @skpModel.set_attribute('Skalp', 'commit', Time.now.strftime("%H%M%S%N")) #avoid empty transaction
