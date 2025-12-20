@@ -5,7 +5,7 @@ module Skalp
   require 'base64'
   require 'logger'
 
-  DEBUG = true
+  DEBUG = true unless defined? DEBUG
 
   LICENSE_SERVER = "license.skalp4sketchup.com" #"license.skalp4sketchup.com"
   DOWNLOAD_SERVER = "license.skalp4sketchup.com"

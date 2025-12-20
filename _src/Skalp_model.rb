@@ -436,26 +436,66 @@ module Skalp
 
     # MIGRATION: Updated to use native SketchUp attributes (SU 2026 compatibility)
     # Writes directly to object.set_attribute() instead of in-memory dictionary
+    # STYLE_SETTINGS keys that should be flattened to native attributes
+    STYLE_SETTINGS_KEYS = [:drawing_scale, :rearview_status, :rearview_linestyle, :section_cut_width_status, :depth_clipping_status, :depth_clipping_distance]
+    
     def set_memory_attribute(object, dict_name, key, value)
       return unless object  # Guard against nil object
       
-      # Write to native attributes (primary storage)
-      object.set_attribute(dict_name, key, value)
-      
-      # DEPRECATED: Also maintain memory_attributes for backward compat during migration
-      # TODO: Remove after full migration complete
+      # Always maintain memory_attributes (required for complex data like style_settings Hash)
       @memory_attributes[object] = {} unless @memory_attributes.include?(object)
       @memory_attributes[object][key] = value
+      
+      # Handle style_settings Hash specially: flatten to individual native attributes
+      if key == 'style_settings' && value.is_a?(Hash)
+        STYLE_SETTINGS_KEYS.each do |style_key|
+          style_value = value[style_key]
+          # Convert to string for storage, skip style_rules (too complex)
+          if style_value && !style_value.is_a?(Hash) && style_key != :style_rules
+            object.set_attribute(dict_name, "ss_#{style_key}", style_value.to_s)
+          end
+        end
+      # Write simple types to native attributes
+      elsif value.nil? || value.is_a?(String) || value.is_a?(Numeric) || value.is_a?(TrueClass) || value.is_a?(FalseClass)
+        object.set_attribute(dict_name, key, value)
+      end
     end
 
     def get_memory_attribute(object, dict_name, key)
       return nil unless object  # Guard against nil object
       
-      # Read from native attributes (source of truth)
+      # Handle style_settings specially: reconstruct Hash from flattened native attributes
+      if key == 'style_settings'
+        # First try memory_attributes (for in-session data)
+        if @memory_attributes.include?(object) && @memory_attributes[object]['style_settings'].is_a?(Hash)
+          return @memory_attributes[object]['style_settings']
+        end
+        
+        # Then try to reconstruct from native attributes
+        reconstructed = {}
+        has_any = false
+        STYLE_SETTINGS_KEYS.each do |style_key|
+          native_value = object.get_attribute(dict_name, "ss_#{style_key}")
+          if native_value
+            has_any = true
+            # Convert back from string to appropriate type
+            case style_key
+            when :drawing_scale, :depth_clipping_distance
+              reconstructed[style_key] = native_value.to_f
+            when :rearview_status, :section_cut_width_status, :depth_clipping_status
+              reconstructed[style_key] = (native_value == 'true' || native_value == true)
+            else
+              reconstructed[style_key] = native_value
+            end
+          end
+        end
+        return has_any ? reconstructed : nil
+      end
+      
+      # For other keys: read from native attributes first
       value = object.get_attribute(dict_name, key)
       
       # Fallback to memory_attributes for old data during migration
-      # TODO: Remove after full migration complete
       if value.nil? && @memory_attributes.include?(object)
         value = @memory_attributes[object][key]
       end
@@ -795,6 +835,15 @@ module Skalp
     end
 
     def active_sectionplane
+      # SU 2026: Priority to native SketchUp state (Source of Truth)
+      skpSectionplane = @skpModel.active_entities.active_section_plane
+      if skpSectionplane && skpSectionplane.valid?
+        id = skpSectionplane.get_attribute('Skalp', 'ID')
+        sp = sectionplane_by_id(id) if id
+        return sp if sp
+      end
+      
+      # Fallback to attribute
       skalpID = get_memory_attribute(@skpModel, 'Skalp', 'active_sectionplane_ID')
       skalpID && skalpID != '' && sectionplane_by_id(skalpID)
     end

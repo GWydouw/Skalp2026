@@ -4,6 +4,7 @@
     return unless @model.skpModel.pages
     return unless @model.skpModel.pages.include?(page)
 
+
     if @model
       unless @model.undoredo_action
         if @model.pages[page] && (page.name != @model.pages[page].name)
@@ -52,9 +53,10 @@
               Skalp.sectionplane_active = true
               Skalp.dialog.show_dialog_settings
 
-              if sectionplaneID != active_sectionplaneID
-                Skalp::update_page(page)
-                @update_needed = false
+              # SU 2026: sectionplaneID and active_sectionplaneID are now likely the same due to native scene undo.
+              # We must trigger update_page anyway to ensure Skalp's internal state and UI are refreshed.
+              Skalp::update_page(page)
+              @update_needed = false
 
                 skalp_sectionplane =  @model.sectionplane_by_id(active_sectionplaneID)
 
@@ -69,9 +71,6 @@
 
                 @page_switch = true
                 @update_needed = false
-              else
-                @page_switch = true
-              end
 
               Sketchup.active_model.styles.selected_style = Sketchup.active_model.styles.selected_style if Sketchup.active_model.styles.selected_style
             else
