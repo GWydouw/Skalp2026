@@ -302,6 +302,8 @@ module Skalp
       return if not Skalp.models[model].observer_active
 
       # pagesUndoRedo.undo removed - native undo handles this now
+      # But we still need to update the dialog
+      Skalp.models[model].pagesUndoRedo.update_dialog if Skalp.models[model].pagesUndoRedo
 
       if Skalp::Material_dialog::materialdialog
         paint = true
@@ -330,6 +332,8 @@ module Skalp
       return if not Skalp.models[model].observer_active
 
       # pagesUndoRedo.redo removed - native redo handles this now
+      # But we still need to update the dialog
+      Skalp.models[model].pagesUndoRedo.update_dialog if Skalp.models[model].pagesUndoRedo
 
       data = {
           :action => :redo_transaction,
