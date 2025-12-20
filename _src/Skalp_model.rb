@@ -847,6 +847,31 @@ module Skalp
       skalpID = get_memory_attribute(@skpModel, 'Skalp', 'active_sectionplane_ID')
       skalpID && skalpID != '' && sectionplane_by_id(skalpID)
     end
+    def active_sectionplane_for_page(page)
+      return unless page && page.valid? rescue return nil
+      
+      # 1. SU 2026: Try native API first (Highest accuracy)
+      if page.respond_to?(:active_section_planes)
+        begin
+          planes = page.active_section_planes
+          if planes && planes.is_a?(Array)
+            # Find the first plane that has a Skalp ID attribute
+            skp_plane = planes.find { |p| p.get_attribute('Skalp', 'ID') }
+            if skp_plane
+              id = skp_plane.get_attribute('Skalp', 'ID')
+              sp = sectionplane_by_id(id)
+              return sp if sp
+            end
+          end
+        rescue
+          # Fallback on any error
+        end
+      end
+
+      # 2. Legacy/Fallback: Use Skalp attribute
+      id = get_memory_attribute(page, 'Skalp', 'sectionplaneID')
+      sectionplane_by_id(id) if id
+    end
 
     def sectionplane_in_active_page_match_model_sectionplane?
       get_memory_attribute(@skpModel.pages.selected_page, 'Skalp', 'sectionplaneID') == get_memory_attribute(@skpModel, 'Skalp', 'active_sectionplane_ID')
@@ -1093,7 +1118,19 @@ module Skalp
         sectionplaneID = get_memory_attribute(page, 'Skalp', 'sectionplaneID')
 
         #visibility of the section result group
-        @skalp_folder.visible = true
+        # Ensure Skalp folders and layers are visible for this page
+        [@skalp_folder, @patternlayer_folder, @rearview_folder].each do |folder|
+          next unless folder && folder.valid?
+          folder.visible = true
+          page.set_drawingelement_visibility(folder, true)
+          folder.each_layer do |layer|
+            layer.visible = true
+            page.set_layer_visibility(layer, true)
+          end
+        end
+
+
+
         section_groups.each do |section_group|
           if section_group.get_attribute('Skalp', 'ID') == pageID
             section_group.layer = Skalp.scene_section_layer
@@ -1424,6 +1461,7 @@ module Skalp
         @skpModel.entities.erase_entities(group)
       end
     end
+
   end
 end
 

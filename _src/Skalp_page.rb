@@ -39,7 +39,8 @@ module Skalp
 
             Skalp.dialog.settings_to_page(object) if @model.save_settings
           else
-            @sectionplane = @model.sectionplane_by_id(@model.get_memory_attribute(@skpPage, 'Skalp', 'sectionplaneID'))
+            # SU 2026: Use dynamic helper that favors native scene state
+            @sectionplane = @model.active_sectionplane_for_page(@skpPage)
           end
         when SectionPlane
           @sectionplane = object
