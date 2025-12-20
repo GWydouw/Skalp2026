@@ -434,24 +434,42 @@ module Skalp
       @operation = 0
     end
 
+    # MIGRATION: Updated to use native SketchUp attributes (SU 2026 compatibility)
+    # Writes directly to object.set_attribute() instead of in-memory dictionary
     def set_memory_attribute(object, dict_name, key, value)
+      # Write to native attributes (primary storage)
+      object.set_attribute(dict_name, key, value)
+      
+      # DEPRECATED: Also maintain memory_attributes for backward compat during migration
+      # TODO: Remove after full migration complete
       @memory_attributes[object] = {} unless @memory_attributes.include?(object)
-      page_attributes = @memory_attributes[object]
-      page_attributes[key] = value
+      @memory_attributes[object][key] = value
     end
 
     def get_memory_attribute(object, dict_name, key)
-      @memory_attributes[object] = {} unless @memory_attributes.include?(object)
-      page_attributes = @memory_attributes[object]
-      page_attributes ? page_attributes[key] : nil
+      # Read from native attributes (source of truth)
+      value = object.get_attribute(dict_name, key)
+      
+      # Fallback to memory_attributes for old data during migration
+      # TODO: Remove after full migration complete
+      if value.nil? && @memory_attributes.include?(object)
+        value = @memory_attributes[object][key]
+      end
+      
+      return value
     end
 
     def clear_memory_attributes(object)
+      # Clear memory cache (native attributes kept intact)
       @memory_attributes[object] = {}
     end
 
     def delete_memory_attribute(object, dict_name)
+      # Delete from both systems
       @memory_attributes[object] = {}
+      if object.attribute_dictionaries && object.attribute_dictionaries[dict_name]
+        object.attribute_dictionaries.delete(dict_name)
+      end
     end
 
 
