@@ -165,8 +165,30 @@ module Skalp
         @mem_attributes[Sketchup.active_model]['style_settings'] = default_settings
         save_to_model
       end
+      
+      # MIGRATION SU2026: Sync migrated data to native page attributes
+      sync_to_native_attributes
     end
 
+    # MIGRATION SU2026: Write @mem_attributes to native page attributes
+    # This ensures old format data is migrated to new native format
+    def sync_to_native_attributes
+      @mem_attributes.each_pair do |object, attrs|
+        next unless object && object.valid? rescue next
+        next unless attrs.is_a?(Hash)
+        
+        attrs.each_pair do |key, value|
+          next if key == 'commit'
+          next if value.is_a?(Hash) && key == 'style_settings'  # Skip complex hashes for now
+          begin
+            object.set_attribute('Skalp', key, value) if value
+          rescue => e
+            # Skip invalid writes silently
+          end
+        end
+      end
+    end
+    
     def check_attributes(objects)
       objects.each do |object|
         object_attributes = @mem_attributes[object]
