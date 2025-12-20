@@ -179,6 +179,8 @@ module Skalp
       puts '---'
     end
 
+    # MIGRATION SU2026: Changed from abort_operation to commit
+    # Native undo now handles scene changes automatically
     def set_active_sectionplane_to_scenes(skpSectionplane)
       @model.force_start("Skalp - #{Skalp.translate('save active Section Plane to scene')}")
       @skpModel.entities.active_section_plane = skpSectionplane
@@ -188,10 +190,11 @@ module Skalp
           page.update(64) if (page && Skalp.page_valid?(page))
         end
       end
-      @redostack = []
-      @model.abort_operation
+      @model.commit
     end
 
+    # MIGRATION SU2026: Changed from abort_operation to commit
+    # Native undo now handles scene changes automatically
     def set_sectionplane_active_in_page(page, sectionplane)
       return unless page && Skalp.page_valid?(page)
 
@@ -199,8 +202,7 @@ module Skalp
       sectionplane ? @skpModel.entities.active_section_plane = sectionplane.skpSectionPlane :
           @skpModel.entities.active_section_plane = nil
       page.update(64)
-      @redostack = []
-      @model.abort_operation
+      @model.commit
     end
 
     def update_dialog

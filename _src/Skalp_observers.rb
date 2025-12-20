@@ -246,9 +246,8 @@ module Skalp
       return if not Skalp.models[model].observer_active
       return if Skalp.models[model].undoredo_action
 
-      if Skalp.models[model] && Skalp.models[model].pagesUndoRedo.redostack != []
-        Skalp.models[model].pagesUndoRedo.redostack = []
-      end
+      # MIGRATION SU2026: Removed pagesUndoRedo.redostack clearing
+      # Native undo handles redo stack automatically
     end
 
     def onTransactionStart(model)
@@ -294,13 +293,15 @@ module Skalp
       Skalp.models[model].controlCenter.add_to_queue(data)
     end
 
+    # MIGRATION SU2026: Removed custom pagesUndoRedo.undo
+    # Native SketchUp undo now handles scene state automatically
     def onTransactionUndo(model)
       return unless model.valid?
       return unless Skalp.models[model]
       return if Skalp.status == 0
       return if not Skalp.models[model].observer_active
 
-      Skalp.models[model].pagesUndoRedo.undo
+      # pagesUndoRedo.undo removed - native undo handles this now
 
       if Skalp::Material_dialog::materialdialog
         paint = true
@@ -320,13 +321,15 @@ module Skalp
       Skalp::errors(e)
     end
 
+    # MIGRATION SU2026: Removed custom pagesUndoRedo.redo
+    # Native SketchUp redo now handles scene state automatically
     def onTransactionRedo(model)
       return unless model.valid?
       return if Skalp.status == 0
       return unless Skalp.models[model]
       return if not Skalp.models[model].observer_active
 
-      Skalp.models[model].pagesUndoRedo.redo
+      # pagesUndoRedo.redo removed - native redo handles this now
 
       data = {
           :action => :redo_transaction,
