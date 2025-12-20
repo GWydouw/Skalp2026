@@ -437,6 +437,8 @@ module Skalp
     # MIGRATION: Updated to use native SketchUp attributes (SU 2026 compatibility)
     # Writes directly to object.set_attribute() instead of in-memory dictionary
     def set_memory_attribute(object, dict_name, key, value)
+      return unless object  # Guard against nil object
+      
       # Write to native attributes (primary storage)
       object.set_attribute(dict_name, key, value)
       
@@ -447,6 +449,8 @@ module Skalp
     end
 
     def get_memory_attribute(object, dict_name, key)
+      return nil unless object  # Guard against nil object
+      
       # Read from native attributes (source of truth)
       value = object.get_attribute(dict_name, key)
       
