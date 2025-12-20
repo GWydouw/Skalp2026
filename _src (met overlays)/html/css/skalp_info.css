@@ -1,0 +1,84 @@
+/* CSS file  for skalp dialog */
+
+/* GENERAL */
+
+/* disable selection */
+* {
+    -webkit-touch-callout:none;
+    -webkit-user-select:none;
+    -moz-user-select:none;
+    -ms-user-select:none;
+    user-select:none;
+}
+
+img {border: none;}
+
+input {
+    -webkit-user-select: text;
+    -khtml-user-select: text;
+    -moz-user-select: text;
+    -o-user-select: text;
+    user-select: text;
+    -ms-user-select: text;
+}
+
+select {
+    -webkit-user-select: text;
+    -khtml-user-select: text;
+    -moz-user-select: text;
+    -o-user-select: text;
+    user-select: text;
+    -ms-user-select: text;
+}
+
+body{
+    background-color:rgb(237,237,237);
+}
+
+
+a {
+    position: relative;
+}
+
+p {
+    font-size:10px;
+    font-family:"Arial" ;
+}
+
+span {
+    color: steelblue;
+    font-size:12px;
+    font-family:"Arial" ;
+    font-weight: bold;.
+}
+
+
+@media all and (-ms-high-contrast:none){
+
+    select::-ms-expand{
+        display: none;
+    }
+}
+
+#content{
+    position: absolute;
+    background-color: white;
+    top: 0px;
+    left: 0px;
+    width: 342px;
+    height: 299px;
+    padding: 8px;
+    padding-top: 0px;
+}
+
+#submit {
+    position: absolute;
+    width:115px;
+    right:8px;
+    bottom: 8px;
+    color: white;;
+    border-color: white;
+    background-color: steelblue;
+    font-size: 10px;
+    padding: 4px
+}

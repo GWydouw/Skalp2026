@@ -1,0 +1,31 @@
+*******BRICKPAT.LSP by Peter Landeck all rights reserved 1997*******
+
+WHAT BRICKPAT.LSP DOES: When run, Brickpat.lsp loads a menu file called Brickpat.mnu, which displays 2 menu choices in the upper right hand of the autocad screen; Selecting MENUNDO will exit the user from the Brickpat menu and restore the original autocad menu in use at the time Brickpat.lsp was loaded.   Selecting BRICKPAT in the upper right of the autocad screen will open an icon menu in the center of the screen which displays the 12 brick patterns.  Selecting any of the patterns will automatically load the pattern and start the usual autocad HATCH command.  The user must input hatch scale and angle, and select the area to be hatched.  To return to the original screen Menu the user must then select MENUNDO in the upper right corner of the Autocad screen.
+
+INSTALLING AND LOADING:  To install Brickpat.lsp, unzip the Brickpat.zip file in one of your autocad directories, such as the ACAD/SUPPORT directory, or make sure the below listed files are all copied to that directory.  These files may be removed at a later date should you wish to un-install.  To load, type (LOAD "BRICKPAT") at the autocad command line, including the parentheses and the quotation marks.  The Brickpat menu should then load automatically allowing the user to select a brick pattern from the icon menu.
+
+        Brickpat.lsp
+        Brickpat.mnu
+        Brickpat.slb
+        Common.pat
+        Commonf.pat
+        Crosseng.pat
+        Crossf.pat
+        Diagonal.pat
+        Double.pat
+        English.pat
+        Flemish.pat
+        Garden.pat
+        Running.pat
+        Stack.pat
+        Thirdrun.pat
+
+AUTOLOCK:  Brickpat.lsp is limited to 10 demonstration uses afterwhich the lsp routine will cease to function.  The user must pay a registration fee of $10 in exchange for an unlimited use copy of Brickpat.lsp.  To register kindly contact Peter Landeck at the following email address:    
+
+        100314.1364@compuserve.com
+
+TROUBLESHOOTING:  If for some reason the user is unable to restore the original screen menu in place of the Brickpat menu, type MENU at the command prompt, find the file ACAD.MNU or ACAD.MNX (usually in the ACAD\SUPPORT directory) in the menu dialogue box which presents itself, and load it.   Your autocad setup may have been customized for another Menu file by the user, or the system manager.  In that case, load this MNU or MNX file instead of the ACAD.MNU file.
+
+CREDITS:  My thanks to J. Andrew Poth for his very useful slide library utilities ICONHLP.ZIP found in the ACAD forum on Compuserve.  Also thanks to the authors of Maximizing Autocad I and II (New Riders Publishing) for their excellent pattern generating lsp routine.  And thanks to the various helpful people on the Compuserve ACAD forum, in particular Steve Johnson. 
+
+The author of this lsp routine accepts no liability whatsoever for any loss or damage of any kind to the users drawing files.  Kindly make a backup copy of your drawings files before running this program.

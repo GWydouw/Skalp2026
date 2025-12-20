@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+
+<meta http-equiv="X-UA-Compatible" content="IE=10"/>
+<meta http-equiv="MSThemeCompatible" content="Yes">
+<head>
+
+    <script src='js/jquery.js'></script>
+<!--    <script src='js/skalp.js'></script>-->
+    <script type="text/javascript" src="js/jquery-ui.min.js"></script>
+    <link href="css/jquery-ui-1.10.4.custom.min.css" rel="stylesheet"/>
+    <!--<link href="css/skalp_dialoog.css"  rel="stylesheet"/>-->
+
+    <script>
+
+        var layernames = [];
+        var layerids = [];
+        var materialnames = [];
+
+        function clear_names(){
+            layernames = [];
+            materialnames = [];
+            layerids = []
+        }
+
+        function add_layername(layername, id){
+            layernames.push(layername);
+            layerids.push(id);
+        }
+
+        function add_materialname(materialname){
+            materialnames.push(materialname);
+        }
+
+        function loaded() {
+            window.location = 'skp:loaded@';
+        }
+
+        function materialSelector(id){
+            var x = window.screenX.toString();
+            var y = window.screenY.toString();
+            var params = x.concat(";", y, ";", id.toString());
+            window.location = 'skp:materialSelector@' + params;
+        }
+
+        function create_material_listbox_html_code(){
+            var html_code = "";
+
+            for (i=0; i < materialnames.length; i++){
+                html_code += "<option value='" + materialnames[i] + "'>" + materialnames[i] + "</option>";
+            }
+
+            return html_code;
+        }
+
+        function load_material_listbox() {
+            var html_code = "";
+            var materials_select_html = create_material_listbox_html_code();
+
+            for (i=0; i < layernames.length; i++) {
+                html_code += "<tr> <td class='layer'>";
+                html_code += layernames[i] + "</td><td>";
+                html_code += "<input class='materials_list' id='" + layerids[i] + "'>";
+                html_code += "</td></tr>";
+            }
+
+            $("#layers").html(html_code);
+
+            $(".materials_list").off("click");
+            $(".materials_list").on("click", function (event) {
+                materialSelector(this.id)
+            })
+        }
+
+        function setPattern(rowId, newValue) {
+            $('#layers_table').find('tr#' + rowId).find('td:eq(2)').val(newValue);
+        }
+
+        function dialog_position() {
+            var x = window.screenX.toString();
+            var y = window.screenY.toString();
+            var w = window.innerWidth.toString();
+            var h = window.innerHeight.toString();
+            var params = w.concat(";", h, ";", x, ";", y);
+
+            window.location = 'skp:dialog_position@' + params;
+        }
+    </script>
+
+    <style>
+        * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        div {
+            border: none;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin: 0px;
+            background-color: rgb(255, 255, 255);
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            overflow: hidden;
+            table-layout: fixed;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        tr {
+            border-top: 1px solid rgb(230, 230, 230);
+            border-bottom: 1px solid rgb(230, 230, 230);
+            background-color: white;
+            height: 22px;
+        }
+
+        body {
+            margin: 0px;
+            padding: 0px;
+            background-color: rgb(230, 230, 230);
+        }
+
+        select {
+            height: 18px;
+            font-size: 12px;
+            font-family: "Arial";
+            outline-color: #000000;
+            outline-style: none;
+            -webkit-appearance: none;
+            background-color: #FFFFFF;
+            border-radius: 0;
+            background-repeat: no-repeat;
+            border: 0px solid #b9b9b9;
+            padding-left: 3px;
+            padding-top: 2px;
+            padding-bottom: 2px;;
+        }
+
+        select::-ms-expand {
+            display: none;
+        }
+
+        .layer {
+            width: 60%;
+            font-size: 12px;
+            font-family: "Arial";
+            padding-left: 3px;
+            padding-top: 2px;
+            padding-bottom: 2px;
+            overflow: hidden;
+        }
+
+        .material {
+            width: 40%;
+            font-size: 12px;
+            font-family: "Arial";
+            padding-left: 3px;
+        }
+
+        .materials_list {
+            border: none;
+            text-align: center;
+            border-radius: 3px;
+            color: black;
+            background-color: #e8e8e8;
+        }
+
+        .materials_list:hover {
+            border-radius: 3px;
+            color: white;
+            background-color: #337cb3;
+        }
+
+        #layers_container {
+            border: 1px solid rgb(116, 116, 116);
+            background-color: rgb(255, 255, 255);
+            position: fixed;
+            top: 30px;
+            bottom: 8px;
+            height: auto;
+            width: auto;
+            right: 8px;
+            left: 8px;
+            overflow-x: hidden;
+            overflow-y: scroll;
+        }
+
+        #title_container {
+            box-shadow: none;
+            font-size: 12px;
+            font-family: "Arial";
+            position: fixed;
+            top: 0px;
+            width: auto;
+            right: 8px;
+            left: 8px;
+            height: 25px;
+            background-color: rgb(230, 230, 230);
+        }
+
+        #heading {
+            vertical-align: bottom;
+        }
+
+        #title {
+            background-color: rgb(230, 230, 230);
+            border: none;
+        }
+
+        #col1 {
+            box-shadow: none;
+            border: none;
+            width: 60%;
+            background-color: rgb(230, 230, 230);
+            padding-left: 3px;
+        }
+
+        #col2 {
+            box-shadow: none;
+            border: none;
+            width: 40%;
+            background-color: rgb(230, 230, 230);
+            padding-left: 3px;
+        }
+
+        ::-ms-selection {
+            background-color: rgb(255, 255, 255);
+            color: rgb(0, 0, 0);
+        }
+
+        /* Works in Internet Explorer */
+        ::-webkit-selection {
+            background-color: rgb(255, 255, 255);
+            color: rgb(0, 0, 0);
+        }
+
+    </style>
+
+</head>
+
+<body onresize="dialog_position()" onload="loaded()" onfocus="onfocus_hatch()" scroll="no" style="OVERFLOW: hidden">
+<div id="title_container">
+    <table id="title">
+        <tbody>
+        <tr id="heading">
+            <td id="col1">Layer</td>
+            <td id="col2">Pattern</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+<div id="layers_container">
+    <table id="layers_table">
+        <tbody id="layers"></tbody>
+    </table>
+</div>
+
+
+<!-- RUBY BRIDGE -->
+<input id="RUBY_BRIDGE" type="hidden">
+<input id="patterns" type="hidden">
+<input id="layer_list" type="hidden">
+
+</body>
+
+</html>

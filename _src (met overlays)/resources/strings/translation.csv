@@ -1,0 +1,237 @@
+en-US;ja;it;ru;zh-CH;zh-TW;pt-BR;nl;de;ko;fr;es
+// Skalp_material_dialog ////////////////////////////////////////////
+none;;;;;;;;;;;
+Create Skalp material;;;;;;;;;;;
+// Skalp_materials ////////////////////////////////////////////
+remove old scaled materials;;;;;;;;;;;
+remove PBR properties from Skalp materials;;;;;;;;;;;
+remove scaled textures;;;;;;;;;;;
+export material textures;;;;;;;;;;;
+correct renamed Skalp materials;;;;;;;;;;;
+// Skalp_hatch_class ////////////////////////////////////////////
+Texture area is too large! Please reduce its size and try again.;;;;;;;;;;;
+// Skalp_loader ////////////////////////////////////////////
+no active Section Plane;;;;;;;;;;;
+needs to be reactivated.;;;;;;;;;;;
+system change detected;;;;;;;;;;;
+Please copy your License Activation Code:;;;;;;;;;;;
+Paste this code into the Skalp Info Dialog and reactivate.;;;;;;;;;;;
+SketchUp will close now.;;;;;;;;;;;
+Do you want to save your model first?;;;;;;;;;;;
+Error while deactivating License. Please contact;;;;;;;;;;;
+Error;;;;;;;;;;;
+Try to restart SketchUp 2 times to solve this problem.;;;;;;;;;;;
+If this does not solve the problem, please contact;;;;;;;;;;;
+Disclaimer: Running Skalp and;;;;;;;;;;;
+concurrently is unsupported at this time and may yield unexpected results.;;;;;;;;;;;
+Skalp will not be able to show section results whenever a;;;;;;;;;;;
+is already shown in the same location.;;;;;;;;;;;
+Proceed loading Skalp at your own risk?;;;;;;;;;;;
+extension detected.;;;;;;;;;;;
+Sorry, running Skalp and;;;;;;;;;;;
+concurrently will yield unexpected results.;;;;;;;;;;;
+In order to run Skalp as intended, we have to advise you to uncheck;;;;;;;;;;;
+from the SketchUp Preferences Extensions manager.;;;;;;;;;;;
+Would you like us to do this for you now?;;;;;;;;;;;
+is uninstalled.;;;;;;;;;;;
+A SketchUp restart is needed to effectuate this change.;;;;;;;;;;;
+SketchUp will be closed.;;;;;;;;;;;
+You will be asked to save your model if necessary.;;;;;;;;;;;
+In order to run Skalp as intended, we will disable the SolidSection function from ;;;;;;;;;;;
+SolidSection is disabled.;;;;;;;;;;;
+Some files are locked by the OS and can't be renamed.;;;;;;;;;;;
+Please restart your computer.;;;;;;;;;;;
+Some old files are locked by the OS and can't be renamed.;;;;;;;;;;;
+Some old directories are locked by the OS and can't be deleted.;;;;;;;;;;;
+SketchUp 2014 encountered a problem loading the Ruby standard Library when you have opened SketchUp by double clicking a SketchUp file instead of starting SketchUp from it's application icon.;;;;;;;;;;;
+This is fixed in SketchUp 2014's latest maintenance release.;;;;;;;;;;;
+Close and restart SketchUp by double clicking it's application icon instead.;;;;;;;;;;;
+Skalp is restarting...;;;;;;;;;;;
+Skalp restart succeeded.;;;;;;;;;;;
+Your license could not be saved automatically.;;;;;;;;;;;
+Please contact;;;;;;;;;;;
+The License system has been updated.;;;;;;;;;;;
+Skalp needs to be reactivated using your original License Activation Code.;;;;;;;;;;;
+The 'activate' section on the Info Dialog will now show.;;;;;;;;;;;
+Your current License Activation Code is filled in automatically.;;;;;;;;;;;
+Please accept the EULA and click on;;;;;;;;;;;
+ACTIVATE SKALP;;;;;;;;;;;
+This Skalp version is too old.;;;;;;;;;;;
+Please install a newer Skalp version.;;;;;;;;;;;
+// Skalp_memory_attributes ////////////////////////////////////////////
+save scene and model attributes from memory;;;;;;;;;;;
+// Skalp_control_center ////////////////////////////////////////////
+set Layer;;;;;;;;;;;
+// Skalp_info ////////////////////////////////////////////
+You need Internet Explorer 10 or higher to run Skalp.;;;;;;;;;;;
+Visit microsoft.com to update.;;;;;;;;;;;
+Your 14-day free Trial License Activation Code;;;;;;;;;;;
+has been sent to your e-mail address.;;;;;;;;;;;
+You can use this code to activate Skalp.;;;;;;;;;;;
+Extension installation was interrupted.;;;;;;;;;;;
+Error;;;;;;;;;;;
+Extension installation Error:;;;;;;;;;;;
+Error: no local identifier found.;;;;;;;;;;;
+Error: End User License Agreement not accepted.;;;;;;;;;;;
+Something went wrong while generating your License.;;;;;;;;;;;
+Please contact support at:;;;;;;;;;;;
+Sorry, License Seat Limit reached.;;;;;;;;;;;
+If you still have your older Skalp installation available, you can solve this yourself:;;;;;;;;;;;
+Use:;;;;;;;;;;;
+Deactivate on this computer;;;;;;;;;;;
+Extensions;;;;;;;;;;;
+Tools;;;;;;;;;;;
+If you no longer have your older Skalp installation available, you can reset all your activation on our server.;;;;;;;;;;;
+Do you want to reset all your activations?;;;;;;;;;;;
+Error: invalid license detected.;;;;;;;;;;;
+Sorry, your Skalp Trial License has expired on this machine.;;;;;;;;;;;
+If you want to continue using Skalp, please purchase a license at;;;;;;;;;;;
+There was a problem sending your email.;;;;;;;;;;;
+Your Skalp Maintenance and Support has expired! Do you want to renew your Skalp Maintenance to run this Skalp version?;;;;;;;;;;;
+Licensed to;;;;;;;;;;;
+Company;;;;;;;;;;;
+Trial License;;;;;;;;;;;
+days left;;;;;;;;;;;
+Educational License;;;;;;;;;;;
+Contact;;;;;;;;;;;
+Classroom License;;;;;;;;;;;
+Reseller License;;;;;;;;;;;
+Full License;;;;;;;;;;;
+Not Licensed;;;;;;;;;;;
+Please explain your problem or question here:;;;;;;;;;;;
+Let's prepare an email to contact Skalp support.;;;;;;;;;;;
+Shall we add some installation details;;;;;;;;;;;
+that might help us solving your case?;;;;;;;;;;;
+// Skalp_dwg_export_dialog ////////////////////////////////////////////
+DWG/DXF export:;;;;;;;;;;;
+Processing sections;;;;;;;;;;;
+step;;;;;;;;;;;
+Please wait...;;;;;;;;;;;
+Processing forward view;;;;;;;;;;;
+Processing rear view;;;;;;;;;;;
+Export scenes to dwg/dxf files;;;;;;;;;;;
+Finished!;;;;;;;;;;;
+Export scenes to dxf files;;;;;;;;;;;
+Your model must be saved before you can export your Skalp section to dwg/dxf.;;;;;;;;;;;
+// Skalp_section ////////////////////////////////////////////
+update section;;;;;;;;;;;
+active;;;;;;;;;;;
+view;;;;;;;;;;;
+// Skalp_preferences ////////////////////////////////////////////
+Section Offset Distance:;;;;;;;;;;;
+Preference;;;;;;;;;;;
+Set Default Drawing Scale;;;;;;;;;;;
+// Skalp_hiddenlines ////////////////////////////////////////////
+rear view;;;;;;;;;;;
+Your model needs to be saved first.;;;;;;;;;;;
+// Skalp_pages_undoredo ////////////////////////////////////////////
+extension stopped by undo.;;;;;;;;;;;
+save active Section Plane to scene;;;;;;;;;;;
+// Skalp_model ////////////////////////////////////////////
+start extension;;;;;;;;;;;
+load model;;;;;;;;;;;
+Scene;;;;;;;;;;;
+rename scene layer;;;;;;;;;;;
+delete Section Plane;;;;;;;;;;;
+Processing Scene;;;;;;;;;;;
+Processing rear lines;;;;;;;;;;;
+Adding rear lines;;;;;;;;;;;
+Saving Model;;;;;;;;;;;
+All Scenes successfully processed.;;;;;;;;;;;
+Model saved.;;;;;;;;;;;
+turn OFF live updating;;;;;;;;;;;
+// Skalp_lib2 ////////////////////////////////////////////
+create pattern layers;;;;;;;;;;;
+Create default material;;;;;;;;;;;
+// Skalp_dxf ////////////////////////////////////////////
+Permission denied;;;;;;;;;;;
+// Skalp_hatch_dialog ////////////////////////////////////////////
+Pattern Designer;;;;;;;;;;;
+define section material;;;;;;;;;;;
+create hatch;;;;;;;;;;;
+Open Image File;;;;;;;;;;;
+Fill Color:;;;;;;;;;;;
+Line Color:;;;;;;;;;;;
+Line Width:;;;;;;;;;;;
+Section Cut Width:;;;;;;;;;;;
+Align with Objects:;;;;;;;;;;;
+Align red X-axis with the longest Edge in an Objects section result.;;;;;;;;;;;
+Do you want to delete this Skalp material?;;;;;;;;;;;
+// Skalp_layer ////////////////////////////////////////////
+layer;;;;;;;;;;;
+// Skalp ////////////////////////////////////////////
+You need Internet Explorer 10 or higher to run Skalp.;;;;;;;;;;;
+Visit microsoft.com to update.;;;;;;;;;;;
+Create Stunning Live Section Cuts.;;;;;;;;;;;
+Import and tweak standard CAD Pattern files.;;;;;;;;;;;
+Use Skalp Styles to tweak Section Cut representations.;;;;;;;;;;;
+Keep plans and elevations up to date in Layout.;;;;;;;;;;;
+Export 2D Section Cuts to DXF.;;;;;;;;;;;
+More info:;;;;;;;;;;;
+You need Sketchup;;;;;;;;;;;
+or higher to run Skalp.;;;;;;;;;;;
+Visit sketchup.com to upgrade.;;;;;;;;;;;
+Sketchup Extension Error;;;;;;;;;;;
+Skalp cannot run because your Windows User Profile path contains special or foreign language characters such as ç, é, à,...;;;;;;;;;;;
+Sketchup's Ruby cannot load files from such a path.;;;;;;;;;;;
+Currently you can work around this issue as follows:;;;;;;;;;;;
+1. Create a new user on your computer without any special characters in it's name.;;;;;;;;;;;
+2. Login as this new user and install / run SketchUp.;;;;;;;;;;;
+3. Optional: After creating this new User Profile, you may change your user name back to your real name including any special characters (ç, é, à,...).;;;;;;;;;;;
+When renaming a user, Windows will NOT change the actual User Profile path itself, so everything keeps working.;;;;;;;;;;;
+We do understand this is not an elegant solution, as you end up with either 2 user accounts, switching back and forth, or having to move a lot of stuff to the new User Profile manually.;;;;;;;;;;;
+For windows 7, Microsoft also explains how to change your existing User Profile here:;;;;;;;;;;;
+// Skalp_dialog ////////////////////////////////////////////
+Skalp;;;;;;;;;;;
+save style settings;;;;;;;;;;;
+Turn OFF Skalp Section Fill;;;;;;;;;;;
+Turn ON Skalp Section Fill;;;;;;;;;;;
+define tag;;;;;;;;;;;
+None;;;;;;;;;;;
+Update Section;;;;;;;;;;;
+Section successfully updated.;;;;;;;;;;;
+Easy Fog only works when there is an active Section Plane.;;;;;;;;;;;
+Activate Sectionplane Toggle;;;;;;;;;;;
+Manual Update;;;;;;;;;;;
+Place new Section Plane;;;;;;;;;;;
+Delete active Section Plane;;;;;;;;;;;
+Drawing Scale;;;;;;;;;;;
+Save settings to Scene;;;;;;;;;;;
+Show more;;;;;;;;;;;
+Menu;;;;;;;;;;;
+Export;;;;;;;;;;;
+Export active view to DXF;;;;;;;;;;;
+Export all scenes to DXF;;;;;;;;;;;
+Preferences;;;;;;;;;;;
+Set Section Offset Distance;;;;;;;;;;;
+Select Sectionplane;;;;;;;;;;;
+Rename Section Plane;;;;;;;;;;;
+Pattern Fill Rules:;;;;;;;;;;;
+Add new rule line;;;;;;;;;;;
+Edit Skalp Style;;;;;;;;;;;
+save style to scene;;;;;;;;;;;
+Multiple selected;;;;;;;;;;;
+no pattern selected;;;;;;;;;;;
+Save Skalp Style as...;;;;;;;;;;;
+Style01;;;;;;;;;;;
+// Skalp_section_dialog ////////////////////////////////////////////
+// Skalp_dashed_lines ////////////////////////////////////////////
+// Skalp_fog ////////////////////////////////////////////
+Skalp will Align your view with the Section Plane.;;;;;;;;;;;
+// Skalp_observers ////////////////////////////////////////////
+save attributes to model;;;;;;;;;;;
+// Skalp_style_rules ////////////////////////////////////////////
+// Skalp_update ////////////////////////////////////////////
+Zero seats available on your license. Please contact Skalp support.;;;;;;;;;;;
+Skalp is already deactivated on this computer.;;;;;;;;;;;
+You can't deactivate a Skalp trial License.;;;;;;;;;;;
+Are you sure you want to deactivate your Skalp License on this computer?;;;;;;;;;;;
+You can (re)activate Skalp on another computer using your License Activation Code:;;;;;;;;;;;
+Error deactivating License, please contact;;;;;;;;;;;
+Are you sure you want to uninstall Skalp?;;;;;;;;;;;
+Sorry, automatic uninstall failed.;;;;;;;;;;;
+Please uninstall Skalp manually.;;;;;;;;;;;
+// Skalp_export_import_materials ////////////////////////////////////////////
+// Skalp_license ////////////////////////////////////////////
+login network license;;;;;;;;;;;
+please contact;;;;;;;;;;;

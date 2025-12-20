@@ -1,0 +1,230 @@
+***BUTTONS
+;
+$P1=*
+^c^c
+^B
+^O
+^G
+^D
+^E
+^T
+
+***ICON
+**hat1
+[Select Hatch Pattern]
+[ Select]S;
+[ User]U;
+[ Edit]E;
+[ List]L;
+[acad(ansi31)]ansi31
+[acad(ansi32)]ansi32
+[acad(ansi34)]ansi34
+[acad(ansi35)]ansi35
+[acad(ansi33)]ansi33
+[acad(ansi36)]ansi36
+[acad(ansi37)]ansi37
+[acad(ansi38)]ansi38
+[acad(ar-b816)]ar-b816
+[acad(ar-b816c)]ar-b816c
+[ Next]$i=hat2 $i=*
+[ Exit]^c^c
+
+**hat2
+[Select Hatch Pattern]
+[acad(ar-b88)]ar-b88
+[acad(ar-brelm)]ar-brelm
+[acad(ar-brstd)]ar-brstd
+[acad(ar-conc)]ar-conc
+[acad(ar-hbone)]ar-hbone
+[acad(ar-parq1)]ar-parq1
+[acad(ar-rroof)]ar-rroof
+[acad(ar-rshke)]ar-rshke
+[acad(ar-sand)]ar-sand
+[acad(box)]box
+[acad(brass)]brass
+[acad(brick)]brick
+[acad(brstone)]brstone
+[acad(clay)]clay
+[ Next]$i=hat3 $i=*
+[ Exit]^c^c
+
+**hat3
+[Select Hatch Pattern]
+[acad(cork)]cork
+[acad(cross)]cross
+[acad(dash)]dash
+[acad(dolmit)]dolmit
+[acad(dots)]dots
+[acad(earth)]earth
+[acad(escher)]escher
+[acad(flex)]flex
+[acad(grass)]grass
+[acad(grate)]grate
+[acad(hex)]hex
+[acad(honey)]honey
+[acad(hound)]hound
+[acad(insul)]insul
+[ Next]$i=hat4 $i=*
+[ Exit]^c^c
+
+**hat4
+[Select Hatch Pattern]
+[acad(line)]line
+[acad(mudst)]mudst
+[acad(net)]net
+[acad(net3)]net3
+[acad(plast)]plast
+[acad(plasti)]plasti
+[acad(sacncr)]sacncr
+[acad(square)]square
+[acad(stars)]stars
+[acad(steel)]steel
+[acad(swamp)]swamp
+[acad(trans)]trans
+[acad(triang)]triang
+[acad(zigzag)]zigzag
+[ Next]$i=hat4a $i=*
+[ Exit]^c^c
+
+**hat4a
+[Select Hatch Pattern]
+[acad(angle)]angle
+[ Beginning]$i=hat1 $i=*
+[ Exit]^c^c
+
+**hat5
+[Select Hatch Pattern]
+[ Select]S;
+[ User]U;
+[ Edit]E;
+[ List]L;
+[acad(ansi31)]ansi31
+[acad(ansi32)]ansi32
+[acad(ansi34)]ansi34
+[acad(ansi35)]ansi35
+[acad(ansi33)]ansi33
+[acad(ansi36)]ansi36
+[acad(ansi37)]ansi37
+[acad(ansi38)]ansi38
+[acad(box)]box
+[acad(brass)]brass
+[ Next]$i=hat6 $i=*
+[ Exit]^c^c
+
+**hat6
+[Select Hatch Pattern]
+[acad(brick)]brick
+[acad(clay)]clay
+[acad(cork)]cork
+[acad(cross)]cross
+[acad(dash)]dash
+[acad(dolmit)]dolmit
+[acad(dots)]dots
+[acad(earth)]earth
+[acad(escher)]escher
+[acad(flex)]flex
+[acad(grass)]grass
+[acad(grate)]grate
+[acad(hex)]hex
+[acad(honey)]honey
+[ Next]$i=hat7 $i=*
+[ Exit]^c^c
+
+**hat7
+[Select Hatch Pattern]
+[acad(hound)]hound
+[acad(insul)]insul
+[acad(line)]line
+[acad(mudst)]mudst
+[acad(net)]net
+[acad(net3)]net3
+[acad(plast)]plast
+[acad(plasti)]plasti
+[acad(sacncr)]sacncr
+[acad(square)]square
+[acad(stars)]stars
+[acad(steel)]steel
+[acad(swamp)]swamp
+[acad(trans)]trans
+[ Next]$i=hat8 $i=*
+[ Exit]^c^c
+
+**hat8
+[Select Hatch Pattern]
+[acad(triang)]triang
+[acad(zigzag)]zigzag
+[acad(angle)]angle
+[ Beginning]$i=hat5 $i=*
+[ Exit]^c^c
+
+**hat9
+[Select Hatch Pattern]
+[ Select]S;
+[ User]U;
+[ Edit]E;
+[ List]L;
+[acad(ansi31)]ansi31
+[acad(ansi32)]ansi32
+[acad(ansi34)]ansi34
+[acad(ansi35)]ansi35
+[acad(ansi33)]ansi33
+[acad(ansi36)]ansi36
+[acad(ansi37)]ansi37
+[acad(ansi38)]ansi38
+[acad(ar-b816)]ar-b816
+[acad(ar-b816c)]ar-b816c
+[acad(ar-b88)]ar-b88
+[acad(ar-brelm)]ar-brelm
+[acad(ar-brstd)]ar-brstd
+[acad(ar-conc)]ar-conc
+[acad(ar-hbone)]ar-hbone
+[acad(ar-parq1)]ar-parq1
+[acad(ar-rroof)]ar-rroof
+[acad(ar-rshke)]ar-rshke
+[acad(ar-sand)]ar-sand
+[acad(box)]box
+[acad(brass)]brass
+[acad(brick)]brick
+[acad(brstone)]brstone
+[acad(clay)]clay
+[acad(cork)]cork
+[acad(cross)]cross
+[acad(dash)]dash
+[acad(dolmit)]dolmit
+[acad(dots)]dots
+[acad(earth)]earth
+[acad(escher)]escher
+[acad(flex)]flex
+[acad(grass)]grass
+[acad(grate)]grate
+[acad(hex)]hex
+[acad(honey)]honey
+[acad(hound)]hound
+[acad(insul)]insul
+[acad(line)]line
+[acad(mudst)]mudst
+[acad(net)]net
+[acad(net3)]net3
+[acad(plast)]plast
+[acad(plasti)]plasti
+[acad(sacncr)]sacncr
+[acad(square)]square
+[acad(stars)]stars
+[acad(steel)]steel
+[acad(swamp)]swamp
+[acad(trans)]trans
+[acad(triang)]triang
+[acad(zigzag)]zigzag
+[acad(angle)]angle
+
+***SCREEN
+[--------]
+[HAT 3.0]
+[(c)1992]
+[Michael]
+[E]
+[Ross]
+[--------]
+
+
+

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title> jQuery Simple Slider Control - AdvanceByDesign </title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+
+<link rel="stylesheet" type="text/css" href="styles.css">
+<link rel="stylesheet" type="text/css" href="../jscslider.css">
+
+</head>
+<body>
+
+<table border="0" cellpadding="0" cellspacing="0" width="800px">
+<tr><td>
+
+<!-- Page content begins -->
+<p>[ <a href="../index.htm">Back to the index</a> ]</p>
+
+<h1>jQuery Simple Slider Control</h1>
+<h2>Examples</h2>
+
+<p>Example showing basic control with a 1 - 100 option, which automatically changes the text in a span:</p>
+
+<input type="number" min="1" max="100" value="1" style="width:250px;" class="slider" id="id_example_1">
+Current value: <span id="id_value_1">1</span>
+
+<div class="codeDiv">
+<h3>HTML Code</h3>
+<hr>
+&lt;input type="number" min="1" max="100" value="1" style="width:250px;" class="slider" id="id_example_1"&gt;<br>
+Current value: &lt;span id="id_value_1"&gt;1&lt;/span&gt;
+<h3>Javascript code</h3>
+<hr>
+$('#id_example_1').change(function() {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$('#id_value_1').text($(this).val());<br>
+});
+</div>
+
+<p>Example used for changing the point size of some text:</p>
+<input type="number" min="6" max="48" value="12" class="slider" id="id_example_2">
+<br><span id="id_value_2">Some example text!</span>
+
+<div class="codeDiv">
+<h3>HTML Code</h3>
+<hr>
+&lt;input type="number" min="6" max="48" value="12" class="slider" id="id_example_2"&gt;
+&lt;br&gt;&lt;span id="id_value_2"&gt;Some example text!&lt;/span&gt;
+<h3>Javascript code</h3>
+<hr>
+$('#id_example_2').change(function() {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$('#id_value_2').css("font-size", $(this).val()+"pt");<br>
+});
+</div>
+
+<!-- Page content ends -->
+
+</td></tr>
+</table>
+
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+<script type="text/javascript" src="../jscslider.js"></script>
+<script type="text/javascript">
+$(function() {
+	$('#id_example_1').change(function() {
+		$('#id_value_1').text($(this).val());
+	});
+	
+	$('#id_example_2').change(function() {
+		$('#id_value_2').css("font-size", $(this).val()+"pt");
+	});
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+FAQ
+Q. On which SketchUp versions can I use Skalp?
+
+A. Skalp runs on SketchUp 2014 Make (Windows|Mac OSX), Sketchup 2014 Pro (Windows|Mac OSX)
+
+Q. Is my license permanent?
+
+A. Yes, for all version 1.x versions of Skalp.
+
+Q. Why is this version of Skalp marked 'beta'? What does this mean?
+
+- This beta release expires august 31, 2014. A new version will be made available before the this version expires.
+
+A. This indicates that this version is an early release. Some posted product features may be missing, unstable or may not be fully implemented yet. You will need to accept any further disclaimers shipped with the product before use. Product is provided to you only as a digital download, no box or cd will be shipped. Pre-odering this beta entitles you to all 1.x updates. You are buying a permanent license. However, for technical reasons, all beta products are provided with time limited license files only. You may be asked to update the product and/or replace your license file. Upon final release a permanent license file will be available. Please contact us at support@skalp4sketchup.com before purchasing if you need further information regarding these conditions.A special user agreement applies indicating 
+
+
+
+A. Do not attempt to copy the plugin from your old SketchUp version to SketchUp 2014.  Using SketchUp 2014, download Artisan from the Extension Warehouse by going to ‘Window->Extension Warehouse’ and searching for ‘Artisan’.  You will need to sign-in using your Google Account before you can download or install Artisan.  
+
+If you’d rather install manually, you can always download and install Artisan by doing this.
+
+Q. Why should I use the Extension Warehouse to download Artisan?
+
+A. The Extension Warehouse will always have the latest version of Artisan available.  You will also get notifications inside SketchUp when updates are released.  The Extension Warehouse also will also make it easy to transfer your plugins to the latest SketchUp version each time you upgrade.
+
+Q.  I purchased Artisan but I have not received my registration key.  What do I do?
+
+A. First, check your spam or junk email folders.  Make sure that you are checking the correct email account.  Check the email account that was used to make the purchase through Paypal.  If you are unable to find it, click here to have it resent.
+
+Q. Can I purchase multiple licenses for educational purposes at a discount?
+
+A. Yes, but you must order at least 10 licenses.  Bulk educational licenses can be as low as $5 US each.  Contact us to place an order.
+
+Q. Do you offer discount pricing for students?
+
+A.  Yes, but you must first send a scanned student ID card.  Contact us for further details and pricing.
+
+Q. Can I install Artisan on more than one computer?
+
+A.  Yes, if you are an individual, you can install Artisan and register it on all the computers that you yourself own.  If you are a company or organization, you must purchase additional licenses for each computer that Artisan is installed and registered on.  Further details can be found in the end-user license agreement.
+
+Q. Do you accept other forms of payment other than Paypal?
+
+A. Not at this time.  However, our resellers may take other forms of payment.   See the resellers page for more information.
+
+Q. Does Artisan work with my SketchUp version?
+
+A. Artisan is compatible with SketchUp versions 7, 8, and will be compatible with all future versions of SketchUp.  It works with both the free (Make) and Pro versions of SketchUp.
+
+Q. Do I need to purchase Artisan again for SketchUp 2013?
+
+A. No.  Your current license will never expire and is good for all future versions of SketchUp.
+
+Q. I have SketchUp 2013.  How do I use Artisan with that version?
+
+A. Download and install Artisan from the Extension Warehouse.  Inside SketchUp 2013, go to the Extension Warehouse and search for Artisan, download, and the install.  By installing through the Extension Warehouse, you will be automatically notified when Artisan updates are available.
+
+Q. Can I export geometry created with Artisan to another application?
+
+A. Artisan produces normal SketchUp geometry so you can use the geometry or export it just the same as any other SketchUp entity.
+
+
+
+
+
+
+Ok, let us see what is going on and how we can work this out.
+The first part of your message worries us. A dialog that opens 48 times should not happen. We need to track this down and we will fix it. In order to do so we need to reproduce this on one of our systems.
+First let me check upon the system requirements. Which version of internet explorer is installed on your system? This should be at least IE version 10. The Skalp dialogs are web dialogs using internet explorer on windows and problems might happen on earlier versions.
+Also would you be able to carefully describe step be step how we can reproduce the issue?
+Directly after the problem happens, please click on Plugins > Skalp > Info for support.  Select all text shown there and try to add this info to your mail please. (If it is too long, maybe wrap it in a document or so.)
+
+The second part of your message, we think we know what needs to be done. 
+1: Start by selecting the objects you want to cut and make solid group or components out of them. If you select such a group or component, only then the dialog will change to assignment mode. You can now assign materials.
+2: If you want to assign a Skalp hatched pattern then will need to add that to the model first. To do so start by selecting a material from the drop down list in the Pattern dialog and click on the '+' sign. Now you can assign this material to group or components as per 1. above. The new pattern should show op in the upper section of the material list in the assignment dialog.
+
+Some remarks: I see in your screenshots that you tried to create a skalp style. For basic usage this is not necessary. In this case it seems you have set it to is to override all objects in the model to use ANSI32. It is a valid setting, but maybe not want you wanted?
+Could you check, after clicking the '+' sign in the pattern dialog wether the material is effectivly available in the standard sketchup materials dialog?
+
+Also, you have deactivated automatic updating? (the red slider button) Is there a reason for this? Is this related to you problem with the dialog popping up 48 times? If not, you could best keep it in the green 'auto update' position as that is the intended default.
+ 
+One last thing: We do intend to provide more *.pat files. We are looking into what needs to be done with the copyright on some of them. This is the reason why in this early beta build we have a limited set.
+Please note that we are working, as we speak on improving the manual. You'll be able to access that through Plugins > Skalp > help - getting started.
+
+There will be several updates to this beta version in the near future, the first one likely before the end of this week.
+
+Thank you for helping us improving Skalp 1.0 beta,
+
+
+*DASH, DASHED LINES
+0, 0,0, .125,.125, .125,-.125
+62,-.339411255
+
+Error: #<TypeError: nil can't be coerced into Float>
+eval:932:in `*'
+eval:932:in `get_xoffset'
+eval:942:in `continuous_line_style_length'
+eval:753:in `update_tiling_size'
+eval:604:in `block in dimensions'
+eval:603:in `each'
+eval:603:in `dimensions'
+eval:94:in `add_hatchdefinition'
+eval:964:in `create_preview'
+eval:832:in `block in initialize'
+-e:1:in `call'
+
+

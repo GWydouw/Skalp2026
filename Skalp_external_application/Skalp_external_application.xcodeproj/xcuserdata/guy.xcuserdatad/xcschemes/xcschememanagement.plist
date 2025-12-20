@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SchemeUserState</key>
+	<dict>
+		<key>Skalp_external_application copy.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+			<key>orderHint</key>
+			<integer>1</integer>
+		</dict>
+		<key>Skalp_external_application.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>0</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>85E809C91B581BA9007D858D</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>E46F50BF1C69DD7B00AB0709</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>E46F50D11C69EFC100AB0709</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>E46F50E41C6A18AB00AB0709</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>E46F50F51C70A8CF00AB0709</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+	</dict>
+</dict>
+</plist>

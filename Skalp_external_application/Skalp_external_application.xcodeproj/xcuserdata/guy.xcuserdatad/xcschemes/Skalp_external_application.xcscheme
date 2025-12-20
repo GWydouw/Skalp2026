@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1010"
+   version = "1.3">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "NO">
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "85E809C91B581BA9007D858D"
+               BuildableName = "Skalp_external_application"
+               BlueprintName = "Skalp_external_application"
+               ReferencedContainer = "container:Skalp_external_application.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES">
+      <Testables>
+      </Testables>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "85E809C91B581BA9007D858D"
+            BuildableName = "Skalp_external_application"
+            BlueprintName = "Skalp_external_application"
+            ReferencedContainer = "container:Skalp_external_application.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
+      <AdditionalOptions>
+      </AdditionalOptions>
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Release"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "85E809C91B581BA9007D858D"
+            BuildableName = "Skalp_external_application"
+            BlueprintName = "Skalp_external_application"
+            ReferencedContainer = "container:Skalp_external_application.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+      <CommandLineArguments>
+         <CommandLineArgument
+            argument = "&quot;get_exploded_entities&quot; &quot;/Users/guy/Library/Application Support/SketchUp 2016/SketchUp/Plugins/Skalp_Skalp/lib/temp.skp&quot; &quot;117.93149764942915&quot; &quot;-1&quot; &quot;Infinity&quot; &quot;false&quot; &quot;112.92419933317927,139.02835924468795,44.036030906197766&quot; &quot;1.0&quot;&#10;/Users/guy/Library/Application\ Support/SketchUp\ 2016/SketchUp/Plugins/Skalp_Skalp/lib/Skalp &quot;get_exploded_entities&quot; &quot;/Users/guy/Library/Application Support/SketchUp 2016/SketchUp/Plugins/Skalp_Skalp/lib/temp_reversed.skp&quot; &quot;117.93149764942915&quot; &quot;&quot; &quot;&quot; &quot;&quot; &quot;&quot; &quot;-1.0&quot;"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = ""
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "&quot;setup_reversed_scene&quot; &quot;/Users/guy/Library/Application Support/SketchUp 2017/SketchUp/Plugins/Skalp_Skalp/lib/temp.skp&quot; &quot;/Users/guy/Library/Application Support/SketchUp 2017/SketchUp/Plugins/Skalp_Skalp/lib/temp_reversed.skp&quot; &quot;-1|0&quot; &quot;44.4050990749219,112.13194592171634,-447.05741486428735|44.4050990749219,112.13194592171634,-453.3150814860594&quot; &quot;44.4050990749219,112.13194592171634,43.53418784535528|44.4050990749219,112.13194592171634,43.53418784535528&quot; &quot;1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,43.612928002835595,1.0|1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,43.612928002835595,1.0&quot; &quot;skalp_live_sectiongroup|1f293b68-85ac-470f-9707-b0d4714a4c3c&quot; &quot;0.0,1.0,0.0|0.0,1.0,0.0&quot; &quot;305.16475611688895&quot;"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "&quot;create_layer_materials&quot; &quot;/Users/guy/Library/Application Support/SketchUp 2017/SketchUp/Plugins/Skalp_Skalp/Resources/temp/&quot; &quot;Skalp Pattern Layer - Skalp default|Skalp Pattern Layer - Skalp linecolor|Skalp Pattern Layer - Honey&quot;"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "&quot;color_fase&quot; &quot;/Users/guy/Documents/test_fases/A1-040-010.skp&quot; &quot;A1-040-010&quot; &quot;255&quot; &quot;0&quot; &quot;0&quot;"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "&quot;create_white_model&quot; &quot;/Users/guy/Dropbox/DWM uitvoeringsdossier/06 3D model/DWM uitvoering 3d_test.skp&quot;"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "&quot;setup_reversed_scene&quot; &quot;/Users/guy/Library/Application Support/SketchUp 2016/SketchUp/Plugins/Skalp_Skalp/temp.skp&quot; &quot;-1&quot; &quot;493.40281199262984,253.67902645608373,-3363.069650652279&quot; &quot;493.40281199262984,253.67902645608373,27.61167499171995&quot; &quot;1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,27.690415149200266,1.0&quot; &quot;skalp_live_sectiongroup&quot; &quot;0.0,1.0,0.0&quot; &quot;988.0601487691515&quot;"
+            isEnabled = "NO">
+         </CommandLineArgument>
+      </CommandLineArguments>
+      <AdditionalOptions>
+      </AdditionalOptions>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "85E809C91B581BA9007D858D"
+            BuildableName = "Skalp_external_application"
+            BlueprintName = "Skalp_external_application"
+            ReferencedContainer = "container:Skalp_external_application.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>A1496D29-21DA-4538-8F6C-A47D5A17C5F8</string>
+	<key>IDESourceControlProjectName</key>
+	<string>project</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>F5003CC719F0A87849CC7D7E8C81FD6EEE6026DF</key>
+		<string>bitbucket.org:Skalp/skalp-for-sketchup.git</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>Skalp external application/Skalp_external_application/project.xcworkspace</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>F5003CC719F0A87849CC7D7E8C81FD6EEE6026DF</key>
+		<string>../../..</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>bitbucket.org:Skalp/skalp-for-sketchup.git</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>111</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>F5003CC719F0A87849CC7D7E8C81FD6EEE6026DF</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>F5003CC719F0A87849CC7D7E8C81FD6EEE6026DF</string>
+			<key>IDESourceControlWCCName</key>
+			<string>Skalp</string>
+		</dict>
+	</array>
+</dict>
+</plist>

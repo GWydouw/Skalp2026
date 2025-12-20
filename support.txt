@@ -1,0 +1,51 @@
+**** PLUGIN CONFLICT & GET INFO ****
+
+We discovered some issues in combination with other plugins. Can you please try the following:
+
+1. Close Sketchup
+2. Go to the Sketchup plugin folder. It's located at the following place at your system:
+
+WINDOWS
+C:/Users/ YOUR USERNAME /AppData/Roaming/SketchUp/SketchUp2014/SketchUp/Plugins/
+
+MAC
+Open a new Finder window, press and hold the Option key on your keyboard, the click Go in the menu bar > Library > Application Support > SketchUp 2013 > SketchUp > Plugins
+
+3. Create a new folder in the plugin folder (call it temp or whatever you like)
+4. Move everything to this new folder except:
+
+- all directories and files that start with _su
+- the Skalp directory and the Skalp.rb file
+
+5. Re-start SketchUp
+6. Try to start Skalp by pushing one of the icons.
+
+If this fixes the problem. You need to replace every plugin you placed in the temp directory one by one and try to start SketchUp and try to startup Skalp and let us know which plugin causes the trouble so we can look to fix it.
+
+Can you also send us the info provided by the function 'Info for support'. This function can be found in the menu Plugins > Skalp > Info for support. Select the contents of this message box and copy paste it in a mail and send this mail to support@skalp4sketchup.com
+
+
+**************************************
+
+How do I get my local network adapter's 'MAC address' on Windows? (Windows 7)
+
+- click on the windows Start Orb in the left bottom side of the screen
+- tyoe ncpa.cpl in the search field and hit Enter.
+- Right click on LAN-connection and select 'Status'
+- Look for a line called 'Physical Address' and copy the value right to it. e.g.: 8D-44-A5-23-3C-EC
+**************************************
+
+I had the same problem on my Sony VAIO running Windows XP Professional SP3.
+My problem is that the "PATH" environment variable did NOT include "C:\WINDOWS\system32"
+Any executable in that folder could only be run from a cmd prompt if the command included the entire path.
+Solution for me: add "C:\WINDOWS\system32;" to the start of my PATH environment variable, like this:
+Log in with Administrator priviledges.
+Right-click "My Computer" & select "Properties."
+Click "Advanced" tab.
+Click "Environment Variables" button.
+In the "System variables" box, scroll down to "PATH" and highlight it.
+Click the "Edit" button.
+In the "Variable value:" box, add to the very beginning of the text "C:\WINDOWS\system32;" without my quotation marks.
+Make sure you include the semicolon.
+Click OK three times.
+No reboot required. If this was your problem, then ipconfig should work right away.

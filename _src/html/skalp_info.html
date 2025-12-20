@@ -1,0 +1,282 @@
+ <!DOCTYPE html>
+<!--[if lt IE 7 ]> <html class="ie6"> <![endif]-->
+<!--[if IE 7 ]>    <html class="ie7"> <![endif]-->
+<!--[if IE 8 ]>    <html class="ie8"> <![endif]-->
+<!--[if IE 9 ]>    <html class="ie9"> <![endif]-->
+<!--[if (gt IE 9)|!(IE)]><!--> <html class=""> <!--<![endif]-->
+
+<head >
+    <meta http-equiv="X-UA-Compatible" content="IE=10">
+    <meta http-equiv="MSThemeCompatible" content="Yes">
+
+    <script src='js/jquery.js'> </script>
+    <script type="text/javascript" src="js/jquery-ui.min.js"></script>
+    <script src='js/skalp.js'> </script>
+
+    <link href="css/skalp_info.css" rel="stylesheet"/>
+    <link href="css/jquery-ui-1.10.4.custom.min.css" rel="stylesheet"/>
+
+    <style>
+        body {
+            background-image: url("images/background.png");
+            background-repeat: no-repeat;
+            background-position: left top;
+        }
+
+        .menu:hover {
+            background-color: steelblue;
+            color: white;
+        }
+
+        .seperator{
+            font-weight: normal;
+        }
+
+        #skalp_info{
+            position: absolute;
+            top: 0px;
+            left: 0px;
+            width: 370px;
+            height: 570px;
+        }
+
+        #general_info{
+            position: absolute;
+            top: 70px;
+            left: 12px;
+        }
+
+        #menu{
+            position: absolute;
+            top: 143px;
+            right: 10px;
+            padding: 3px;
+        }
+
+        #pages{
+            position: absolute;
+            background-color: white;
+            top: 167px;
+            left: 6px;
+            width: 358px;
+            height: 307px;
+        }
+
+        #links{
+            position: absolute;
+            top: 473px;
+            left: 10px;
+            height: 100px;
+            width: 150px;
+        }
+
+        #manual{
+            position: absolute;
+            top: 10px;
+        }
+        #video_tutorial{
+            position: absolute;
+            top: 30px;
+        }
+        #support{
+            position: absolute;
+            top: 50px;
+        }
+        #website{
+            position: absolute;
+            top: 70px;
+        }
+
+        #social_media{
+            position: absolute;
+            top: 529px;
+            left: 260px;
+            height: 25px;
+            width: 214px;
+        }
+        #facebook{
+            position: absolute;
+            left: 0px;
+        }
+
+        #twitter{
+            position: absolute;
+            left: 35px;
+        }
+
+        #youtube{
+            position: absolute;
+            left: 70px;
+        }
+
+        a[href], input[type='submit'], input[type='image'], label[for], select, button, .pointer {
+            cursor: pointer;
+        }
+
+    </style>
+
+    <script>
+
+        function check_IE_version(){
+            if ($('html').is('.ie6, .ie7, .ie8, .ie9') ) {
+                return false
+            } else {
+                return true
+            };
+        };
+
+        function ready_info(){
+            if (check_IE_version()) {
+                window.location = 'skp:dialog_ready@';
+            } else {
+                window.location = 'skp:dialog_wrong_IE@';
+            }
+        }
+
+        $(function(){
+
+            $("#support").click(function(){
+                window.location = 'skp:support@';
+            } );
+
+            $("#buy").click(function(){
+                $("#update").css("background-color","transparent");
+                $("#update").css("color","steelblue");
+
+                $("#buy").css("background-color","steelblue");
+                $("#buy").css("color","white");
+
+                $("#release_notes_menu").css("background-color","transparent");
+                $("#release_notes_menu").css("color","steelblue");
+
+                $("#activate").css("background-color","transparent");
+                $("#activate").css("color","steelblue");
+
+                $("#trial").css("background-color","transparent");
+                $("#trial").css("color","steelblue");
+                window.location = 'skp:buy@';
+            });
+
+             $("#release_notes_menu").click(function(){
+                $("#update").css("background-color","transparent");
+                $("#update").css("color","steelblue");
+
+                $("#buy").css("background-color","transparent");
+                $("#buy").css("color","steelblue");
+
+                $("#release_notes_menu").css("background-color","steelblue");
+                $("#release_notes_menu").css("color","white");
+
+                $("#activate").css("background-color","transparent");
+                $("#activate").css("color","steelblue");
+
+                $("#trial").css("background-color","transparent");
+                $("#trial").css("color","steelblue");
+
+                window.location = 'skp:release_notes_menu@';
+            });
+
+            $("#trial").click(function(){
+
+                $("#release_notes_menu").css("background-color","transparent");
+                $("#release_notes_menu").css("color","steelblue");
+
+                $("#update").css("background-color","transparent");
+                $("#update").css("color","steelblue");
+
+                $("#buy").css("background-color","transparent");
+                $("#buy").css("color","steelblue");
+
+                $("#activate").css("background-color","transparent");
+                $("#activate").css("color","steelblue");
+
+                $("#trial").css("background-color","steelblue");
+                $("#trial").css("color","white");
+
+                window.location = 'skp:trial@';
+            } );
+
+            $("#activate").click(function(){
+                $("#release_notes_menu").css("background-color","transparent");
+                $("#release_notes_menu").css("color","steelblue");
+
+                $("#update").css("background-color","transparent");
+                $("#update").css("color","steelblue");
+
+                $("#buy").css("background-color","transparent");
+                $("#buy").css("color","steelblue");
+
+                $("#activate").css("background-color","steelblue") ;
+                $("#activate").css("color","white") ;
+
+                $("#trial").css("background-color","transparent");
+                $("#trial").css("color","steelblue") ;
+
+                window.location = 'skp:activate@';
+            } );
+
+            $("#update").click(function(){
+                $("#release_notes_menu").css("background-color","transparent");
+                $("#release_notes_menu").css("color","steelblue") ;
+
+                $("#update").css("background-color","steelblue");
+                $("#update").css("color","white")  ;
+
+                $("#buy").css("background-color","transparent") ;
+                $("#buy").css("color","steelblue")   ;
+
+                $("#activate").css("background-color","transparent");
+                $("#activate").css("color","steelblue")  ;
+
+                $("#trial").css("background-color","transparent") ;
+                $("#trial").css("color","steelblue");
+
+                window.location = 'skp:update@';
+            } );
+        });
+    </script>
+
+</head>
+
+<body onload="ready_info()" scroll="no" style="OVERFLOW: hidden">
+
+<div id="skalp_info">
+    <div id="general_info">
+        <p id="license_info">
+        </p>
+    </div>
+
+    <div id="menu">
+        <span class="menu update" id="update" >&nbsp update &nbsp</span>
+        <span class="seperator update" >|</span>
+        <span class="menu release_notes_menu" id="release_notes_menu" >&nbsp release notes &nbsp</span>
+        <span class="seperator release_notes_menu" >|</span>
+        <span class="menu activate" id="activate">&nbsp activate &nbsp</span>
+        <span class="seperator activate">|</span>
+        <span class="menu trial" id="trial">&nbsp trial &nbsp</span>
+        <span class="seperator trial">|</span>
+        <span class="menu buy" id="buy">&nbsp buy &nbsp</span>
+    </div>
+
+    <div id="pages">
+        <p>You need an internet connection!</p>
+
+    </div>
+
+    <div id="links">
+        <a href="http://download.skalp4sketchup.com/downloads/docs/manual.php" target="_blank"> <img id="manual" alt="" src="images/manual.png" >  </a>
+        <a href="http://www.youtube.com/playlist?list=PL4o5Ke8mDBjjka1kZPJ5-tMhf_d51CVbr" target="_blank"><img id="video_tutorial" src="images/video_tutorials.png" alt="" >  </a>
+        <a href="http://www.skalp4sketchup.com" target="_blank"><img id="website" src="images/website.png" alt="" >  </a>
+        <img class="pointer" id="support" src="images/support.png" alt="" >
+    </div>
+
+    <div id="social_media">
+        <a href="https://www.facebook.com/skalp4sketchup" target="_blank"> <img id="facebook" alt="" src="images/facebook.png" >  </a>
+        <a href="https://twitter.com/skalp4sketchup" target="_blank"><img id="twitter" src="images/twitter.png" alt="" >  </a>
+        <a href="https://www.youtube.com/skalp4sketchup" target="_blank"> <img id="youtube" src="images/youtube.png" alt="" >   </a>
+    </div>
+</div>
+    <!-- RUBY BRIDGE -->
+    <input id="RUBY_BRIDGE" type="hidden">
+</body>
+</html>
