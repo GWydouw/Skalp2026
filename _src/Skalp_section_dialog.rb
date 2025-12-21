@@ -946,7 +946,29 @@ module Skalp
         end
       end
 
+      script("multitag_visible = #{multitag_visible?}")
       script("model_lists()")
+    end
+
+    def multitag_visible?
+      return true if defined?(AW::Tags)
+
+      # Check model default style
+      model_settings = Skalp::StyleSettings.style_settings(Sketchup.active_model)
+      if model_settings[:style_rules] && model_settings[:style_rules].respond_to?(:any?)
+        return true if model_settings[:style_rules].any? { |r| r[:type] == :ByMultiTag }
+      end
+
+      # Check scenes
+      Sketchup.active_model.pages.each do |page|
+         page_settings = Skalp.active_model.get_memory_attribute(page, 'Skalp', 'style_settings')
+         next unless page_settings.is_a?(Hash) && page_settings[:style_rules]
+         if page_settings[:style_rules].respond_to?(:any?)
+            return true if page_settings[:style_rules].any? { |r| r[:type] == :ByMultiTag }
+         end
+      end
+
+      false
     end
 
     def reset_style
@@ -956,7 +978,8 @@ module Skalp
         object = Sketchup.active_model
       end
 
-      settings = style_settings(object)[:style_rules] || StyleRules.new
+
+      settings = Skalp::StyleSettings.style_settings(object)[:style_rules] || StyleRules.new
       settings.create_default_model_rule
       update_dialog
 
