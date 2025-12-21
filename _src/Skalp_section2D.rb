@@ -63,6 +63,11 @@ module Skalp
       rules = Skalp.dialog.style_settings(object)[:style_rules]
       return 'Skalp default' unless rules
 
+      # Cache frequently accessed properties
+      node_value = @node.value
+      su_material = node_value.su_material_used_by_hatch
+      tags_array = nil # Lazy init only when needed
+      
       rules.merge.reverse_each do |rule|
         case rule[:type]
         when :Scene
@@ -73,35 +78,34 @@ module Skalp
           end
 
         when :ByLayer
-          layer = @skpModel.layers[@node.value.layer]
+          layer = @skpModel.layers[node_value.layer]
           if layer
             material = layer.get_attribute('Skalp', 'material')
             return material if material && !material.empty?
           end
 
         when :ByMultiTag
-          material = @node.value.multi_tags_hatch
+          material = node_value.multi_tags_hatch
           return material if material.is_a?(String) && !material.empty?
 
         when :ByTexture
-          su_material = @node.value.su_material_used_by_hatch
           return su_material&.name || 'su_default' if su_material&.valid?
 
         when :Layer
-          material = rule[:type_setting][@node.value.layer_used_by_hatch]
+          material = rule[:type_setting][node_value.layer_used_by_hatch]
           return material if material
 
         when :Tag
-          if @node.value.tag
-            tags = @node.value.tag.split(',').map { |tag| Skalp.utf8(tag.strip) }
-            return rule[:pattern] if tags.include?(rule[:type_setting].strip)
+          if node_value.tag
+            # Lazy initialize and cache tag splitting
+            tags_array ||= node_value.tag.split(',').map { |tag| Skalp.utf8(tag.strip) }
+            return rule[:pattern] if tags_array.include?(rule[:type_setting].strip)
           end
 
         when :Pattern
           return rule[:pattern] if rule[:type_setting] == @section_material
 
         when :Texture
-          su_material = @node.value.su_material_used_by_hatch
           if su_material && su_material.valid?
             material = rule[:type_setting][su_material.name]
             return material if material
