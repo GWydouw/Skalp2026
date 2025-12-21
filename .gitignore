@@ -56,3 +56,25 @@ ipch/
 # Encrypted Ruby and build artifacts
 *.data
 XCBuildData/
+
+# Build scripts generated artifacts
+dev_license_files/
+dev_trial_license_files/
+skalp lic files/
+**/skalp.strings
+**/translation.csv
+*.rbs
+_src/Skalp_dialog.rb
+_src\ \(met\ overlays\)/Skalp_dialog.rb
+SUEX_Skalp/SkalpC/build/
+Skalp_external_application/Build/
+Skalp_external_application/Release/
+Skalp_external_application/Debug/
+Skalp_external_application/Release_x64/
+Skalp_external_application/Debug_x64/
+Skalp_external_application/x64/
+Skalp_external_application/.vs/
+**/Skalp_Skalp_installer/Skalp_Skalp_installer/Skalp.rbz
+Buildversion/
+encoder_to/
+encoder_from/
