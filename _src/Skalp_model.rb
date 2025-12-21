@@ -307,7 +307,11 @@ module Skalp
         Skalp.sectionplane_active = true
         if Skalp.status != 0
           sectionplane = sectionplane_by_id(get_memory_attribute(@skpModel, 'Skalp', 'active_sectionplane_ID'))
-          sectionplane ? sectionplane.activate : Skalp.sectionplane_active = false
+          if sectionplane
+            # sectionplane.activate # Prevent recursive calculation
+          else
+            Skalp.sectionplane_active = false
+          end
 
           return sectionplane.section if Skalp.sectionplane_active
         end
@@ -1248,42 +1252,59 @@ module Skalp
         Skalp.active_model.observer_active = true
         Skalp.exportLObutton_off
       else
-        UI.start_timer(0.01, false) { Sketchup.set_status_text "#{Skalp.translate('Processing Scene')} (#{Skalp.translate('step')} 1/4) #{Skalp.translate('Please wait...')}" }
+        # Mac: Chain timers to ensure sequential execution
         UI.start_timer(0.01, false) do
-          start('Skalp - Processing rear lines', true)
+          Sketchup.set_status_text "#{Skalp.translate('Processing Scene')} (#{Skalp.translate('step')} 1/4) #{Skalp.translate('Please wait...')}"
+          start('Skalp - Processing Scene', true)
           skalp_pages.each { |skpPage| sectionplane_by_id(get_memory_attribute(skpPage, 'Skalp', 'sectionplaneID')).calculate_section(false, skpPage) }
           manage_sections(skalp_pages, no_skalp_pages)
           commit
-        end
 
-        if rear_view
-          UI.start_timer(0.01, false) { Sketchup.set_status_text "#{Skalp.translate('Processing rear lines')} (#{Skalp.translate('step')} 2/4) #{Skalp.translate('Please wait...')}" }
-          UI.start_timer(0.01, false) do
-            start('Skalp - adding rear lines', true)
-            @hiddenlines.update_rear_lines(:all, true)
-            commit
+          if rear_view
+            UI.start_timer(0.01, false) do
+              Sketchup.set_status_text "#{Skalp.translate('Processing rear lines')} (#{Skalp.translate('step')} 2/4) #{Skalp.translate('Please wait...')}"
+              start('Skalp - Processing rear lines', true)
+              @hiddenlines.update_rear_lines(:all, true)
+              commit
+
+              UI.start_timer(0.01, false) do
+                Sketchup.set_status_text "#{Skalp.translate('Adding rear lines')} (#{Skalp.translate('step')} 3/4) #{Skalp.translate('Please wait...')}"
+                start('Skalp - adding rear lines', true)
+                @hiddenlines.add_rear_lines_to_model(:all)
+                manage_sections(skalp_pages, no_skalp_pages)
+                commit
+
+                if save
+                  UI.start_timer(0.01, false) do
+                    Sketchup.set_status_text "#{Skalp.translate('Saving Model')} (#{Skalp.translate('step')} 4/4) #{Skalp.translate('Please wait...')}"
+                    Sketchup.send_action 'saveDocument:'
+                    Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')} #{Skalp.translate('Model saved.')}"
+                    Skalp.active_model.observer_active = true
+                    Skalp.exportLObutton_off
+                  end
+                else
+                  Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')}"
+                  Skalp.active_model.observer_active = true
+                  Skalp.exportLObutton_off
+                end
+              end
+            end
+          else
+            if save
+              UI.start_timer(0.01, false) do
+                Sketchup.set_status_text "#{Skalp.translate('Saving Model')} (#{Skalp.translate('step')} 4/4) #{Skalp.translate('Please wait...')}"
+                Sketchup.send_action 'saveDocument:'
+                Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')} #{Skalp.translate('Model saved.')}"
+                Skalp.active_model.observer_active = true
+                Skalp.exportLObutton_off
+              end
+            else
+              Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')}"
+              Skalp.active_model.observer_active = true
+              Skalp.exportLObutton_off
+            end
           end
         end
-
-        if rear_view
-          UI.start_timer(0.01, false) { Sketchup.set_status_text "#{Skalp.translate('Adding rear lines')} (#{Skalp.translate('step')} 3/4) #{Skalp.translate('Please wait...')}" }
-          UI.start_timer(0.01, false) {
-            start('Skalp - adding rear lines', true)
-            @hiddenlines.add_rear_lines_to_model(:all)
-            manage_sections(skalp_pages, no_skalp_pages)
-            commit
-          }
-        end
-
-        if save
-          UI.start_timer(0.01, false) { Sketchup.set_status_text "#{Skalp.translate('Saving Model')} (#{Skalp.translate('step')} 4/4) #{Skalp.translate('Please wait...')}" }
-          UI.start_timer(0.01, false) { Sketchup.send_action 'saveDocument:' }
-          UI.start_timer(0.01, false) { Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')} #{Skalp.translate('Model saved.')}" }
-        else
-          UI.start_timer(0.01, false) { Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')}" }
-        end
-
-        UI.start_timer(0.01, false) {Skalp.active_model.observer_active = true; Skalp.exportLObutton_off }
       end
     end
 

@@ -138,7 +138,8 @@ module Skalp
 
     def settings_to_page(page)
       return unless Skalp.active_model
-      page_settings = Skalp.active_model.set_memory_attribute(page, 'Skalp', 'style_settings', Hash.new)
+      Skalp.active_model.set_memory_attribute(page, 'Skalp', 'style_settings', Hash.new)
+      page_settings = Skalp.active_model.get_memory_attribute(page, 'Skalp', 'style_settings')
       model_settings = style_settings
       STYLE_SETTINGS.each { |setting| page_settings[setting] = model_settings[setting] }
     end

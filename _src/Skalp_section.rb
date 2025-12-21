@@ -289,6 +289,9 @@ module Skalp
       (@skpModel.pages && type == @skpModel) ? active_page = @skpModel.pages.selected_page : active_page = type
       if id == @model.hiddenlines.calculated[active_page]
         place_lines_or_definition_in_model(active_page)
+      elsif id == @model.hiddenlines.calculated[@skpModel]
+        # Fallback: check if calculated for model (live section)
+        place_lines_or_definition_in_model(@skpModel)
       else
         found = false
         @model.hiddenlines.calculated.each do |k, v|
@@ -305,12 +308,37 @@ module Skalp
 
     def place_lines_or_definition_in_model(page, force = false)
       @model.section_result_group.locked = false
+      
+      # Try to find an existing valid definition with entities
+      definition = nil
       if @model.hiddenlines.rear_view_definitions[page] && @model.hiddenlines.rear_view_definitions[page].valid? && !force
-        definition = @model.hiddenlines.rear_view_definitions[page]
-        @sectiongroup.entities.add_instance(definition, Geom::Transformation.new)
-      elsif @model.hiddenlines.rear_lines_result[page]
-        @model.hiddenlines.add_lines_to_page(page, true)
+        def_check = @model.hiddenlines.rear_view_definitions[page]
+        definition = def_check if def_check.entities.size > 0
       end
+      
+      # Fallback: search for any valid definition with entities
+      unless definition
+        @model.hiddenlines.rear_view_definitions.each_value do |def_candidate|
+          if def_candidate && def_candidate.valid? && def_candidate.entities.size > 0
+            definition = def_candidate
+            break
+          end
+        end
+      end
+      
+      if definition
+        # Check if instance already exists to prevent duplicates (and slow double-work)
+        existing = @sectiongroup.entities.grep(Sketchup::ComponentInstance).find { |i| i.definition == definition }
+        unless existing
+           @sectiongroup.entities.add_instance(definition, Geom::Transformation.new)
+        end
+      elsif @model.hiddenlines.rear_lines_result[page]
+        puts "[Skalp DEBUG] Falling back to add_lines_to_page (slow path)"
+        @model.hiddenlines.add_lines_to_page(page, true)
+      else
+        puts "[Skalp DEBUG] No definition found, no rear_lines_result for page"
+      end
+      
       @model.section_result_group.locked = true
     end
 
