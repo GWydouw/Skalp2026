@@ -438,5 +438,9 @@ module Skalp
       script("$('#fog_label').css('color', 'red')")
       set_icon('align_view', 'icons/align_view_red.png')
     end
+    
+    # Make these methods available both as module methods and as public instance methods
+    module_function :style_settings, :save_style_rules
+    public :style_settings, :save_style_rules
   end
 end

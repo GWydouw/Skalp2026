@@ -1,4 +1,5 @@
 module Skalp
+  extend self
 =begin
  Use Custom Skalp materials
 
@@ -47,6 +48,9 @@ Sketchup.active_model.set_attribute('Skalp_sectionmaterials', 'test', {line_colo
       if e.class == Sketchup::Group || e.class == Sketchup::ComponentInstance
         materialname =  e.get_attribute('Skalp', 'material')
         used_materials << mats[materialname] if materialname && mats[materialname]
+        
+        sectionmaterial = e.get_attribute('Skalp', 'sectionmaterial')
+        used_materials << mats[sectionmaterial] if sectionmaterial && mats[sectionmaterial]
       end
     end
 
@@ -55,14 +59,47 @@ Sketchup.active_model.set_attribute('Skalp_sectionmaterials', 'test', {line_colo
         if e.class == Sketchup::Group || e.class == Sketchup::ComponentInstance
           materialname =  e.get_attribute('Skalp', 'material')
           used_materials << mats[materialname] if materialname && mats[materialname]
+
+          sectionmaterial = e.get_attribute('Skalp', 'sectionmaterial')
+          used_materials << mats[sectionmaterial] if sectionmaterial && mats[sectionmaterial]
         end
       end
+    end
+
+    # Check Style Rules (Model + Scenes)
+    check_rules = lambda do |rules|
+      return unless rules && rules.is_a?(Array)
+      rules.each do |rule|
+        if rule[:pattern] && mats[rule[:pattern]]
+          used_materials << mats[rule[:pattern]]
+        end
+        if rule[:type_setting].is_a?(Hash)
+          rule[:type_setting].each_value do |mat_name|
+            used_materials << mats[mat_name] if mat_name && mats[mat_name]
+          end
+        end
+      end
+    end
+
+    # 1. Model default style
+    model_settings = Skalp::StyleSettings.style_settings(Sketchup.active_model)
+    if model_settings[:style_rules]
+      check_rules.call(model_settings[:style_rules].rules)
+    end
+
+    # 2. Page specific styles
+    Sketchup.active_model.pages.each do |page|
+      page_settings = Skalp.active_model.get_memory_attribute(page, 'Skalp', 'style_settings')
+      next unless page_settings.is_a?(Hash) && page_settings[:style_rules]
+      
+      check_rules.call(page_settings[:style_rules].rules)
     end
 
     return used_materials
   end
 
   def create_skalp_material_instance
+    cleanup_duplicate_skalp_materials_definitions
     componentdefinition = find_skalp_materials_definition || Sketchup.active_model.definitions.add('skalp_materials')
 
     if componentdefinition.count_instances == 0
@@ -119,6 +156,326 @@ Sketchup.active_model.set_attribute('Skalp_sectionmaterials', 'test', {line_colo
     UI.messagebox("The following materials are missing in your model: #{missing_materials.join(', ')}") if missing_materials != []
   end
 
+  def force_purge_skalp_materials
+    componentdefinition = find_skalp_materials_definition
+    return unless componentdefinition
+
+    @used_materials = Set.new # Force refresh of used materials
+    Skalp.active_model.start("Skalp - #{Skalp.translate('purge stored materials')}", true)
+    update_skalp_materials_definition(componentdefinition)
+    Skalp.active_model.commit
+    Sketchup.active_model.materials.purge_unused
+    
+    UI.messagebox("Force Purge Completed.\n\nAll unused Skalp materials have been removed from the hidden storage and purged from the model.")
+  end
+
+  def cleanup_duplicate_materials(auto = false)
+    begin
+      materials = Sketchup.active_model.materials
+      # Group materials by Skalp ID
+      skalp_groups = {}
+      
+      materials.each do |mat|
+        id = mat.get_attribute('Skalp', 'ID')
+        next unless id
+        skalp_groups[id] ||= []
+        skalp_groups[id] << mat
+      end
+
+    duplicates = {} # { dup_mat => base_mat }
+
+    # 1. Group by ID
+    skalp_groups.each do |id, mats|
+      next if mats.size < 2
+      sorted = mats.sort_by { |m| [m.name.length, m.name] }
+      base_mat = sorted.shift
+      sorted.each { |dup| duplicates[dup] = base_mat }
+    end
+
+    # 2. Setup regex for name stripping (Plan B)
+    # Catches: Name1, Name2, Name#1, Name#2
+    suffix_regex = /(#?\d+)\z/
+
+    # 3. Check for name-based duplicates among those NOT yet handled
+    materials.each do |mat|
+      next if duplicates.key?(mat) # Already marked as duplicate via ID
+      next if duplicates.value?(mat) # This is a base material for something else, keep it safe? 
+      # actually, a base material could theoretically be a duplicate of another even-baser material, 
+      # but let's keep it simple: if it has an ID, we prioritize ID grouping.
+
+      original_name = mat.name.gsub(suffix_regex, '')
+      next if original_name == mat.name # No suffix found
+
+      base_mat = materials[original_name]
+      next unless base_mat
+
+      # Visual check to ensure safety
+      next unless materials_identical?(mat, base_mat)
+      
+      duplicates[mat] = base_mat
+    end
+
+    return if duplicates.empty?
+
+    # Usage tracking
+    used_duplicates = Set.new
+    
+    # Check definitions
+    Sketchup.active_model.definitions.each do |d|
+      d.entities.grep(Sketchup::Drawingelement).each do |e|
+        used_duplicates << e.material if e.respond_to?(:material) && duplicates.key?(e.material)
+        used_duplicates << e.back_material if e.respond_to?(:back_material) && duplicates.key?(e.back_material)
+        
+        # Check Skalp attributes
+        mat_name = e.get_attribute('Skalp', 'material')
+        used_duplicates << materials[mat_name] if mat_name && materials[mat_name] && duplicates.key?(materials[mat_name])
+
+        sec_name = e.get_attribute('Skalp', 'sectionmaterial')
+        used_duplicates << materials[sec_name] if sec_name && materials[sec_name] && duplicates.key?(materials[sec_name])
+      end
+    end
+
+    # Check model entities
+    Sketchup.active_model.entities.grep(Sketchup::Drawingelement).each do |e|
+      used_duplicates << e.material if e.respond_to?(:material) && duplicates.key?(e.material)
+      used_duplicates << e.back_material if e.respond_to?(:back_material) && duplicates.key?(e.back_material)
+
+      # Check Skalp attributes
+      mat_name = e.get_attribute('Skalp', 'material')
+      used_duplicates << materials[mat_name] if mat_name && materials[mat_name] && duplicates.key?(materials[mat_name])
+
+      sec_name = e.get_attribute('Skalp', 'sectionmaterial')
+      used_duplicates << materials[sec_name] if sec_name && materials[sec_name] && duplicates.key?(materials[sec_name])
+    end
+
+    # Check layers
+    Sketchup.active_model.layers.each do |layer|
+      mat_name = layer.get_attribute('Skalp', 'material')
+      if mat_name && materials[mat_name] && duplicates.key?(materials[mat_name])
+        used_duplicates << materials[mat_name]
+      end
+    end
+
+    # Check Style Rules (Model + Scenes)
+    check_style_rules_for_duplicates(duplicates, used_duplicates, materials)
+
+    unused_duplicates = duplicates.keys.reject { |m| used_duplicates.include?(m) }
+    
+    merge_assigned = false
+    if !used_duplicates.empty?
+      if auto
+        merge_assigned = true
+      else
+        msg = "Found #{used_duplicates.size} duplicate Skalp materials that are currently assigned to objects. \n\n"
+        msg += "Do you want to reassign these to their original materials and delete the duplicates? \n\n"
+        msg += "(Click 'No' to only delete unused duplicates)"
+        result = UI.messagebox(msg, MB_YESNO)
+        merge_assigned = (result == IDYES)
+      end
+    end
+
+    # Only start a new operation if we are not already in one
+    in_operation = Skalp.active_model && Skalp.active_model.operation > 0
+    Skalp.active_model.start("Skalp - #{Skalp.translate('cleanup duplicate materials')}", true) unless in_operation
+    
+    removed_unused = 0
+    merged_assigned = 0
+
+    # 1. Handle Unused
+    unused_duplicates.each do |mat|
+      materials.remove(mat)
+      removed_unused += 1
+    end
+
+    # 2. Handle Used/Assigned if approved
+    if merge_assigned
+      to_merge = duplicates.select { |k, v| used_duplicates.include?(k) }
+      
+      # Reassign in definitions
+      Sketchup.active_model.definitions.each do |d|
+        d.entities.grep(Sketchup::Drawingelement).each do |e|
+          # Standard materials
+          e.material = to_merge[e.material] if e.respond_to?(:material) && to_merge.key?(e.material)
+          e.back_material = to_merge[e.back_material] if e.respond_to?(:back_material) && to_merge.key?(e.back_material)
+        
+          # Skalp attributes
+          start_mat_name = e.get_attribute('Skalp', 'material')
+          if start_mat_name && materials[start_mat_name] && to_merge.key?(materials[start_mat_name])
+             e.set_attribute('Skalp', 'material', to_merge[materials[start_mat_name]].name)
+          end
+
+          sec_mat_name = e.get_attribute('Skalp', 'sectionmaterial')
+          if sec_mat_name && materials[sec_mat_name] && to_merge.key?(materials[sec_mat_name])
+             e.set_attribute('Skalp', 'sectionmaterial', to_merge[materials[sec_mat_name]].name)
+          end
+        end
+      end
+      
+      # Reassign in model
+      Sketchup.active_model.entities.grep(Sketchup::Drawingelement).each do |e|
+        # Standard materials
+        e.material = to_merge[e.material] if e.respond_to?(:material) && to_merge.key?(e.material)
+        e.back_material = to_merge[e.back_material] if e.respond_to?(:back_material) && to_merge.key?(e.back_material)
+
+        # Skalp attributes
+        start_mat_name = e.get_attribute('Skalp', 'material')
+        if start_mat_name && materials[start_mat_name] && to_merge.key?(materials[start_mat_name])
+           e.set_attribute('Skalp', 'material', to_merge[materials[start_mat_name]].name)
+        end
+
+        sec_mat_name = e.get_attribute('Skalp', 'sectionmaterial')
+        if sec_mat_name && materials[sec_mat_name] && to_merge.key?(materials[sec_mat_name])
+           e.set_attribute('Skalp', 'sectionmaterial', to_merge[materials[sec_mat_name]].name)
+        end
+      end
+
+      # Reassign in layers
+      Sketchup.active_model.layers.each do |layer|
+        mat_name = layer.get_attribute('Skalp', 'material')
+        if mat_name && materials[mat_name] && to_merge.key?(materials[mat_name])
+          layer.set_attribute('Skalp', 'material', to_merge[materials[mat_name]].name)
+        end
+      end
+
+      # Update Style Rules
+      to_merge.each do |dup_mat, base_mat|
+        replace_material_in_style_rules(dup_mat.name, base_mat.name)
+      end
+
+      # Delete them
+      to_merge.each_key do |mat|
+        materials.remove(mat) rescue nil
+        merged_assigned += 1
+      end
+    end
+
+    Skalp.active_model.commit unless in_operation
+
+    if !auto
+      summary = "Skalp Cleanup Summary:\n\n"
+      summary += "- Unused duplicates removed: #{removed_unused}\n"
+      summary += "- Assigned duplicates merged: #{merged_assigned}\n" if merge_assigned
+      summary += "- Assigned duplicates kept: #{used_duplicates.size}\n" if !merge_assigned && !used_duplicates.empty?
+      UI.messagebox(summary)
+    end
+    rescue => e
+      UI.messagebox("Skalp Cleanup Error: #{e.message}\n\n#{e.backtrace.first(5).join("\n")}")
+      if defined?(DEBUG) && DEBUG
+        puts "Skalp Cleanup Error: #{e.message}"
+        puts e.backtrace
+      end
+    end
+  end
+
+  def check_style_rules_for_duplicates(duplicates, used_duplicates, materials)
+    begin
+      # Helper to check a single ruleset
+      check_rules = lambda do |rules|
+        return unless rules && rules.is_a?(Array)
+        rules.each do |rule|
+          # Check 'pattern' (the material name)
+          if rule[:pattern] && materials[rule[:pattern]] && duplicates.key?(materials[rule[:pattern]])
+            used_duplicates << materials[rule[:pattern]]
+          end
+          # Check 'type_setting' for layer/texture mapping hash
+          if rule[:type_setting].is_a?(Hash)
+            rule[:type_setting].each_value do |mat_name|
+              if mat_name && materials[mat_name] && duplicates.key?(materials[mat_name])
+                used_duplicates << materials[mat_name]
+              end
+            end
+          end
+        end
+      end
+
+      # 1. Model default style
+      if defined?(Skalp::StyleSettings) && Skalp::StyleSettings.respond_to?(:style_settings)
+        model_settings = Skalp::StyleSettings.style_settings(Sketchup.active_model)
+        if model_settings[:style_rules]
+          check_rules.call(model_settings[:style_rules].rules)
+        end
+      end
+
+      # 2. Page specific styles
+      if Skalp.active_model && Skalp.active_model.respond_to?(:get_memory_attribute)
+        Sketchup.active_model.pages.each do |page|
+          page_settings = Skalp.active_model.get_memory_attribute(page, 'Skalp', 'style_settings')
+          next unless page_settings.is_a?(Hash) && page_settings[:style_rules]
+          
+          check_rules.call(page_settings[:style_rules].rules)
+        end
+      end
+    rescue => e
+      if defined?(DEBUG) && DEBUG
+        puts "Skalp Warning: Error checking style rules for duplicates: #{e}"
+        puts e.backtrace.first(5).join("\n")
+      end
+    end
+  end
+
+  def replace_material_in_style_rules(old_name, new_name)
+    # Helper to replace in a single ruleset
+    replace_in_rules = lambda do |rules|
+      return false unless rules && rules.is_a?(Array)
+      changed = false
+      rules.each do |rule|
+        # Replace 'pattern' (the material name)
+        if rule[:pattern] == old_name
+          rule[:pattern] = new_name
+          changed = true
+        end
+        # Replace in 'type_setting' for layer/texture mapping hash
+        if rule[:type_setting].is_a?(Hash)
+          rule[:type_setting].each do |key, val|
+            if val == old_name
+              rule[:type_setting][key] = new_name
+              changed = true
+            end
+          end
+        end
+      end
+      changed
+    end
+
+    # 1. Model default style
+    model_settings = Skalp::StyleSettings.style_settings(Sketchup.active_model)
+    if model_settings[:style_rules]
+      if replace_in_rules.call(model_settings[:style_rules].rules)
+        Skalp::StyleSettings.save_style_rules(model_settings[:style_rules], Sketchup.active_model)
+      end
+    end
+
+    # 2. Page specific styles
+    Sketchup.active_model.pages.each do |page|
+      page_settings = Skalp.active_model.get_memory_attribute(page, 'Skalp', 'style_settings')
+      next unless page_settings.is_a?(Hash) && page_settings[:style_rules]
+      
+      if replace_in_rules.call(page_settings[:style_rules].rules)
+        # We need to save it back because we modify the hash in place but might need to trigger save mechanisme if any
+        Skalp.active_model.set_memory_attribute(page, 'Skalp', 'style_settings', page_settings)
+      end
+    end
+  end
+
+  def materials_identical?(mat1, mat2)
+    return false unless mat1.color.to_i == mat2.color.to_i
+    return false unless mat1.alpha == mat2.alpha
+    
+    t1 = mat1.texture
+    t2 = mat2.texture
+    
+    return true if t1.nil? && t2.nil?
+    return false if t1.nil? || t2.nil?
+    
+    # Both have texture
+    return false unless t1.filename == t2.filename
+    # Check dimensions (tolerance needed?)
+    return false unless t1.width == t2.width
+    return false unless t1.height == t2.height
+    
+    true
+  end
+
   def add_skalp_material_to_instance(materialnames)
     materialnames.each do |materialname|
       next if materialname == ''
@@ -133,7 +490,7 @@ Sketchup.active_model.set_attribute('Skalp_sectionmaterials', 'test', {line_colo
   def get_materials_in_defintion(definition)
     materials = {}
     definition.entities.each do |group|
-      materials[group.entities.first.material] = group if group.entities.first&.material
+      materials[group.material] = group if group.material
     end
     return materials
   end
@@ -145,6 +502,35 @@ Sketchup.active_model.set_attribute('Skalp_sectionmaterials', 'test', {line_colo
       end
     end
     return nil
+  end
+
+  def cleanup_duplicate_skalp_materials_definitions
+    model = Sketchup.active_model
+    skalp_defs = model.definitions.select { |d| d.name =~ /\Askalp_materials(#\d+)?\z/ }
+    return if skalp_defs.size <= 1
+
+    # Pick the base one or rename the first one to be the master
+    base_def = skalp_defs.find { |d| d.name == 'skalp_materials' }
+    unless base_def
+      base_def = skalp_defs.first
+      base_def.name = 'skalp_materials'
+    end
+
+    other_defs = skalp_defs - [base_def]
+    
+    # We don't use Skalp.active_model.start here because this might be called 
+    # during very early initialization before the Skalp model is fully ready.
+    model.start_operation("Skalp - cleanup duplicate definitions", true)
+    other_defs.each do |d|
+      # Erase instances of the duplicate definition
+      d.instances.each do |inst|
+        inst.locked = false if inst.respond_to?(:locked=)
+        inst.erase!
+      end
+      # Remove the definition from the model
+      model.definitions.remove(d) rescue nil
+    end
+    model.commit
   end
 
   def create_su_material(material_name)
@@ -168,21 +554,6 @@ Sketchup.active_model.set_attribute('Skalp_sectionmaterials', 'test', {line_colo
     su_material
   end
 
-  def delete_old_scaled_skalp_materials
-    to_delete = []
-    materials = Sketchup.active_model.materials
-    materials.each do |material|
-      if material.get_attribute('Skalp', 'ID')
-        to_delete << material if material.name != material.name.gsub(/%\d+\Z/, '')
-      end
-    end
-
-    return if to_delete == []
-
-    Skalp.active_model.start("Skalp - #{Skalp.translate('remove old scaled materials')}", true)
-    to_delete.each { |material| materials.remove(material) }
-    Skalp.active_model.commit
-  end
 
   def remove_PBR_properties
     materials = Sketchup.active_model.materials
@@ -244,7 +615,7 @@ Sketchup.active_model.set_attribute('Skalp_sectionmaterials', 'test', {line_colo
 
           json_data << info
         rescue => e
-          puts "Error parsing line in #{cache_file}: #{e}"
+          puts "Error parsing line in #{cache_file}: #{e}" if defined?(DEBUG) && DEBUG
         end
       end
 
@@ -501,6 +872,101 @@ Sketchup.active_model.set_attribute('Skalp_sectionmaterials', 'test', {line_colo
 
     Skalp.active_model.commit
     updated if thumbnails
+  end
+
+  def merge_material_dialog_action(source_material_name)
+    source_material = Sketchup.active_model.materials[source_material_name]
+    unless source_material
+      UI.messagebox(Skalp.translate("Source material not found."))
+      return
+    end
+
+    # Collect other Skalp materials
+    materials = Sketchup.active_model.materials
+    target_names = []
+    materials.each do |mat|
+      next if mat == source_material
+      if mat.get_attribute('Skalp', 'ID')
+        target_names << mat.name
+      end
+    end
+    
+    target_names.sort!
+
+    if target_names.empty?
+      UI.messagebox(Skalp.translate("No other Skalp materials found to merge into."))
+      return
+    end
+
+    prompts = [Skalp.translate("Merge") + " '#{source_material_name}' " + Skalp.translate("into") + ":"]
+    defaults = [target_names.first]
+    list = [target_names.join('|')]
+    
+    input = UI.inputbox(prompts, defaults, list, Skalp.translate("Merge Material"))
+    return unless input
+
+    target_material_name = input[0]
+    target_material = materials[target_material_name]
+    return unless target_material
+
+    Skalp.active_model.start("Skalp - #{Skalp.translate('merge material')}", true)
+    
+    begin
+      # Reassign in definitions
+      Sketchup.active_model.definitions.each do |d|
+        d.entities.grep(Sketchup::Drawingelement).each do |e|
+          # Standard materials
+          e.material = target_material if e.respond_to?(:material) && e.material == source_material
+          e.back_material = target_material if e.respond_to?(:back_material) && e.back_material == source_material
+        
+          # Skalp attributes
+          if e.get_attribute('Skalp', 'material') == source_material_name
+             e.set_attribute('Skalp', 'material', target_material_name)
+          end
+
+          if e.get_attribute('Skalp', 'sectionmaterial') == source_material_name
+             e.set_attribute('Skalp', 'sectionmaterial', target_material_name)
+          end
+        end
+      end
+      
+      # Reassign in model
+      Sketchup.active_model.entities.grep(Sketchup::Drawingelement).each do |e|
+        e.material = target_material if e.respond_to?(:material) && e.material == source_material
+        e.back_material = target_material if e.respond_to?(:back_material) && e.back_material == source_material
+
+        if e.get_attribute('Skalp', 'material') == source_material_name
+           e.set_attribute('Skalp', 'material', target_material_name)
+        end
+
+        if e.get_attribute('Skalp', 'sectionmaterial') == source_material_name
+           e.set_attribute('Skalp', 'sectionmaterial', target_material_name)
+        end
+      end
+
+      # Reassign in layers
+      Sketchup.active_model.layers.each do |layer|
+        if layer.get_attribute('Skalp', 'material') == source_material_name
+          layer.set_attribute('Skalp', 'material', target_material_name)
+        end
+      end
+
+      # Update Style Rules
+      replace_material_in_style_rules(source_material_name, target_material_name)
+
+      # Delete source
+      Sketchup.active_model.materials.remove(source_material)
+      
+      Skalp.active_model.commit
+      
+      # Refresh dialog
+      Skalp::Material_dialog.create_thumbnails('Skalp materials in model')
+      
+    rescue => e
+      Skalp.active_model.abort_operation
+      UI.messagebox("Error merging materials: #{e.message}")
+      puts e.backtrace if defined?(DEBUG) && DEBUG
+    end
   end
 end
 
