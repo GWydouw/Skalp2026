@@ -1,2 +1,0 @@
-Target dependency graph (1 target)
-Target 'Ruby_2_5_x86_64' in project 'SkalpC' (no dependencies)

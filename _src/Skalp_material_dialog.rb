@@ -136,7 +136,6 @@ module Skalp
       }
 
       @materialdialog.add_action_callback("select") { |action_context, materialname|
-        puts materialname
         if materialname == 'none'
           materialname = ''
         elsif !Sketchup.active_model.materials[materialname]

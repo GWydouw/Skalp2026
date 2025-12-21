@@ -52,3 +52,7 @@ SketchUp frameworks/lib_mac/Skalp
 .vs/
 ipch/
 *.ipch
+
+# Encrypted Ruby and build artifacts
+*.data
+XCBuildData/
