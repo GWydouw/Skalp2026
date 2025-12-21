@@ -103,6 +103,8 @@ module Skalp
             Skalp::export_material_textures(true)
           when 'save_all'
             Skalp::save_all_skalp_materials_to_new_library
+          when 'merge'
+            Skalp::merge_material_dialog_action(@selected_material)
           end
         else
           UI.messagebox('These functions only work on Skalp materials inside the model.')

@@ -51,8 +51,8 @@ require 'socket'
     COMPUTERNAME = Socket.gethostname
     USERNAME = Etc.getlogin
     RUBY_PLATFORM.include?('darwin') ? OS = :MAC : OS = :WINDOWS
-    @version_required = 25
-    @version_max = 25
+    @version_required = 26
+    @version_max = 26
 
     #SKALPCONSOLE#
     #SKALPDEBUG#

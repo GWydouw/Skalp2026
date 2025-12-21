@@ -159,8 +159,6 @@ module Skalp
 
         check_attributes(to_check)
       else
-        read_old_page_attributes
-        model.delete_old_page_attributes = true
         @mem_attributes[Sketchup.active_model]={}
         @mem_attributes[Sketchup.active_model]['style_settings'] = default_settings
         save_to_model
@@ -238,19 +236,6 @@ module Skalp
       end
     end
 
-    def read_old_page_attributes
-      read_attributes(@model.skpModel)
-      @model.skpModel.pages.each do |page|
-        read_attributes(page)
-      end
-    end
-
-    def remove_old_page_attributes
-      @skpModel.attribute_dictionaries.delete('Skalp')
-      @model.skpModel.pages.each do |page|
-        page.delete_attribute('Skalp')
-      end
-    end
 
     def find_page(id)
       @skpModel.pages.each do |page|

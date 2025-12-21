@@ -232,7 +232,6 @@ module Skalp
       model.set_attribute('Skalp', 'version', SKALP_VERSION[0..2].to_s)
       Skalp.remove_scaled_textures
       Skalp.active_model.force_start("Skalp - #{Skalp.translate('save attributes to model')}")
-      Skalp.models[model].memory_attributes.remove_old_page_attributes if Skalp.models[model].delete_old_page_attributes = true
       Skalp.active_model.memory_attributes.save_to_model
       Skalp.active_model.commit
       Skalp.fixTagFolderBug('PreSaveModel')
@@ -261,7 +260,7 @@ module Skalp
       return false unless caller && caller[0]
       return false if caller[0].include?('start_operation')
       return false if caller[0].include?('commit_operation')
-      #return false if caller[0].include?('/library/application support/sketchup 2015/sketchup/plugins') #start from other plugin
+      # return false if caller[0].include?('sketchup/plugins') # start from other plugin
       true
     end
 
@@ -398,7 +397,7 @@ module Skalp
 
   class SkalpEntityObserver < Sketchup::EntityObserver
     def onChangeEntity(entity)
-      return unless entity.kind_of?(Sketchup::Entity) # workaround bug on SU16.0.19913 / Skalp v1.2.0059 where Geom::Point3d could be returned
+      return unless entity.kind_of?(Sketchup::Entity)
       return unless entity.valid?
       return if Skalp.status == 0
       return unless Skalp.models[entity.model] && Skalp.models[entity.model].observer_active
@@ -473,7 +472,7 @@ module Skalp
      Skalp::errors(e)
     end
 
-    def onActivateModel(model) #SketchUp 2015+
+    def onActivateModel(model)
       return if model.get_attribute('Skalp', 'CreateSection') == false
       Skalp::skalp_paint = PaintBucket.new
       return if Skalp.block_observers

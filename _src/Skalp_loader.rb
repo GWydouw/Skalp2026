@@ -537,16 +537,30 @@ end
     end
 
     def self.activate_model(skpModel)
+      puts ">>> [DEBUG] activate_model called for: #{skpModel.title rescue 'unknown'} (object_id: #{skpModel.object_id})"
       return unless skpModel
       return if skpModel.get_attribute('Skalp', 'CreateSection') == false
       return if @unloaded
+      
+      # CRITICAL FIX: Don't re-activate if already active
+      if @models && @models[skpModel]
+        puts ">>> [DEBUG] Model ALREADY ACTIVATED, returning early"
+        return
+      end
+      
+      puts ">>> [DEBUG] Model NOT in @models, creating new instance..."
+      puts ">>> [DEBUG] @models keys: #{@models ? @models.keys.map{|m| m.object_id}.join(', ') : 'nil'}"
       @models[skpModel] = Model.new(skpModel)
+      puts ">>> [DEBUG] Model created successfully, loading observers..."
       @models[skpModel].load_observers
+      puts ">>> [DEBUG] Observers loaded, checking dialog..."
 
       return unless Skalp.dialog
+      puts ">>> [DEBUG] Dialog exists, updating..."
 
       Skalp.dialog.update_styles(skpModel)
       Skalp.dialog.update(1)
+      puts ">>> [DEBUG] activate_model COMPLETED"
     end
 
     def self.change_active_model(skpModel)
@@ -585,6 +599,8 @@ end
     end
 
     def self.errors(e)
+      puts ">>> [DEBUG] Skalp.errors called with: #{e.class}: #{e.message}"
+      puts ">>> [DEBUG] Backtrace: #{e.backtrace.first(3).join(' | ')}"
       return if e.message.to_s == 'reference to deleted Pages' #error bij afsluiten model
 
       if e.class == TypeError

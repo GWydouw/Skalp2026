@@ -243,9 +243,9 @@ module Skalp
       Sketchup.read_default('Skalp', 'Layers dialog - y') ? y = Sketchup.read_default('Skalp', 'Layers dialog - y') : y = 100
 
       if OS == :WINDOWS
-        @layers_dialog = UI::WebDialog.new('Define Pattern by Layer', false, 'Skalp Layers', width, height, 0, 0, true)
+        @layers_dialog = UI::WebDialog.new("Define Pattern by Tag", false, 'Skalp Layers', width, height, 0, 0, true)
       else
-        @layers_dialog = UI::WebDialog.new('Define Pattern by Layer', false, 'Skalp Layers', width, height, 0, 0, false)
+        @layers_dialog = UI::WebDialog.new("Define Pattern by Tag", false, 'Skalp Layers', width, height, 0, 0, false)
       end
 
       html_file = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp/html/layers_dialog.html"
@@ -286,6 +286,10 @@ module Skalp
       @layers_dialog.add_action_callback("dialog_focus") { |webdialog, params|
         self.update_layers_dialog
       }
+
+      @layers_dialog.add_action_callback("editPattern"){|webdialog, params|
+        self.edit_material_pattern(params)
+      }
     else
       update_layers_dialog
     end
@@ -317,47 +321,182 @@ module Skalp
   def self.update_layers_dialog
     return unless Sketchup.active_model
     return unless @layers_dialog
+    
+    # Ensure required libraries
+    require 'base64'
+    require 'json'
 
     @layers_hash = {}
-    @layers_dialog.execute_script("clear_names();")
-
-    # Set materialnames variable in javascript
-    materials = get_patterns_to_string.split(';')
-    materials.each { |material| @layers_dialog.execute_script("add_materialname('#{material.gsub('<','&lt;').gsub('>','&gt;')}');") }
-
-    # Set layernames variable in javascript
-    layernames = []
-
-    for layer in Sketchup.active_model.layers do
-    layernames << layer.name unless layer.get_attribute('Skalp', 'ID') || layer.name.include?('Skalp Pattern Layer -') || layer.name.include?('*** SKALP TAGS ***')
-    end
-    layernames.sort!
-
-    id = 0
     
-    for layername in layernames do
-      id += 1
-      layerId = 'layer' + id.to_s
-      (layer.get_attribute('Skalp', 'material') && layer.get_attribute('Skalp', 'material') != '') ? pattern = layer.get_attribute('Skalp', 'material') : pattern = '- no pattern selected -'
-      @layers_hash[layerId] = Sketchup.active_model.layers[layername]
-      @layers_dialog.execute_script("add_layername('#{layername.delete("\n") }', '#{layerId}');")
+    # Send Materials List (for dropdown/autocompletion if needed, though we primarily use selector now)
+    # Keeping this if JS strictly needs it, but we can send it as a simple list mostly.
+    materials = get_patterns_to_string.split(';')
+    materials_json = materials.to_json
+    @layers_dialog.execute_script("layernames = []; materialnames = [];") # Clear old globals if any
+    # Pass materials list to JS possibly? JS function add_materialname populates a list.
+    # Let's populate the JS array efficiently.
+    @layers_dialog.execute_script("materialnames = #{materials_json};")
+
+    # Build Tree Data
+    root_items = []
+    
+    # Check for LayerFolder support (SU 2021+)
+    if Sketchup.active_model.layers.respond_to?(:folders)
+       # Root folders
+       folders = Sketchup.active_model.layers.folders.to_a
+       root_items.concat(folders)
+       # Root layers (layers not in any folder)
+       layers = Sketchup.active_model.layers.select { |l| (l.respond_to?(:folder) && l.folder.nil?) || (l.respond_to?(:parent) && l.parent.nil?) }
+       root_items.concat(layers)
+       puts "Skalp Debug: root_folders=#{folders.size}, root_layers=#{layers.size}" if defined?(DEBUG) && DEBUG
+    else
+       # Fallback for old SU: flat list
+       root_items.concat(Sketchup.active_model.layers.to_a)
+       puts "Skalp Debug: Fallback flat list, layers=#{root_items.size}" if defined?(DEBUG) && DEBUG
     end
 
-    @layers_dialog.execute_script("load_material_listbox();")
+    tree_data = build_layer_tree(root_items)
+    puts "Skalp Debug: tree_data size=#{tree_data.size}" if defined?(DEBUG) && DEBUG
+    
+    require 'json'
+    json_payload = JSON.generate(tree_data)
+    
+    # Use direct object passing to avoid large string escaping issues in execute_script
+    @layers_dialog.execute_script("update_layers(#{json_payload});")
+  end
 
-    # Set correct pattern for each layer
-    id=0
-    for layername in layernames do
-      layer = Sketchup.active_model.layers[layername]
-      id += 1
-      layerId = 'layer' + id.to_s
-      if layer.get_attribute('Skalp', 'material') && layer.get_attribute('Skalp', 'material') != ''
-        pattern = layer.get_attribute('Skalp', 'material')
-      else
-        pattern = ''
-      end
-      @layers_dialog.execute_script("$('##{layerId}').val('#{pattern}');") unless pattern == ''
+  def self.build_layer_tree(items)
+    tree = []
+    return tree if items.nil?
+
+    # Mix folders and layers, sort alphabetical
+    sorted_items = items.sort_by { |i| i.name.downcase }
+
+    sorted_items.each do |item|
+       if item.is_a?(Sketchup::Layer)
+         next if is_skalp_internal_layer?(item)
+         
+         lid = "layer_#{item.entityID}"
+         @layers_hash[lid] = item
+         mat_name = item.get_attribute('Skalp', 'material') || ''
+         
+         thumb = nil
+         thickness = 1 # default to 1 point
+         if !mat_name.empty?
+            # Get thumbnail and thickness
+            mat = Sketchup.active_model.materials[mat_name]
+            if mat && mat.get_attribute('Skalp', 'ID')
+               pattern_info = nil
+               pattern_info_str = mat.get_attribute('Skalp', 'pattern_info')
+               if pattern_info_str
+                  begin
+                    parts = pattern_info_str.split(';')
+                    pattern_info = eval(parts.last)
+                  rescue
+                  end
+               end
+               
+               if pattern_info.is_a?(Hash)
+                  # section_cut_width is in inches. Convert to categorized pixel values.
+                  # Thresholds in inches: 0.25mm=0.00984, 0.5mm=0.01969, 1.0mm=0.03937
+                  scw = pattern_info[:section_cut_width]
+                  if scw.nil? || scw.to_f < 0.0001 # nil or effectively zero = no border
+                     thickness = 0
+                  elsif scw.to_f <= 0.00984 # <= 0.25mm: thin
+                     thickness = 1
+                  elsif scw.to_f <= 0.01969 # <= 0.5mm: medium
+                     thickness = 2
+                  elsif scw.to_f <= 0.03937 # <= 1.0mm: thick
+                     thickness = 3
+                  else # > 1.0mm: super thick
+                     thickness = 4
+                  end
+                  
+                  thumb = pattern_info[:png_blob]
+                  unless thumb
+                    begin
+                       thumb = Skalp.create_thumbnail(pattern_info)
+                       if thumb
+                          pattern_info[:png_blob] = thumb
+                          mat.set_attribute('Skalp', 'pattern_info', "eval(Sketchup.active_model.get_attribute('Skalp', 'version_check').to_s);#{pattern_info.inspect}")
+                       end
+                    rescue
+                    end
+                  end
+                  
+                  if thumb
+                     require 'base64'
+                     # Thumbnail from Skalp is already base64 encoded (starts with iVBOR)
+                     # If it doesn't start with iVBOR, it might be raw binary PNG data.
+                     unless thumb.start_with?('iVBOR')
+                        thumb = Base64.strict_encode64(thumb)
+                     end
+                   end
+                end
+             end
+          end
+
+         tree << {
+            type: 'layer',
+            name: item.name,
+            id: lid,
+            material: mat_name,
+            thumb: thumb,
+            thickness: thickness
+         }
+       elsif defined?(Sketchup::LayerFolder) && item.is_a?(Sketchup::LayerFolder)
+          # Skip Skalp internal folder
+          next if item.name == 'Skalp' || item.name.start_with?('Skalp ')
+          
+          # Folder
+          children = build_layer_tree(item.layers.to_a + item.folders.to_a)
+          tree << {
+             type: 'folder',
+             name: item.name,
+             children: children
+          }
+       end
     end
+    tree
+  end
+
+  def self.is_skalp_internal_layer?(layer)
+     layer.get_attribute('Skalp', 'ID') || 
+     layer.name.include?('Skalp Pattern Layer -') || 
+     layer.name.include?('*** SKALP TAGS ***')
+  end
+
+  def self.get_material_thumbnail_base64(mat_name)
+     # Potentially redundant now that it's in build_layer_tree, but keeping for compatibility if needed elsewhere
+     mat = Sketchup.active_model.materials[mat_name]
+     return nil unless mat
+     return nil unless mat.get_attribute('Skalp', 'ID')
+     
+     pattern_info_str = mat.get_attribute('Skalp', 'pattern_info')
+     return nil unless pattern_info_str
+     
+     pattern_info = nil
+     begin
+        parts = pattern_info_str.split(';')
+        pattern_info = eval(parts.last)
+     rescue
+     end
+     
+     return nil unless pattern_info.is_a?(Hash)
+     
+     blob = pattern_info[:png_blob]
+     unless blob
+        blob = Skalp.create_thumbnail(pattern_info) rescue nil
+     end
+     
+     if blob
+        require 'base64'
+        unless blob.start_with?('iVBOR')
+           blob = Base64.strict_encode64(blob)
+        end
+        return blob
+     end
+     nil
   end
 
   def self.rebuild
@@ -422,6 +561,15 @@ module Skalp
     }
     tool_menu.add_item("#{translate('Uninstall')} Skalp") {
       uninstall
+    }
+
+    tool_menu.add_separator
+    tool_menu.add_item(translate('Cleanup Duplicate Materials')) {
+      Skalp.cleanup_duplicate_materials
+    }
+    tool_menu.add_item(translate('Force Purge Skalp Materials')) {
+      result = UI.messagebox("This will remove all Skalp materials from the hidden purge-prevention component that are not currently assigned to any layer or object. These materials can then be purged from the model using SketchUp's standard purge. Proceed?", MB_YESNO)
+      Skalp.force_purge_skalp_materials if result == IDYES
     }
 
     tool_menu = skalp_menu.add_submenu(translate('Skalp commands'))
@@ -581,6 +729,27 @@ module Skalp
         @dialog_loading = false
       end
     end
+  end
+
+  def self.edit_material_pattern(material_name)
+    if @info_dialog_active
+      UI.messagebox(Skalp.translate('Please close the Skalp Info Dialog to start using Skalp'), MB_OK)
+      return
+    end
+
+    skalpTool if @status == 0
+
+    Skalp.check_skalp_default_material
+
+    if @hatch_dialog
+      @hatch_dialog.hatchname = material_name
+      @hatch_dialog.show
+      @hatch_dialog.select_last_pattern
+    else
+      @hatch_dialog = Skalp::Hatch_dialog.new(material_name)
+      @hatch_dialog.show
+    end
+    patterndesignerbutton_on
   end
 
   def self.patternDesignerTool

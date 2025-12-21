@@ -18,6 +18,7 @@ module Skalp
     attr_reader :active_section
 
     def initialize(skpModel)
+      puts ">>> [DEBUG] Model.initialize START (model object_id: #{skpModel.object_id})"
       load_multitags_materials
       @incontext = false
       @hide_rest_of_model = skpModel.rendering_options["InactiveHidden"]
@@ -37,7 +38,6 @@ module Skalp
       @clear_timestamp = false
       @load = false
       @dialog_undo_flag = false
-      @delete_old_page_attributes = false
       @rendering_options = Skalp::RenderingOptions.new(@skpModel)
       @save_settings = true
       @active_page = @skpModel.pages.selected_page
@@ -49,13 +49,10 @@ module Skalp
       @memory_attributes = Memory_attributes.new
       @memory_attributes.read_from_model
 
-      version_recover
       Skalp.check_SU_material_library
 
-      covert_skalp_layers #NEW 2020
-
       check_empty_materials
-      Skalp.delete_old_scaled_skalp_materials
+      Skalp.cleanup_duplicate_materials(true)
       Skalp.remove_PBR_properties #NEW 2025
       Skalp.set_thea_render_params
       Skalp.create_thumbnails_cache
@@ -94,6 +91,7 @@ module Skalp
       Skalp.fixTagFolderBug('Model initialize')
       Skalp.create_skalp_material_instance
       commit
+      puts ">>> [DEBUG] Model.initialize COMPLETED"
     end
 
     def modified_multi_tags(objects)
@@ -696,6 +694,7 @@ module Skalp
     end
 
     def load_observers
+      puts ">>> [DEBUG] load_observers START"
       @entities_observer = SkalpEntitiesObserver.new
       @skpModel.entities.add_observer(@entities_observer) if @skpModel.entities
 
@@ -719,8 +718,11 @@ module Skalp
 
       @model_observer = SkalpModelObserver.new
       @skpModel.add_observer(@model_observer)
+      puts ">>> [DEBUG] load_observers COMPLETED"
 
     rescue => e
+      puts ">>> [DEBUG] ERROR in load_observers: #{e.class}: #{e.message}"
+      puts e.backtrace.first(10).join("\n")
       Skalp.errors(e)
     end
 
@@ -1064,51 +1066,6 @@ module Skalp
       end
     end
 
-    def covert_skalp_layers
-      start('Skalp - remove old Skalp layers', true)
-      layers_to_delete = []
-
-      layers = @skpModel.layers
-      entities = @skpModel.entities
-
-      old_version = false
-      #Place sectionplanes on Layer0
-      section_planes = entities.grep(Sketchup::SectionPlane)
-
-      section_planes.each do |sectionplane|
-        if sectionplane.get_attribute('Skalp', 'ID') && sectionplane.layer.name.include?('Section Plane:')
-          old_version = true
-          layers_to_delete << sectionplane.layer
-          sectionplane.layer = nil
-        end
-      end
-
-      #Remove sectiongroup layers
-      layers.each do |layer|
-        layer_id = layer.get_attribute('Skalp', 'ID')
-        if layer_id && layer.name.include?("Scene:")
-          old_version = true
-          layers_to_delete << layer
-        end
-        layers_to_delete << layer if layer.name.include?("*** SKALP LAYERS ***")
-        layers_to_delete << layer if layer.name.include?("Skalp Live Section")
-      end
-
-      if old_version
-        result = UI.messagebox('This model contains Skalp sections from a previous version. Skalp will update these sections.')
-
-        if result == IDOK
-          section_groups = entities.grep(Sketchup::Group)
-
-          section_groups.each { |group| group.locked = false if group.get_attribute('Skalp', 'ID') }
-          layers_to_delete.each { |layer| layers.remove(layer, true) }
-          UI.messagebox('Skalp sections are updated!')
-        end
-      end
-
-      commit
-    end
-
     def manage_sections(skalp_pages, no_skalp_pages)
       @section_result_group.locked = false
       @section_result_group.hidden = false
@@ -1431,20 +1388,6 @@ module Skalp
         count += 1 if sectionplane.get_attribute('Skalp', 'sectionplane_name') == name
       end
       count
-    end
-
-    def version_recover
-      version = get_memory_attribute(@skpModel, 'Skalp', 'skalp_version').to_s
-
-      case version
-      when '2.0.0055', '2.0.0056', '2.0.0062'
-        #eval(material.get_attribute('Skalp', 'pattern_info').split(')).to_s;').last)     OLD
-        #eval(material.get_attribute('Skalp', 'pattern_info').split(').to_s);').last)     NIEUW
-        @skpModel.materials.each do |mat|
-          attrib = material.get_attribute('Skalp', 'pattern_info')
-          mat.set_attribute('Skalp', 'pattern_info', attrib.gsub(".split(')).to_s;", ".split(').to_s);"))
-        end
-      end
     end
 
     def correct_sectiongroup(id, layer)

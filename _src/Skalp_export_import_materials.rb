@@ -296,6 +296,10 @@ module Skalp
   end
 
   def create_thumbnail(pattern_string, w = 81, h = 27)
+  end
+  module_function :create_thumbnail
+
+  def create_thumbnail(pattern_string, w = 81, h = 27)
     hatch = Skalp::SkalpHatch::Hatch.new
     hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(pattern_string[:pattern], false))
 

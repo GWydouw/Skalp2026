@@ -1,6 +1,6 @@
 module Skalp
   class Hatch_dialog < Webdialog
-    attr_accessor :webdialog, :selected_material
+    attr_accessor :webdialog, :selected_material, :hatchname
 
     PREVIEW_X_SIZE = 215
     PREVIEW_Y_SIZE = 100
