@@ -238,7 +238,7 @@ module Skalp
       }
       end
       transformation_inverse = @sectionplane.transformation.inverse
-      place_rear_view_lines_in_model if Skalp.dialog.style_settings(@page)[:rearview_status]
+      place_rear_view_lines_in_model(sectiongroup) if Skalp.dialog.style_settings(@page)[:rearview_status]
       @model.section_result_group.locked = true
 
       return unless sectiongroup.valid?
@@ -271,12 +271,13 @@ module Skalp
       correct_faces(sectiongroup)
 
       @page ? type = @page : type = @skpModel
-      place_rear_view_lines_in_model if Skalp.dialog.style_settings(type)[:rearview_status]
+      place_rear_view_lines_in_model(sectiongroup) if Skalp.dialog.style_settings(type)[:rearview_status]
       @model.section_result_group.locked = true
     end
 
-    def place_rear_view_lines_in_model
-      return unless @sectiongroup.valid?
+    def place_rear_view_lines_in_model(target_group = nil)
+      target_group ||= @sectiongroup
+      return unless target_group && target_group.valid?
       return unless Skalp.models[@skpModel]
 
       observer_status = Skalp.models[@skpModel].observer_active
@@ -284,14 +285,18 @@ module Skalp
 
       @page ? type = @page : type = @skpModel
 
-      id = sectionplane.skalpID
+      unless @sectionplane && @sectionplane.respond_to?(:skalpID)
+        puts "[Skalp DEBUG] Rearview failed: @sectionplane is invalid" if defined?(DEBUG) && DEBUG
+        return
+      end
+      id = @sectionplane.skalpID
 
       (@skpModel.pages && type == @skpModel) ? active_page = @skpModel.pages.selected_page : active_page = type
       if id == @model.hiddenlines.calculated[active_page]
-        place_lines_or_definition_in_model(active_page)
+        place_lines_or_definition_in_model(active_page, target_group)
       elsif id == @model.hiddenlines.calculated[@skpModel]
         # Fallback: check if calculated for model (live section)
-        place_lines_or_definition_in_model(@skpModel)
+        place_lines_or_definition_in_model(@skpModel, target_group)
       else
         found = false
         @model.hiddenlines.calculated.each do |k, v|
@@ -301,12 +306,12 @@ module Skalp
             found = true
           end
         end
-        place_lines_or_definition_in_model(type, true) if found #TODO what if not found
+        place_lines_or_definition_in_model(type, target_group, true) if found
       end
       Skalp.models[@skpModel].observer_active = observer_status
     end
 
-    def place_lines_or_definition_in_model(page, force = false)
+    def place_lines_or_definition_in_model(page, target_group, force = false)
       @model.section_result_group.locked = false
       
       # Try to find an existing valid definition with entities
@@ -328,9 +333,9 @@ module Skalp
       
       if definition
         # Check if instance already exists to prevent duplicates (and slow double-work)
-        existing = @sectiongroup.entities.grep(Sketchup::ComponentInstance).find { |i| i.definition == definition }
+        existing = target_group.entities.grep(Sketchup::ComponentInstance).find { |i| i.definition == definition }
         unless existing
-           @sectiongroup.entities.add_instance(definition, Geom::Transformation.new)
+           target_group.entities.add_instance(definition, Geom::Transformation.new)
         end
       elsif @model.hiddenlines.rear_lines_result[page]
         puts "[Skalp DEBUG] Falling back to add_lines_to_page (slow path)"
@@ -370,9 +375,9 @@ module Skalp
         Sketchup.active_model.entities.grep(Sketchup::SectionPlane).each do |sectionplane|
           if sectionplane.get_attribute('Skalp', 'ID')
             if sectionplane.get_attribute('Skalp', 'ID') == sectionplaneID
-              skpPage_toset.set_drawingelement_visibility(sectionplane, true)
+              skpPage_toset.set_drawingelement_visibility(sectionplane, true) if sectionplane.is_a?(Sketchup::Drawingelement) && sectionplane.valid?
             else
-              skpPage_toset.set_drawingelement_visibility(sectionplane, false)
+              skpPage_toset.set_drawingelement_visibility(sectionplane, false) if sectionplane.is_a?(Sketchup::Drawingelement) && sectionplane.valid?
             end
           end
         end

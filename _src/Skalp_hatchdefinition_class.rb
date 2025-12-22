@@ -16,6 +16,7 @@ module Skalp
       def initialize(pattern_string , save_to_hatchdefs = true)
         SkalpHatch.hatchdefs << self if SkalpHatch.hatchdefs && save_to_hatchdefs
         @originaldefinition = pattern_string.dup
+        pattern_string = pattern_string.dup
 
         @print_scale = 50 #intended scale  SKP/LAYOUT > 1to1 / 1to50
 
@@ -61,13 +62,18 @@ module Skalp
         if tempoffset.size >= 2
           offset_size = tempoffset.inject(0) { |num1, num2| [num1, num2].max }
         else
-          offset_size = tempoffset[0].abs
+          if tempoffset[0]
+            offset_size = tempoffset[0].abs
+          else
+            offset_size = 0.0
+          end
         end
 
         [@def_x, @def_y, offset_size]
       end
 
       def max_size(tempsizes)
+        return 0.0 if tempsizes.nil? || tempsizes.empty?
         x_size = tempsizes.max
         return 0.0 unless x_size
         x_size.abs
@@ -85,6 +91,8 @@ module Skalp
           tempybboxes << (hl.ybbox)
         end
 
+        tempxbboxes ||= []
+        tempybboxes ||= []
         tempxbboxes = tempxbboxes.uniq - [0.0]
         tempybboxes = tempybboxes.uniq - [0.0]
         if tempxbboxes.size >= 2
@@ -128,7 +136,11 @@ module Skalp
       end
 
       def preprocesshatchline (linefromfile)
-        linefromfile[1..-1].chomp.split(",", 2)
+        if linefromfile.start_with?('*')
+          linefromfile[1..-1].chomp.split(",", 2)
+        else
+          linefromfile.chomp.split(",", 2)
+        end
       end
 
       # Attention: only to be used for DXF export. Do NOT try to create anything tilable from a rotated HatchDefinition instance, you will blow a fuse!

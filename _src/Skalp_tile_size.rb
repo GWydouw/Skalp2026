@@ -240,20 +240,20 @@ module Skalp
       end
     end
 
-    def input_to_inch(num)
-      case @unit
-        when 'mm'
-          return num * 0.03937
-        when 'cm'
-          return num * 0.3937
-        when 'm'
-          return num * 39.37
-        when 'inch'
-          return num
-        when 'feet'
-          return num * 12.0
+      def input_to_inch(num)
+        case @unit
+          when 'mm'
+            return num / 25.4
+          when 'cm'
+            return num / 2.54
+          when 'm'
+            return num / 0.0254
+          when 'inch'
+            return num
+          when 'feet'
+            return num * 12.0
+        end
       end
-    end
 
     def metric?
       !(@model_unit == 'inch' || @model_unit == 'feet')

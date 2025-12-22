@@ -103,11 +103,11 @@ module Skalp
     def input_to_inch(num)
       case @unit
         when 'mm'
-          return num * 0.03937
+          return num / 25.4
         when 'cm'
-          return num * 0.3937
+          return num / 2.54
         when 'm'
-          return num * 39.37
+          return num / 0.0254
         when 'inch'
           return num
         when 'feet'
@@ -973,6 +973,7 @@ module Skalp
     tile.calculate(unit_string, :x)
     tile.x_value
   end
+  module_function :unit_string_to_inch
 
   def mm_or_pts_to_inch(pen)
     return pen if pen.to_f.to_s == pen.to_s

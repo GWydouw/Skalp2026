@@ -526,7 +526,8 @@ module Skalp
       end
 
       if Skalp.active_model.section_result_group
-        Skalp.active_model.section_result_group.entities.grep(Sketchup::Group).each do |section_group|
+        Skalp.active_model.section_result_group.entities.each do |section_group|
+          next unless section_group.is_a?(Sketchup::Group) || section_group.is_a?(Sketchup::ComponentInstance)
           return section_group if section_group.get_attribute('Skalp', 'ID') == page_id
         end
       end

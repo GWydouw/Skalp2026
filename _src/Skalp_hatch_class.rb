@@ -90,12 +90,27 @@ module Skalp
           @hatchdefinition.update_tile_size
 
           def_x == 0.0 ? def_x_or_y = def_y : def_x_or_y = def_x
-          scale = user_x / def_x_or_y * resolution
-          width = scale * hatchdefinition.definitionxbbox
-          height = scale * hatchdefinition.definitionybbox
 
-          # Create scaling transformation to compensate for integer canvas size versus real (float) canvas size.
-          @comp_trans = Transformation2D.new.scaling((width.round(1).to_i / width), (height.round(1).to_i / height))
+          # Guard for solid color patterns where def_x and def_y are both 0
+          if def_x_or_y == 0.0 || @opts[:solid_color] == true
+            # Use a fixed small tile for solid colors (no pattern to tile)
+            width = 10.0
+            height = 10.0
+            scale = 1.0
+            @comp_trans = Transformation2D.new.scaling(1.0, 1.0)
+          else
+            scale = user_x / def_x_or_y * resolution
+            width = scale * hatchdefinition.definitionxbbox
+            height = scale * hatchdefinition.definitionybbox
+            
+            # Prevent NaN or Division by Zero if width/height are invalid
+            if width.nil? || width.nan? || width.abs < 0.0001 || height.nil? || height.nan? || height.abs < 0.0001
+              @comp_trans = Transformation2D.new.scaling(1.0, 1.0)
+            else
+              # Create scaling transformation to compensate for integer canvas size versus real (float) canvas size.
+              @comp_trans = Transformation2D.new.scaling((width.round(1).to_i / width), (height.round(1).to_i / height))
+            end
+          end
 
           @zoom_factor = 1
           @tile_width, @tile_height = width, height #feedback naar dialoog om SU material size te zetten        #TODO na te kijken
@@ -567,6 +582,7 @@ module Skalp
       private :draw_one_pixel_line
 
       def draw_pen_line(p0, p1, pen, png, stroke_color, v0)
+        return if p0.x.nan? || p0.y.nan? || p1.x.nan? || p1.y.nan?
         png.polygon(v0, stroke_color, fill_color = stroke_color)
         png.circle_float(p0, (pen / 2), @opts[:line_color], 1.1)
         png.circle_float(p1, (pen / 2), @opts[:line_color], 1.1)

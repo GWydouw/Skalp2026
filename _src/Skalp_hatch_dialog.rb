@@ -223,6 +223,20 @@ module Skalp
           } if OS == :MAC
         else
           Skalp.patterndesignerbutton_off
+          # Refresh layers dialog to restore previews only if not already updated by create_hatch
+          Skalp.update_layers_dialog unless @updated_layers
+          @updated_layers = false
+          
+          if @recalc_section_needed
+            # Prevent observers from triggering a second dialog update during calculation
+            Skalp.observers_disabled = true if defined?(Skalp.observers_disabled) 
+            begin
+              Skalp.active_model.active_sectionplane.calculate_section if Skalp.active_model && Skalp.active_model.active_sectionplane
+            ensure
+              Skalp.observers_disabled = false if defined?(Skalp.observers_disabled)
+            end
+            @recalc_section_needed = false
+          end
         end
       }
     end
@@ -296,8 +310,15 @@ module Skalp
       @hatchdefs = {}
 
       SkalpHatch::hatchdefs.each do |hatchdef|
-        pat_names << "#{hatchdef.name},#{hatchdef.description}"
-        @hatchdefs["#{hatchdef.name},#{hatchdef.description}"] = hatchdef
+        name = hatchdef.name.to_s.strip
+        if hatchdef.description && hatchdef.description.to_s.strip != ""
+          description = hatchdef.description.to_s.strip
+          key = "#{name}, #{description}"
+        else
+          key = name
+        end
+        @hatchdefs[key] = hatchdef
+        pat_names << key
       end
 
       pat_names.compact!
@@ -306,9 +327,16 @@ module Skalp
 
       pat_names.unshift('SOLID_COLOR, solid color without hatching')
 
-      pat_names = [@selected_material[:pattern]] + pat_names
+      # Ensure current material pattern is in list and in @hatchdefs
+      current_pat = @selected_material[:pattern].to_s.strip
+      if current_pat != "" && current_pat != 'SOLID_COLOR, solid color without hatching'
+        # If it's already in the list, move it to the front
+        pat_names.delete(current_pat)
+        pat_names.unshift(current_pat)
+      end
+
       pat_names.each do |pat|
-        add('acad_pattern_list', pat) #unless pat == ''
+        add('acad_pattern_list', pat) unless pat.nil? || pat == ''
       end
     end
 
@@ -362,7 +390,6 @@ module Skalp
 
         @selected_material[:material] = suMaterial.name
         @selected_material[:pattern] = pattern_name
-        load_patterns
 
         @hatch = Skalp::SkalpHatch::Hatch.new
 
@@ -375,6 +402,8 @@ module Skalp
           solidcolor = false
         end
 
+        load_patterns
+        
         zoom_factor = 1.0 / ((105 - vars[7].to_i)*5.0 / 100.0)
 
         # previewing a pattern that already exist in the model
@@ -428,14 +457,15 @@ module Skalp
 
       else
         if new
-          return if (Skalp.utf8(vars[11]) == nil || Skalp.utf8(vars[11]) == '' || @hatchdefs[Skalp.utf8(vars[0])] == nil) &&  vars[0] != 'SOLID_COLOR, solid color without hatching'
+          pattern_key = Skalp.utf8(vars[0]).to_s.strip
+          return if (Skalp.utf8(vars[11]) == nil || Skalp.utf8(vars[11]) == '' || @hatchdefs[pattern_key] == nil) &&  pattern_key != 'SOLID_COLOR, solid color without hatching'
           @hatch = Skalp::SkalpHatch::Hatch.new
 
-          if  vars[0] == 'SOLID_COLOR, solid color without hatching'
+          if  pattern_key == 'SOLID_COLOR, solid color without hatching'
             @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["SOLID_COLOR, solid color without hatching", "45, 0,0, 0,.125"]))
             vars[5] = vars[6]
           else
-            @hatch.add_hatchdefinition(@hatchdefs[Skalp.utf8(vars[0])])
+            @hatch.add_hatchdefinition(@hatchdefs[pattern_key])
           end
 
           script("$('#update_preview').show()")
@@ -583,29 +613,79 @@ module Skalp
 
       Skalp.set_ID(hatch_material)
 
-      Skalp.set_pattern_info_attribute(hatch_material, {
+      # Create thumbnail for layers dialog preview
+      # Ensure pattern array includes the name at the beginning
+      pattern_array = pattern_info[:original_definition]
+      
+      # vars[0] might be the pattern name OR the definition string if things went wrong
+      # vars[9] is the material name (user input)
+      
+      current_name_or_def = Skalp.utf8(vars[0])
+      material_name = Skalp.utf8(vars[9])
+      
+      # Determine the best name to use
+      if current_name_or_def =~ /^\d/ # Starts with a digit, likely a definition line
+         pattern_name_to_use = material_name
+      else
+         pattern_name_to_use = current_name_or_def
+      end
+
+      if pattern_array.is_a?(Array) && pattern_array[0]
+         first_line = pattern_array[0].to_s
+         # If the first line is NOT a name line (doesn't start with *), prepend the name
+         if !first_line.start_with?('*')
+            pattern_array = ["*#{pattern_name_to_use}"] + pattern_array
+         end
+      end
+      
+      new_pattern_info = {
           :name => Skalp.utf8(vars[9]),
-          :pattern => pattern_info[:original_definition],
+          :pattern => pattern_array,
           :print_scale => 1,
           :resolution => PRINT_DPI,
           :user_x => @tile.x_string,
           :space => vars[2].to_s.to_sym,
           :pen => pen_width.to_s,
-          :section_cut_width => Skalp::mm_or_pts_to_inch(vars[8]), # pen_width in inch (1pt = 1.0 / 72) was: 1.0 / SCREEN_DPI
+          :section_cut_width => Skalp::mm_or_pts_to_inch(vars[8]),
           :line_color => vars[5],
           :fill_color => vars[6],
           :gauge_ratio => @tile.gauge.to_s,
           :pat_scale => pattern_info[:pat_scale],
           :alignment => vars[7]
-      }.inspect)
+      }
+      
+      # Generate thumbnail for this pattern
+      begin
+        thumb = Skalp.create_thumbnail(new_pattern_info)
+        new_pattern_info[:png_blob] = thumb if thumb
+      rescue => e
+        # Thumbnail generation failed, continue without it
+      end
+
+      # Optimisation: Check if we need to recalculate section (geometry)
+      # Only needed if section_cut_width (line weight) changes
+      old_pattern_info = Skalp.get_pattern_info(hatch_material)
+      
+      Skalp.set_pattern_info_attribute(hatch_material, new_pattern_info.inspect)
 
       update_all_material_scales(hatch_material) unless vars[2] == 'modelspace'
       get_section_materials
       load_materials
       select_last_pattern
-      Skalp.active_model.active_sectionplane.calculate_section if Skalp.active_model && Skalp.active_model.active_sectionplane if Skalp.dialog.lineweights_status
+      
+      if Skalp.active_model && Skalp.active_model.active_sectionplane && Skalp.dialog.lineweights_status
+        # Defer recalculation to on_close
+        if old_pattern_info.nil? || (old_pattern_info[:section_cut_width].to_f - new_pattern_info[:section_cut_width].to_f).abs > 0.000001
+           @recalc_section_needed = true
+        end
+      end
       Skalp.set_thea_render_params(hatch_material)
+      
       Skalp.active_model.commit
+
+      # Refresh layers dialog to show updated preview
+      Skalp.update_layers_dialog
+      @updated_layers = true
 
       layer_name = "\uFEFF".encode('utf-8') + 'Skalp Pattern Layer - ' + hatch_material.name
       Skalp.create_Color_by_Layer_layers([hatch_material], true) if Sketchup.active_model.layers[layer_name]

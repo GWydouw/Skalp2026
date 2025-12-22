@@ -817,7 +817,14 @@ Sketchup.active_model.set_attribute('Skalp_sectionmaterials', 'test', {line_colo
 
   def get_pattern_info(material)
     return {} unless material.get_attribute('Skalp', 'pattern_info')
-    eval(material.get_attribute('Skalp', 'pattern_info').split(').to_s);').last)
+    pattern_string = material.get_attribute('Skalp', 'pattern_info').split(').to_s);').last
+    # Handle corrupted data with Infinity or NaN values
+    pattern_string = pattern_string.gsub(/(?<![a-zA-Z])Infinity(?![a-zA-Z])/, '1.0')
+    pattern_string = pattern_string.gsub(/(?<![a-zA-Z])NaN(?![a-zA-Z])/, '1.0')
+    eval(pattern_string)
+  rescue => e
+    puts "Skalp Warning: Error parsing pattern_info for #{material.name}: #{e.message}" if defined?(DEBUG) && DEBUG
+    {}
   end
 
   def set_thea_render_params(material = nil)

@@ -314,7 +314,7 @@ module Skalp
     else
       Skalp.active_model.start("Skalp - #{translate('dissociate section-material from layer')}", true)
       layer.delete_attribute('Skalp', 'material')  if layer
-      Skalp.active_model.commit
+    Skalp.active_model.commit
     end
   end
 
@@ -345,9 +345,9 @@ module Skalp
        # Root folders
        folders = Sketchup.active_model.layers.folders.to_a
        root_items.concat(folders)
-       # Root layers (layers not in any folder)
-       layers = Sketchup.active_model.layers.select { |l| (l.respond_to?(:folder) && l.folder.nil?) || (l.respond_to?(:parent) && l.parent.nil?) }
-       root_items.concat(layers)
+        # Root layers (layers not in any folder)
+        layers = Sketchup.active_model.layers.to_a.select { |l| !l.respond_to?(:folder) || l.folder.nil? }
+        root_items.concat(layers)
        puts "Skalp Debug: root_folders=#{folders.size}, root_layers=#{layers.size}" if defined?(DEBUG) && DEBUG
     else
        # Fallback for old SU: flat list
@@ -360,6 +360,7 @@ module Skalp
     
     require 'json'
     json_payload = JSON.generate(tree_data)
+    puts "Skalp Debug: JSON payload length=#{json_payload.length}" if defined?(DEBUG) && DEBUG
     
     # Use direct object passing to avoid large string escaping issues in execute_script
     @layers_dialog.execute_script("update_layers(#{json_payload});")
@@ -419,8 +420,11 @@ module Skalp
                        if thumb
                           pattern_info[:png_blob] = thumb
                           mat.set_attribute('Skalp', 'pattern_info', "eval(Sketchup.active_model.get_attribute('Skalp', 'version_check').to_s);#{pattern_info.inspect}")
+                       else
+                          puts "Skalp Debug: Failed to create thumbnail for #{mat_name}" if defined?(DEBUG) && DEBUG
                        end
-                    rescue
+                    rescue => e
+                       puts "Skalp Debug: Error creating thumbnail: #{e.message}" if defined?(DEBUG) && DEBUG
                     end
                   end
                   
@@ -431,7 +435,9 @@ module Skalp
                      unless thumb.start_with?('iVBOR')
                         thumb = Base64.strict_encode64(thumb)
                      end
-                   end
+                  else
+                     puts "Skalp Debug: No thumbnail found/created for #{mat_name}" if defined?(DEBUG) && DEBUG
+                  end
                 end
              end
           end
@@ -453,6 +459,7 @@ module Skalp
           tree << {
              type: 'folder',
              name: item.name,
+             id: "folder_#{item.entityID}", 
              children: children
           }
        end

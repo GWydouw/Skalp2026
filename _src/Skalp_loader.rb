@@ -13,6 +13,88 @@ module Skalp
   # centralized to avoid issues with translation mismatches due to typos in the code:
   NO_ACTIVE_SECTION_PLANE = Skalp.translate('no active Section Plane')
 
+  # Missing method implementation to fix blank pattern column
+  def self.create_thumbnail(pattern_info)
+    # Return existing blob if present
+    if pattern_info[:png_blob]
+       return pattern_info[:png_blob] 
+    end
+    
+    require 'Skalp_Skalp/Skalp_hatch'
+    
+    begin
+      hatch = Skalp::SkalpHatch::Hatch.new
+      pattern = pattern_info[:pattern]
+      unless pattern
+        puts "Skalp Debug: No pattern found in info."
+        return nil 
+      end
+      
+      hatch_def = nil
+      if pattern.is_a?(String)
+         # Try to find existing definition by name
+         found = Skalp::SkalpHatch.hatchdefs.find { |d| d.name == pattern }
+         if found
+             hatch_def = found
+         else
+             puts "Skalp Debug: Pattern '#{pattern}' not found in loaded definitions."
+             # Fallback attempt?
+         end
+      elsif pattern.is_a?(Array)
+         hatch_def = Skalp::SkalpHatch::HatchDefinition.new(pattern, false)
+      end
+
+      if hatch_def
+         hatch.add_hatchdefinition(hatch_def)
+      else
+         return nil
+      end
+  
+      if Skalp.respond_to?(:dialog) && Skalp.dialog && Skalp.dialog.respond_to?(:drawing_scale)
+        printscale = Skalp.dialog.drawing_scale.to_f
+      else
+        printscale = 50
+      end
+      
+      # Default w/h if not provided (UI dialog expects standard size)
+      w = 81
+      h = 27
+  
+      # Debug unit conversion
+      user_x_val = pattern_info[:user_x]
+      # puts "Skalp Debug: user_x raw: #{user_x_val}"
+      converted_x = Skalp.unit_string_to_inch(user_x_val)
+      # puts "Skalp Debug: user_x converted: #{converted_x}"
+  
+      result = hatch.create_png({
+                           type: :thumbnail,
+                           :gauge => false,
+                           :width => w,
+                           :height => h,
+                           :line_color => pattern_info[:line_color],
+                           :fill_color => pattern_info[:fill_color],
+                           :pen => Skalp::PenWidth.new(pattern_info[:pen], pattern_info[:space]).to_inch,
+                           :section_cut_width => pattern_info[:section_cut_width].to_f,
+                           :resolution => 72,
+                           :print_scale => printscale,
+                           :zoom_factor => 0.444,
+                           :user_x => converted_x,
+                           :space => pattern_info[:space]
+                       })
+       if result
+         # puts "Skalp Debug: Thumb created successfully, size: #{result.size}"
+       else
+         puts "Skalp Debug: Thumb creation returned nil"
+       end
+       return result
+    rescue => e
+      puts "Skalp Debug: Error in create_thumbnail: #{e.message}"
+      puts e.backtrace.join("\n")
+      return nil
+    end
+  end
+
+
   def self.insert_version_check_code
     code = <<-EOF
 def exit_skalp
@@ -146,6 +228,49 @@ end
 
   @log = Logger.new(SKALP_PATH + 'Skalp_log.txt')
   @log.level = Logger::INFO
+  
+  @log = Logger.new(SKALP_PATH + 'Skalp_log.txt')
+  @log.level = Logger::INFO
+  
+  # DIRECT EMBED of Diagnostics because require failed in build
+  def self.diagnose
+    model = Sketchup.active_model
+    puts "=== SKALP DIAGNOSTICS (Embedded) ==="
+    puts "Timestamp: #{Time.now}"
+    puts "Model: #{model.title}"
+    puts "Skalp.create_thumbnail defined? #{Skalp.respond_to?(:create_thumbnail)}"
+    
+    # Check simple thumbnail generation
+    begin
+        test_info = {:name => "Test", :pattern => "ANSI31", :png_blob => nil, :user_x => "1", :pen => "0.1", :space => "0.1"}
+        res = Skalp.create_thumbnail(test_info)
+        puts "Test Thumbnail Generation: #{res ? 'SUCCESS (' + res.size.to_s + ' bytes)' : 'FAILED (returned nil)'}"
+    rescue => e
+        puts "Test Thumbnail Generation ERROR: #{e.message}"
+    end
+    
+    puts "\n--- SECTION RESULT GROUP ---"
+    if Skalp.active_model && Skalp.active_model.section_result_group
+      srg = Skalp.active_model.section_result_group
+      puts "SRG Visibility: #{srg.visible?} | Layer: #{srg.layer.name} | Hidden: #{srg.hidden?}"
+      srg.entities.each do |g|
+         next unless g.is_a?(Sketchup::Group) || g.is_a?(Sketchup::ComponentInstance)
+         name = g.name
+         if g.is_a?(Sketchup::ComponentInstance) && g.definition
+            name = g.definition.name + " (" + g.name + ")"
+         end
+         puts "  > #{g.class.name.split('::').last}: #{name} | Layer: #{g.layer.name} | Visible: #{g.visible?} | Hidden: #{g.hidden?}"
+      end
+    else
+      puts "No Section Result Group found."
+    end
+    puts "===================================="
+    nil
+  end
+  
+  # Remove the dynamic require that failed
+  # match_diag = Dir.glob(SKALP_PATH + 'Skalp_diagnostics.r*') ...
+
   @log.info("Skalp version: " + SKALP_VERSION)
   @log.info("Sketchup version: " + Sketchup.version)
 
@@ -503,6 +628,9 @@ end
 
     @skalp_observer = SkalpAppObserver.new
     Sketchup.add_observer(@skalp_observer)
+
+    # Load pattern definitions during startup so thumbnails can be generated by name
+    UI.start_timer(0.5, false) { Skalp::SkalpHatch.load_hatch if defined?(Skalp::SkalpHatch) }
 
     def self.start_skalp
       skalp_require_run
@@ -912,3 +1040,5 @@ if 1 #SKALP_VERSION == '9.9.9999'
   #Skalp.send :include, Skalp::Method_spoofer
 end
 =end
+# Startup Debug Info
+puts ">>> Skalp Loaded: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')} - Build: #10"

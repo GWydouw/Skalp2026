@@ -468,12 +468,7 @@ module Skalp
       
       # Handle style_settings specially: reconstruct Hash from flattened native attributes
       if key == 'style_settings'
-        # First try memory_attributes (for in-session data)
-        if @memory_attributes.include?(object) && @memory_attributes[object]['style_settings'].is_a?(Hash)
-          return @memory_attributes[object]['style_settings']
-        end
-        
-        # Then try to reconstruct from native attributes
+        # Then try to reconstruct from native attributes (PRIORITY in SU 2026)
         reconstructed = {}
         has_any = false
         STYLE_SETTINGS_KEYS.each do |style_key|
@@ -491,10 +486,43 @@ module Skalp
             end
           end
         end
-        return has_any ? reconstructed : nil
-      end
-      
-      # For other keys: read from native attributes first
+
+        if has_any
+           @memory_attributes[object] = {} unless @memory_attributes.include?(object)
+           @memory_attributes[object]['style_settings'] = reconstructed
+           return reconstructed
+        end
+
+        # MIGRATION FALLBACK (PRIORITY 2): If no new ss_* keys, check for old style_settings blob
+        old_blob = object.get_attribute(dict_name, 'style_settings')
+        if old_blob.is_a?(String) || old_blob.is_a?(Hash)
+          begin
+             old_hash = old_blob.is_a?(String) ? eval(old_blob) : old_blob
+             if old_hash.is_a?(Hash)
+                puts "Skalp: Migrating legacy style_settings for #{object}..."
+                old_hash.each do |k,v| 
+                   sym_k = k.to_sym
+                   reconstructed[sym_k] = v
+                   # Auto-save migration
+                   object.set_attribute(dict_name, "ss_#{sym_k}", v.to_s)
+                end
+                @memory_attributes[object] = {} unless @memory_attributes.include?(object)
+                @memory_attributes[object]['style_settings'] = reconstructed
+                return reconstructed
+             end
+          rescue => e
+             puts "Skalp: Migration error: #{e.message}"
+          end
+        end
+
+        # Then try memory_attributes (for in-session data or initialized defaults)
+        if @memory_attributes.include?(object) && @memory_attributes[object]['style_settings'].is_a?(Hash)
+          return @memory_attributes[object]['style_settings']
+        end
+      return has_any ? reconstructed : nil
+    end    
+    
+    # For other keys: read from native attributes first
       value = object.get_attribute(dict_name, key)
       
       # Fallback to memory_attributes for old data during migration
@@ -1083,10 +1111,10 @@ module Skalp
         [@skalp_folder, @patternlayer_folder, @rearview_folder].each do |folder|
           next unless folder && folder.valid?
           folder.visible = true
-          page.set_drawingelement_visibility(folder, true)
+          page.set_visibility(folder, true) # set_visibility works for LayerFolder
           folder.each_layer do |layer|
             layer.visible = true
-            page.set_layer_visibility(layer, true)
+            page.set_visibility(layer, true) # set_visibility works for Layer
           end
         end
 
@@ -1105,9 +1133,9 @@ module Skalp
         section_planes.each do |sectionplane|
           if sectionplane.get_attribute('Skalp', 'ID')
             if sectionplane.get_attribute('Skalp', 'ID') == sectionplaneID
-              page.set_drawingelement_visibility(sectionplane, true)
+              page.set_drawingelement_visibility(sectionplane, true) if sectionplane.is_a?(Sketchup::Drawingelement) && sectionplane.valid?
             else
-              page.set_drawingelement_visibility(sectionplane, false)
+              page.set_drawingelement_visibility(sectionplane, false) if sectionplane.is_a?(Sketchup::Drawingelement) && sectionplane.valid?
             end
           end
         end
@@ -1128,12 +1156,37 @@ module Skalp
       end
 
       #set visiblity of the section_groups
-      section_result_group.entities.grep(Sketchup::Group).each do |section_group|
-        if section_group.get_attribute('Skalp', 'ID') == 'skalp_live_sectiongroup' && Skalp.sectionplane_active == true
+      #set visiblity of the section_groups
+      # puts "Skalp Debug: manage_sections checking section_groups..."
+      section_result_group.entities.each do |section_group|
+        next unless section_group.is_a?(Sketchup::Group) || section_group.is_a?(Sketchup::ComponentInstance)
+        is_live = section_group.get_attribute('Skalp', 'ID') == 'skalp_live_sectiongroup' && Skalp.sectionplane_active == true
+        name_check = section_group.name
+        if section_group.is_a?(Sketchup::ComponentInstance) && section_group.definition
+           name_check = section_group.definition.name
+        end
+        is_rearview = name_check.include?("Rear View") || section_group.get_attribute('Skalp', 'scenedata')
+        
+        # puts "Skalp Debug: Group '#{section_group.name}' (ID: #{section_group.get_attribute('Skalp', 'ID')}) - Live: #{is_live}, Rearview: #{is_rearview}"
+
+        if is_live
           section_group.layer = nil
           Skalp.sectiongroup_visibility(section_group, true)
+        elsif is_rearview
+          # puts "Skalp Debug: Keeping Rearview group visible"
+          Skalp.sectiongroup_visibility(section_group, true)
         else
+          # puts "Skalp Debug: Hiding group '#{section_group.name}'"
           Skalp.sectiongroup_visibility(section_group, false)
+        end
+      end
+      
+      # Ensure Skalp folders and layers are visible in active view
+      [@skalp_folder, @patternlayer_folder, @rearview_folder].each do |folder|
+        next unless folder && folder.valid?
+        folder.visible = true
+        folder.each_layer do |layer|
+          layer.visible = true
         end
       end
 
@@ -1145,7 +1198,7 @@ module Skalp
 
         #set visibility of the sectionplane
         section_planes.each do |sectionplane|
-          page.set_drawingelement_visibility(sectionplane, false)
+          page.set_drawingelement_visibility(sectionplane, false) if sectionplane.is_a?(Sketchup::Drawingelement) && sectionplane.valid?
         end
       end
 

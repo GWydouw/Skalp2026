@@ -295,9 +295,6 @@ module Skalp
     mat_file.close
   end
 
-  def create_thumbnail(pattern_string, w = 81, h = 27)
-  end
-  module_function :create_thumbnail
 
   def create_thumbnail(pattern_string, w = 81, h = 27)
     hatch = Skalp::SkalpHatch::Hatch.new
@@ -325,6 +322,7 @@ module Skalp
                          :space => pattern_string[:space]
                      })
   end
+module_function :create_thumbnail
 
   def get_skalp_material_definition
     definitions = Sketchup.active_model.definitions

@@ -1,0 +1,8 @@
+# Logfile created on 2025-12-22 07:07:01 +0100 by logger.rb/v1.5.3
+I, [2025-12-22T07:07:01.891903 #22726]  INFO -- : Skalp version: 2026.0.9999
+I, [2025-12-22T07:07:01.891951 #22726]  INFO -- : Sketchup version: 26.1.188
+I, [2025-12-22T07:07:01.891988 #22726]  INFO -- : OS: arm64-darwin en-US
+I, [2025-12-22T07:07:23.910110 #22726]  INFO -- : start Skalp
+I, [2025-12-22T07:09:37.749824 #22939]  INFO -- : Skalp version: 2026.0.9999
+I, [2025-12-22T07:09:37.750202 #22939]  INFO -- : Sketchup version: 26.1.188
+I, [2025-12-22T07:09:37.750280 #22939]  INFO -- : OS: arm64-darwin en-US

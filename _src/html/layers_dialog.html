@@ -131,7 +131,7 @@
 
         .col-pattern-header {
             width: 45%;
-            padding: 2px 4px;
+            padding: 2px 4px 2px 7px;
             display: flex;
             align-items: center;
             box-sizing: border-box;
@@ -345,43 +345,45 @@
         var fullData = [];
         var zebraCount = 0;
         var sortAsc = true;
+        var collapsedFolders = loadCollapsedFolders(); // Track collapsed folder state by name
 
-        function update_layers(data) {
-            console.log("update_layers called", data);
-            if (typeof data === 'string') {
-                try { data = JSON.parse(data); } catch (e) { console.error("JSON parse error", e); return; }
+        function loadCollapsedFolders() {
+            try {
+                var stored = localStorage.getItem('skalp_layers_collapsed');
+                return stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                return {};
             }
-            fullData = data || [];
-            console.log("fullData size", fullData.length);
-            render();
         }
 
-        function render() {
-            var container = $('#list-container');
-            container.empty();
-            zebraCount = 0;
-            var filter = $('#filter').val().toLowerCase();
-
-            // Sort data
-            var sortedData = sortTree(fullData, sortAsc);
-            render_tree(sortedData, container, 0, filter);
-
-            // Update sort indicator
-            updateSortIndicator();
+        function saveCollapsedFolders() {
+            try {
+                localStorage.setItem('skalp_layers_collapsed', JSON.stringify(collapsedFolders));
+            } catch (e) { }
         }
 
-        function sortTree(items, asc) {
+        function sortTree(items, ascending) {
             if (!items || !Array.isArray(items)) return items;
-            var sorted = items.slice().sort(function (a, b) {
-                var cmp = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-                return asc ? cmp : -cmp;
+            var sorted = items.slice().sort(function(a, b) {
+                var nameA = a.name.toLowerCase();
+                var nameB = b.name.toLowerCase();
+                if (nameA < nameB) return ascending ? -1 : 1;
+                if (nameA > nameB) return ascending ? 1 : -1;
+                return 0;
             });
-            sorted.forEach(function (item) {
-                if (item.children) {
-                    item.children = sortTree(item.children, asc);
+            // Recursively sort children
+            sorted.forEach(function(item) {
+                if (item.type === 'folder' && item.children) {
+                    item.children = sortTree(item.children, ascending);
                 }
             });
             return sorted;
+        }
+
+        function toggleSort() {
+            sortAsc = !sortAsc;
+            updateSortIndicator();
+            render();
         }
 
         function updateSortIndicator() {
@@ -390,93 +392,171 @@
             indicator.addClass(sortAsc ? 'asc' : 'desc');
         }
 
-        function toggleSort() {
-            sortAsc = !sortAsc;
-            render();
+        function update_layers(json) {
+            if (!json) return;
+            try {
+                fullData = (typeof json === 'string') ? JSON.parse(json) : json;
+                // DIAGNOSTIC
+                if (window.location.host === "") { // Only in local/Sketchup context
+                   // console.log("Skalp: fullData size=" + (fullData ? fullData.length : "null"));
+                }
+                if (!fullData || fullData.length === 0) {
+                     $('#list-container').html('<div style="padding:10px; color:#666;">No tags found.</div>');
+                     return;
+                }
+            } catch (e) {
+                console.error("Invalid JSON:", e);
+                $('#list-container').html('<div style="padding:10px; color:red;">Error loading tags.</div>');
+                return;
+            }
+
+            var container = $('#list-container');
+            if (container.length === 0) return;
+
+            var scrollTop = container.scrollTop();
+            zebraCount = 0;
+            var filterString = $('#filter').val() || "";
+            var filter = filterString.toLowerCase();
+            var sortedData = sortTree(fullData, sortAsc);
+
+            // Re-use strategy: keep track of what we processed
+            var processedIds = new Set();
+            var existingElements = {};
+            container.find('.tree-item').each(function () {
+                var id = $(this).attr('data-id');
+                if (id) existingElements[id] = $(this);
+            });
+
+            // Recursive render
+            render_tree_recursive(sortedData, container, 0, filter, existingElements, processedIds);
+
+            // Cleanup stale elements
+            for (var id in existingElements) {
+                if (!processedIds.has(id)) {
+                    existingElements[id].remove();
+                }
+            }
+
+            container.scrollTop(scrollTop);
+            updateSortIndicator();
         }
 
-        function render_tree(items, parent_el, level, filter) {
+        function render_tree_recursive(items, container, level, filter, existingElements, processedIds) {
             if (!items || !Array.isArray(items)) return;
 
             items.forEach(function (item) {
-                var isVisibleBySearch = true;
-                if (filter && item.type === 'layer') {
-                    isVisibleBySearch = item.name.toLowerCase().indexOf(filter) !== -1;
+                // Visibility check
+                var isVisible = true;
+                if (filter) {
+                    isVisible = item.name.toLowerCase().indexOf(filter) !== -1;
+                    if (!isVisible && item.type === 'folder' && item.children) {
+                        isVisible = check_visible_recursive(item.children, filter);
+                    }
+                }
+                if (!isVisible) return;
+
+                var itemId = item.id;
+                processedIds.add(itemId);
+
+                var row = existingElements[itemId];
+                var isNew = false;
+                if (!row) {
+                    row = $('<div class="tree-item"></div>').attr('data-id', itemId);
+                    isNew = true;
                 }
 
-                var hasVisibleChildren = false;
-                if (item.type === 'folder' && item.children) {
-                    hasVisibleChildren = check_visible_recursive(item.children, filter);
-                }
-
-                if (filter && item.type === 'folder' && !hasVisibleChildren) {
-                    isVisibleBySearch = item.name.toLowerCase().indexOf(filter) !== -1;
-                }
-
-                if (!isVisibleBySearch && !hasVisibleChildren && filter) return;
-
-                var row = $('<div class="tree-item"></div>');
+                // Update striping
+                row.removeClass('zebra');
                 if (zebraCount % 2 === 1) row.addClass('zebra');
                 zebraCount++;
 
-                var nameCol = $('<div class="col-name item-row"></div>');
-
-                // Indentation: Minimal whitespace
-                var pad = (level * 12) + 0;
+                // Build Columns if needed
+                var nameCol = row.find('.col-name');
+                if (nameCol.length === 0) {
+                    nameCol = $('<div class="col-name item-row"></div>');
+                    row.append(nameCol);
+                }
+                var pad = (level * 18) + 4; // Increased padding for better hierarchy
                 nameCol.css('padding-left', pad + 'px');
 
+                // Content update
+                var nameContent = '';
                 if (item.type === 'folder') {
-                    var toggle = $('<div class="toggle-icon"></div>');
-                    var icon = $('<div class="folder-icon"></div>');
-                    var label = $('<span class="item-label">' + item.name + '</span>');
+                    var expanded = !collapsedFolders[item.name];
+                    var arrowClass = expanded ? 'toggle-icon expanded' : 'toggle-icon';
+                    nameContent += '<div class="' + arrowClass + '" onclick="toggleFolder(\'' + item.name + '\', event)"></div>';
+                    nameContent += '<div class="folder-icon"></div>';
+                    nameContent += '<div class="item-label" title="' + item.name + '">' + item.name + '</div>';
+                } else {
+                    nameContent += '<div class="toggle-spacer" style="width:18px; flex-shrink:0;"></div>';
+                    nameContent += '<div class="item-label" title="' + item.name + '">' + item.name + '</div>';
+                }
+                if (nameCol.html() !== nameContent) nameCol.html(nameContent);
 
-                    nameCol.append(toggle).append(icon).append(label);
-                    row.append(nameCol);
-                    row.append('<div class="col-pattern item-row"></div>');
-                    parent_el.append(row);
+                var patCol = row.find('.col-pattern');
+                if (patCol.length === 0) {
+                    patCol = $('<div class="col-pattern item-row"></div>');
+                    row.append(patCol);
+                }
 
-                    var childrenContainer = $('<div class="children-container"></div>');
-                    parent_el.append(childrenContainer);
+                if (item.type === 'layer') {
+                    var matName = item.material || "";
+                    var thumb = item.thumb;
+                    var thickness = item.thickness || 1;
 
-                    if (item.children && item.children.length > 0) {
-                        render_tree(item.children, childrenContainer, level + 1, filter);
-                    } else {
-                        toggle.css('opacity', 0).css('cursor', 'default');
+                    // Use the helper function to render material/pattern preview
+                    var patContainer = patCol.find('.material-selector');
+                    if (patContainer.length === 0) {
+                        patContainer = $('<div class="material-selector"></div>');
+                        patCol.append(patContainer);
                     }
-
-                    toggle.addClass('expanded');
-
-                    toggle.click(function () {
-                        var $this = $(this);
-                        if ($this.hasClass('expanded')) {
-                            $this.removeClass('expanded');
-                            childrenContainer.hide();
-                        } else {
-                            $this.addClass('expanded');
-                            childrenContainer.show();
-                        }
+                    
+                    update_material_selector_visual(patContainer, matName, thumb, thickness);
+                    
+                    patContainer.off('click').on('click', function(e) {
+                         e.stopPropagation();
+                         materialSelector(item.id);
                     });
                 } else {
-                    // Layer - add spacer matching toggle width for alignment
-                    nameCol.append($('<div style="width:20px;flex-shrink:0;"></div>'));
-                    var label = $('<span class="item-label">' + item.name + '</span>');
-                    nameCol.append(label);
-                    row.append(nameCol);
+                    patCol.empty();
+                }
 
-                    var matCol = $('<div class="col-pattern item-row"></div>');
-                    var matSelector = $('<div class="material-selector" id="' + item.id + '"></div>');
+                // Placement logic
+                if (isNew) {
+                    container.append(row);
+                } else {
+                    // Always append to ensure correct order in the flat list
+                    container.append(row);
+                }
 
-                    update_material_selector_visual(matSelector, item.material, item.thumb, item.thickness);
-
-                    matSelector.click(function () {
-                        materialSelector(item.id);
-                    });
-
-                    matCol.append(matSelector);
-                    row.append(matCol);
-                    parent_el.append(row);
+                // Recursion for folders
+                if (item.type === 'folder' && !collapsedFolders[item.name]) {
+                    render_tree_recursive(item.children, container, level + 1, filter, existingElements, processedIds);
                 }
             });
+        }
+
+        function toggleFolder(name, event) {
+            event.stopPropagation();
+            if (collapsedFolders[name]) {
+                delete collapsedFolders[name];
+            } else {
+                collapsedFolders[name] = true;
+            }
+            saveCollapsedFolders();
+            render();
+        }
+
+        function editPattern(id) {
+            // Restore proper callback format with coordinates
+            var x = window.screenX.toString();
+            var y = window.screenY.toString();
+            var params = x.concat(";", y, ";", id.toString());
+            window.location = 'skp:materialSelector@' + params;
+        }
+
+        function render() {
+            update_layers(fullData);
         }
 
         function check_visible_recursive(items, filter) {
