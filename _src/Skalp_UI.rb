@@ -260,7 +260,7 @@ module Skalp
         vars = params.split(';')
         x = vars[0]
         y = vars[1]
-        id = vars[2]
+        id = vars[2..-1].join(';') # Could be multiple IDs separated by ;
 
         Skalp::Material_dialog.show_dialog(x, y, webdialog, id)
       }
@@ -314,8 +314,38 @@ module Skalp
     else
       Skalp.active_model.start("Skalp - #{translate('dissociate section-material from layer')}", true)
       layer.delete_attribute('Skalp', 'material')  if layer
-    Skalp.active_model.commit
+      Skalp.active_model.commit
     end
+  end
+
+  def self.define_batch_layer_materials(ids, material)
+    # ids is a semicolon separated string of IDs
+    id_list = ids.split(';')
+    
+    Skalp.active_model.start("Skalp - #{translate('batch associate section-material')}", true)
+    
+    id_list.each do |id|
+      layer = Skalp.layers_hash[id]
+      next unless layer
+      
+      if material == "- #{translate('no pattern selected')} -" || material == ""
+        layer.delete_attribute('Skalp', 'material')
+      else
+        layer.set_attribute('Skalp', 'material', material)
+      end
+    end
+    
+    # Ensure the material is in the model if it's a Skalp material
+    unless material == "- #{translate('no pattern selected')} -" || material == ""
+       Skalp.add_skalp_material_to_instance([material])
+    end
+
+    Skalp.active_model.commit
+    
+    data = {
+        :action => :update_style
+    }
+    Skalp.active_model.controlCenter.add_to_queue(data)
   end
 
   def self.update_layers_dialog

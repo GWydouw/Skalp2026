@@ -179,6 +179,23 @@
             background-color: #e8f2ff;
         }
 
+        .tree-item.selected {
+            background-color: #3875d7 !important;
+        }
+
+        .tree-item.selected .item-label,
+        .tree-item.selected .material-name {
+            color: #fff !important;
+        }
+
+        .tree-item.selected .folder-icon {
+            filter: brightness(0) invert(1);
+        }
+
+        .tree-item.selected .toggle-icon {
+            filter: brightness(0) invert(1);
+        }
+
         .item-row {
             display: flex;
             align-items: center;
@@ -257,8 +274,7 @@
             height: 100%;
             margin-right: 8px;
             flex-shrink: 0;
-            background-color: #eee;
-            background-size: contain;
+            background-size: 100% 100%;
             background-repeat: no-repeat;
             background-position: center;
             cursor: pointer;
@@ -346,6 +362,9 @@
         var zebraCount = 0;
         var sortAsc = true;
         var collapsedFolders = loadCollapsedFolders(); // Track collapsed folder state by name
+        var selectedIds = new Set();
+        var lastSelectedId = null;
+        var flattenedItems = []; // For shift-selection range mapping
 
         function loadCollapsedFolders() {
             try {
@@ -364,7 +383,7 @@
 
         function sortTree(items, ascending) {
             if (!items || !Array.isArray(items)) return items;
-            var sorted = items.slice().sort(function(a, b) {
+            var sorted = items.slice().sort(function (a, b) {
                 var nameA = a.name.toLowerCase();
                 var nameB = b.name.toLowerCase();
                 if (nameA < nameB) return ascending ? -1 : 1;
@@ -372,7 +391,7 @@
                 return 0;
             });
             // Recursively sort children
-            sorted.forEach(function(item) {
+            sorted.forEach(function (item) {
                 if (item.type === 'folder' && item.children) {
                     item.children = sortTree(item.children, ascending);
                 }
@@ -398,11 +417,11 @@
                 fullData = (typeof json === 'string') ? JSON.parse(json) : json;
                 // DIAGNOSTIC
                 if (window.location.host === "") { // Only in local/Sketchup context
-                   // console.log("Skalp: fullData size=" + (fullData ? fullData.length : "null"));
+                    // console.log("Skalp: fullData size=" + (fullData ? fullData.length : "null"));
                 }
                 if (!fullData || fullData.length === 0) {
-                     $('#list-container').html('<div style="padding:10px; color:#666;">No tags found.</div>');
-                     return;
+                    $('#list-container').html('<div style="padding:10px; color:#666;">No tags found.</div>');
+                    return;
                 }
             } catch (e) {
                 console.error("Invalid JSON:", e);
@@ -428,6 +447,7 @@
             });
 
             // Recursive render
+            flattenedItems = [];
             render_tree_recursive(sortedData, container, 0, filter, existingElements, processedIds);
 
             // Cleanup stale elements
@@ -457,6 +477,7 @@
 
                 var itemId = item.id;
                 processedIds.add(itemId);
+                flattenedItems.push(item);
 
                 var row = existingElements[itemId];
                 var isNew = false;
@@ -465,10 +486,15 @@
                     isNew = true;
                 }
 
-                // Update striping
-                row.removeClass('zebra');
-                if (zebraCount % 2 === 1) row.addClass('zebra');
+                // Update selection & striping
+                row.removeClass('zebra selected');
+                if (selectedIds.has(itemId)) row.addClass('selected');
+                else if (zebraCount % 2 === 1) row.addClass('zebra');
                 zebraCount++;
+
+                row.off('click').on('click', function (e) {
+                    handleRowClick(item, e);
+                });
 
                 // Build Columns if needed
                 var nameCol = row.find('.col-name');
@@ -510,12 +536,18 @@
                         patContainer = $('<div class="material-selector"></div>');
                         patCol.append(patContainer);
                     }
-                    
+
                     update_material_selector_visual(patContainer, matName, thumb, thickness);
-                    
-                    patContainer.off('click').on('click', function(e) {
-                         e.stopPropagation();
-                         materialSelector(item.id);
+
+                    patContainer.off('click').on('click', function (e) {
+                        e.stopPropagation(); // Avoid triggering row selection
+                        if (!selectedIds.has(item.id)) {
+                            selectedIds.clear();
+                            selectedIds.add(item.id);
+                            lastSelectedId = item.id;
+                            render();
+                        }
+                        materialSelector(Array.from(selectedIds).join(';'));
                     });
                 } else {
                     patCol.empty();
@@ -544,6 +576,38 @@
                 collapsedFolders[name] = true;
             }
             saveCollapsedFolders();
+            render();
+        }
+
+        function handleRowClick(item, event) {
+            var id = item.id;
+
+            if (event.ctrlKey || event.metaKey) {
+                // Toggle
+                if (selectedIds.has(id)) selectedIds.delete(id);
+                else selectedIds.add(id);
+                lastSelectedId = id;
+            } else if (event.shiftKey && lastSelectedId !== null) {
+                // Range
+                var idx1 = -1, idx2 = -1;
+                for (var i = 0; i < flattenedItems.length; i++) {
+                    if (flattenedItems[i].id === lastSelectedId) idx1 = i;
+                    if (flattenedItems[i].id === id) idx2 = i;
+                }
+                if (idx1 !== -1 && idx2 !== -1) {
+                    selectedIds.clear();
+                    var start = Math.min(idx1, idx2);
+                    var end = Math.max(idx1, idx2);
+                    for (var i = start; i <= end; i++) {
+                        selectedIds.add(flattenedItems[i].id);
+                    }
+                }
+            } else {
+                // Single select
+                selectedIds.clear();
+                selectedIds.add(id);
+                lastSelectedId = id;
+            }
             render();
         }
 
@@ -586,7 +650,7 @@
                 if (thumb && thumb !== '') {
                     previewBox.css('background-image', 'url(data:image/png;base64,' + thumb + ')');
                 } else {
-                    previewBox.css('background-color', '#fff');
+                    previewBox.css('background-color', 'transparent');
                 }
 
                 el.append(previewBox);

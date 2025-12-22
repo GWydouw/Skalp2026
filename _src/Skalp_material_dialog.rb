@@ -161,7 +161,11 @@ module Skalp
             @return_webdialog.execute_script("$('##{@id}').change()")
             @materialdialog.close if @return_webdialog
           elsif @return_webdialog == Skalp.layers_dialog
-            Skalp.define_layer_material(Skalp.layers_hash[@id], materialname) if Skalp.layers_hash[@id]
+            if @id.to_s.include?(';')
+              Skalp.define_batch_layer_materials(@id, materialname)
+            else
+              Skalp.define_layer_material(Skalp.layers_hash[@id], materialname) if Skalp.layers_hash[@id]
+            end
             Skalp.update_layers_dialog
             @materialdialog.close if @return_webdialog
           elsif @return_webdialog == Skalp.hatch_dialog.webdialog
