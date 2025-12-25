@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>SectionBox Settings</title>
+    <style>
+        :root {
+            --primary-color: #0078d4;
+            --bg-color: #f7f7f7;
+            --text-color: #333;
+            --input-bg: #fff;
+            --spacing: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            flex: 1;
+            padding: var(--spacing);
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .section {
+            background: var(--input-bg);
+            border-radius: 6px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        h3 {
+            margin: 0 0 8px 0;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            min-height: 24px;
+        }
+
+        .row:last-child {
+            margin-bottom: 0;
+        }
+
+        .label {
+            flex: 0 0 110px;
+            color: #444;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: var(--input-bg);
+            font-size: 12px;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        input[type="text"]:focus,
+        select:focus {
+            border-color: var(--primary-color);
+        }
+
+        /* Standard Checkbox */
+        input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        /* Flex alignment for checkbox labels */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        .footer {
+            padding: 10px var(--spacing);
+            background: #fff;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        button {
+            padding: 5px 16px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+        }
+
+        #cancel {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #dcdcdc;
+        }
+
+        #cancel:hover {
+            background: #e0e0e0;
+        }
+
+        #save {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        #save:hover {
+            background: #0064b1;
+        }
+
+        #save-default {
+            font-size: 11px;
+            color: var(--primary-color);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        #save-default:hover {
+            text-decoration: underline;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 4px;
+            line-height: 1;
+            margin-left: 2px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .delete-btn:hover {
+            color: #d00;
+        }
+
+        /* Custom Scale Overlay */
+        #custom-scale-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 10;
+            display: none;
+            padding: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .scale-form {
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 15px;
+            border-radius: 6px;
+            width: 320px;
+        }
+
+        .scale-inputs {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .scale-inputs input {
+            flex: 1;
+            padding: 6px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .scale-inputs span {
+            font-weight: bold;
+            color: #666;
+            padding: 0 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- GLOBAL -->
+        <div class="section">
+            <div class="row" style="margin-top: 5px;">
+                <div class="label">Name</div>
+                <div class="input-wrapper"><input type="text" id="name" placeholder="SectionBox Name"></div>
+            </div>
+            <div class="row">
+                <div class="label">Drawing Scale</div>
+                <div class="input-wrapper">
+                    <select id="scale-select"></select>
+                    <button type="button" class="delete-btn" id="delete-scale" title="Remove scale from list">×</button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="label">Rear View Proj.</div>
+                <div class="input-wrapper">
+                    <select id="rear-view-global">
+                        <option value="off">Off</option>
+                        <option value="on">On</option>
+                        <option value="side">Define by side</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- PER SIDE -->
+        <div class="section">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 24px;">
+                <h3 style="margin: 0;">Side Settings</h3>
+                <label class="checkbox-label" style="font-weight: normal; color: #333;">
+                    <input type="checkbox" id="all-same" checked>
+                    <span>All sides same</span>
+                </label>
+            </div>
+            <div class="row" id="side-select-row" style="display: none;">
+                <div class="label">Side</div>
+                <div class="input-wrapper">
+                    <select id="side-selector">
+                        <option value="top">Top</option>
+                        <option value="bottom">Bottom</option>
+                        <option value="front">Front</option>
+                        <option value="back">Back</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="label">Section Cut Width</div>
+                <div class="input-wrapper"><input type="checkbox" id="cut-width" checked></div>
+            </div>
+            <div class="row">
+                <div class="label">Style Rule</div>
+                <div class="input-wrapper">
+                    <select id="style-rule">
+                        <option value="default_color">Default Color</option>
+                        <option value="by_tag">By Tag</option>
+                        <option value="by_object">By Object</option>
+                        <option value="by_material">By Material</option>
+                        <option value="by_multitag">By MultiTag</option>
+                        <option value="combined">Combined Object/Tag</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="label">Rear View</div>
+                <div class="input-wrapper">
+                    <select id="rear-view-local">
+                        <option value="off">Off</option>
+                        <option value="on">On</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div style="text-align: right; margin-top: -5px;"><a id="save-default">Save as Default</a></div>
+
+        <!-- Custom Scale Overlay -->
+        <div id="custom-scale-overlay">
+            <div class="scale-form">
+                <h3 style="margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 5px;">Add Custom Scale
+                </h3>
+                <div style="font-size: 11px; color: #666; margin-bottom: 8px;">Enter value with (optional) unit (e.g.,
+                    1, 1cm, 1/8", 5')</div>
+                <div class="scale-inputs">
+                    <input type="text" id="paper-input" placeholder="Paper (e.g. 1cm)">
+                    <span>=</span>
+                    <input type="text" id="model-input" placeholder="Model (e.g. 50m)">
+                </div>
+                <div id="parse-preview" style="font-size: 10px; color: #999; margin-top: 4px; text-align: right;"></div>
+                <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 15px;">
+                    <button id="cancel-scale"
+                        style="background: #f0f0f0; color: #333; border: 1px solid #ccc;">Cancel</button>
+                    <button id="add-scale" style="background: var(--primary-color); color: white;">Add Scale</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="footer">
+        <button id="cancel" onclick="window.location.href='skp:close'">Cancel</button>
+        <button id="save">Create</button>
+    </div>
+
+    <script src="../html/js/jquery.js"></script>
+    <script>
+        let availableScales = [];
+        function initScales(scales) {
+            availableScales = scales;
+            renderScaleSelect();
+        }
+
+        function renderScaleSelect(selectValue = null) {
+            // Sort scales: Metric first, then Imperial. Both sorted from Large to Small (Ratio Ascending).
+            const metric = [];
+            const imperial = [];
+
+            availableScales.forEach(s => {
+                const isImperial = s.includes('"') || s.includes("'") || s.toLowerCase().includes('in') || s.toLowerCase().includes('ft');
+                if (isImperial) imperial.push(s);
+                else metric.push(s);
+            });
+
+            const sorter = (a, b) => parseScaleValue(a) - parseScaleValue(b);
+            metric.sort(sorter);
+            imperial.sort(sorter);
+
+            availableScales = [...metric, ...imperial];
+
+            const $sel = $('#scale-select');
+            $sel.empty();
+            availableScales.forEach(s => {
+                const $opt = $('<option>').val(s).text(s);
+                $sel.append($opt);
+            });
+            $sel.append('<option disabled>──────────</option>');
+            $sel.append($('<option>').val('custom').text('Custom...'));
+
+            if (selectValue && availableScales.includes(selectValue)) {
+                $sel.val(selectValue);
+            } else {
+                const defaultScale = availableScales.find(s => s === "1:50" || s === "1:50 (1:50)" || s.includes("(1:50)"));
+                if (defaultScale) $sel.val(defaultScale);
+                else if (availableScales.length > 0) $sel.val(availableScales[0]);
+            }
+        }
+
+        function parseScaleValue(scaleStr) {
+            if (!scaleStr) return 50;
+            const ratioMatch = scaleStr.match(/\(1:([\d\.]+)\)$/) || scaleStr.match(/^1:([\d\.]+)$/);
+            if (ratioMatch) return parseFloat(ratioMatch[1]);
+            if (scaleStr.includes(':')) {
+                const parts = scaleStr.split(':');
+                if (parts.length === 2 && parseFloat(parts[0]) !== 0) return parseFloat(parts[1]) / parseFloat(parts[0]);
+            }
+            return 50;
+        }
+
+        function loadDefaults(defaults) {
+            if (defaults.scale) {
+                const val = parseFloat(defaults.scale.replace('1/', ''));
+                const found = availableScales.find(s => Math.abs(parseScaleValue(s) - val) < 0.001);
+                if (found) $('#scale-select').val(found);
+            }
+            $('#rear-view-global').val(defaults.rear_view_global || 'off');
+            $('#all-same').prop('checked', defaults.sides_all_same !== false).trigger('change');
+            if (defaults.sides) {
+                sides.forEach(s => {
+                    const src = defaults.sides['all'] || defaults.sides[s] || defaultSideSettings;
+                    sideData[s] = { ...src };
+                });
+                const currentSide = $('#all-same').is(':checked') ? 'all' : $('#side-selector').val();
+                loadSideData(currentSide === 'all' ? 'top' : currentSide);
+            }
+        }
+
+        const sides = ['top', 'bottom', 'front', 'back', 'left', 'right'];
+        let sideData = {};
+        const defaultSideSettings = { cut_width: true, style_rule: 'combined', rear_view: 'off' };
+        sides.forEach(s => sideData[s] = { ...defaultSideSettings });
+        function saveCurrentSideData() {
+            const sideName = $('#all-same').is(':checked') ? 'all' : $('#side-selector').val();
+            sideData[sideName] = {
+                cut_width: $('#cut-width').is(':checked'),
+                style_rule: $('#style-rule').val(),
+                rear_view: $('#rear-view-local').val()
+            };
+            if (sideName === 'all') sides.forEach(s => sideData[s] = { ...sideData['all'] });
+        }
+        function loadSideData(sideName) {
+            const d = sideData[sideName];
+            $('#cut-width').prop('checked', d.cut_width);
+            $('#style-rule').val(d.style_rule);
+            $('#rear-view-local').val(d.rear_view);
+        }
+
+        // Smart Unit Parser
+        function parseUnitValue(str) {
+            if (!str) return null;
+            str = str.trim().toLowerCase();
+
+            // Handle fractions like 1/8
+            let numeric = 0;
+            const fractionMatch = str.match(/^(\d+)\/(\d+)/);
+            if (fractionMatch) {
+                numeric = parseFloat(fractionMatch[1]) / parseFloat(fractionMatch[2]);
+                str = str.replace(fractionMatch[0], '').trim();
+            } else {
+                const numMatch = str.match(/^[\d\.]+/);
+                if (!numMatch) return null;
+                numeric = parseFloat(numMatch[0]);
+                str = str.replace(numMatch[0], '').trim();
+            }
+
+            // Detect unit
+            let multiplier = 1.0; // default mm
+            if (str.includes('cm')) multiplier = 10.0;
+            else if (str.includes('m')) multiplier = 1000.0;
+            else if (str.includes('"') || str.includes('inch')) multiplier = 25.4;
+            else if (str.includes("'") || str.includes('ft') || str.includes('foot')) multiplier = 304.8;
+
+            return { value: numeric * multiplier, original: numeric, unit: str || 'mm' };
+        }
+
+        const callRuby = (callback, data = null) => {
+            if (window.sketchup && window.sketchup[callback]) {
+                window.sketchup[callback](data);
+            } else {
+                const url = `skp:${callback}${data !== null ? '@' + (typeof data === 'string' ? data : JSON.stringify(data)) : ''}`;
+                window.location.href = url;
+            }
+        };
+
+        $(document).ready(() => {
+            callRuby("ready");
+
+            $('#scale-select').on('change', function () {
+                if ($(this).val() === 'custom') $('#custom-scale-overlay').css('display', 'flex');
+            });
+
+            $('#delete-scale').on('click', () => {
+                const current = $('#scale-select').val();
+                if (!current || current === 'custom') return;
+                const idx = availableScales.indexOf(current);
+                if (idx > -1) {
+                    availableScales.splice(idx, 1);
+                    renderScaleSelect();
+                    callRuby("save_scales", availableScales);
+                }
+            });
+
+            $('#paper-input, #model-input').on('input', function () {
+                const p = parseUnitValue($('#paper-input').val());
+                const m = parseUnitValue($('#model-input').val());
+                if (p && m) {
+                    const ratio = m.value / p.value;
+                    const nice = Math.round(ratio * 100) / 100;
+                    $('#parse-preview').text(`Detected Ratio: 1:${nice}`);
+                } else {
+                    $('#parse-preview').text('');
+                }
+            });
+
+            $('#cancel-scale').on('click', () => {
+                $('#custom-scale-overlay').hide();
+                const defaultScale = availableScales.find(s => s.includes("1:50"));
+                $('#scale-select').val(defaultScale || availableScales[0]);
+            });
+
+            $('#add-scale').on('click', () => {
+                const p = parseUnitValue($('#paper-input').val());
+                const m = parseUnitValue($('#model-input').val());
+
+                if (!p || !m) {
+                    alert("Please enter valid sizes (e.g., 1cm, 50m)");
+                    return;
+                }
+
+                const ratio = m.value / p.value;
+                const niceRatio = Math.round(ratio * 100) / 100;
+
+                const displayPaper = $('#paper-input').val().trim();
+                const displayModel = $('#model-input').val().trim();
+                const ratioStr = `1:${niceRatio}`;
+                const primaryStr = `${displayPaper}:${displayModel}`;
+                const newString = (primaryStr === ratioStr) ? primaryStr : `${primaryStr} (${ratioStr})`;
+
+                availableScales.push(newString);
+                renderScaleSelect(newString);
+                $('#custom-scale-overlay').hide();
+                callRuby("save_scales", availableScales);
+            });
+
+            $('#all-same').on('change', function () {
+                if (this.checked) { $('#side-select-row').hide(); }
+                else { $('#side-select-row').show(); loadSideData($('#side-selector').val()); }
+            });
+            $('#side-selector').on('change', function () { saveCurrentSideData(); loadSideData($(this).val()); });
+            $('#rear-view-global').on('change', function () {
+                const val = $(this).val();
+                $('#rear-view-local').prop('disabled', val !== 'side');
+                if (val !== 'side') $('#rear-view-local').val('off');
+            }).trigger('change');
+
+            $('#save').on('click', () => {
+                saveCurrentSideData();
+                const allSame = $('#all-same').is(':checked');
+                const finalSideData = allSame ? { 'all': sideData['top'] } : sideData;
+                const scaleVal = parseScaleValue($('#scale-select').val());
+                const data = {
+                    name: $('#name').val(),
+                    scale: scaleVal,
+                    rear_view_global: $('#rear-view-global').val(),
+                    sides_all_same: allSame,
+                    sides: finalSideData
+                };
+                callRuby("save", data);
+            });
+
+            $('#save-default').on('click', (e) => {
+                e.preventDefault();
+                saveCurrentSideData();
+                const allSame = $('#all-same').is(':checked');
+                const finalSideData = allSame ? { 'all': sideData['top'] } : sideData;
+                const scaleVal = parseScaleValue($('#scale-select').val());
+                const data = {
+                    name: $('#name').val(),
+                    scale: scaleVal,
+                    rear_view_global: $('#rear-view-global').val(),
+                    sides_all_same: allSame,
+                    sides: finalSideData
+                };
+                callRuby("save_default", data);
+            });
+
+            $('#cancel').on('click', () => callRuby("close"));
+        });
+
+        function setName(name) { $('#name').val(name); }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>SectionBox Manager</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            user-select: none;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+            gap: 8px;
+        }
+
+        .tool-icon {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+
+        .tool-icon:hover {
+            opacity: 1;
+        }
+
+        .filter-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 1px 5px;
+        }
+
+        .filter-input {
+            border: none;
+            outline: none;
+            width: 100%;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+
+        .header {
+            display: flex;
+            background-color: #fff;
+            border-bottom: 1px solid #eee;
+            font-weight: bold;
+            color: #666;
+            padding: 4px 0;
+        }
+
+        .header-cell {
+            padding: 0 10px;
+        }
+
+        .col-name {
+            flex-grow: 1;
+            border-right: 1px solid #eee;
+        }
+
+        .sort-toggle {
+            cursor: pointer;
+            float: right;
+            padding: 0 5px;
+        }
+
+        .tree-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            background: white;
+        }
+
+        .tree-item {
+            display: flex;
+            align-items: center;
+            padding: 3px 0;
+            cursor: default;
+            border-bottom: 1px solid #f9f9f9;
+        }
+
+        .tree-item:hover {
+            background-color: #e8f0fe;
+        }
+
+        .tree-item.selected {
+            background-color: #d2e3fc;
+        }
+
+        .tree-item.active {
+            font-weight: bold;
+        }
+
+        .toggle {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .icon {
+            width: 16px;
+            height: 16px;
+            margin: 0 4px;
+        }
+
+        .name-label {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .scale-label {
+            color: #999;
+            font-style: italic;
+            font-size: 10px;
+            width: 100px;
+            text-align: right;
+            padding-right: 15px;
+            white-space: nowrap;
+        }
+
+        .status-bar {
+            padding: 4px 10px;
+            background: #eee;
+            border-top: 1px solid #ccc;
+            color: #666;
+            font-size: 10px;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        #status-text-bottom {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #controls-min {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #666;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        #context-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            min-width: 140px;
+        }
+
+        .menu-item {
+            padding: 5px 15px;
+            cursor: pointer;
+        }
+
+        .menu-item:hover {
+            background-color: #0078d4;
+            color: white;
+        }
+
+        .menu-sep {
+            height: 1px;
+            background: #eee;
+            margin: 3px 0;
+        }
+
+        .drag-over {
+            background-color: #e0e0e0 !important;
+            border: 1px dashed #999;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="toolbar">
+        <div id="controls-max" style="display: flex; flex-grow: 1; align-items: center; gap: 8px;">
+            <img src="../icons/box_section/plus_circled.png" class="tool-icon" id="add-box"
+                title="Add SectionBox from selection">
+            <img src="../icons/box_section/folderplus.png" class="tool-icon" id="add-folder" title="New Folder">
+            <div class="filter-container">
+                <span>&#128269;</span><input type="text" class="filter-input" placeholder="Filter" id="filter">
+            </div>
+        </div>
+        <div id="controls-min" style="display: none;">SectionBox: None</div>
+        <!-- Toggle button consistently in the toolbar -->
+        <div class="tool-icon" id="minimize-btn" title="Minimize to Status Bar">
+            <img src="../icons/box_section/dlg_hide_secondary_view.png" id="minimize-icon"
+                style="width: 18px; height: 18px;">
+        </div>
+    </div>
+    <div class="header">
+        <div class="header-cell col-name sort-toggle" data-col="name" style="cursor: pointer; flex-grow: 1;">
+            Name <span id="sort-indicator-name">^</span>
+        </div>
+        <div class="header-cell col-scale sort-toggle" data-col="scale"
+            style="cursor: pointer; width: 100px; text-align: right; padding-right: 15px;">
+            <span id="sort-indicator-scale"></span>
+        </div>
+    </div>
+    <div class="tree-container" id="tree"></div>
+    <div class="status-bar" id="status-line">
+        <div id="status-text-bottom">SectionBox: None</div>
+    </div>
+    <div id="context-menu"></div>
+
+    <script src="../html/js/jquery.js"></script>
+    <script>
+        let currentState = { boxes: {}, hierarchy: [], active_id: null };
+        let draggedDetails = null;
+        let selectedFolderId = null;
+        let activeSort = { col: 'name', asc: true };
+        let isMinimized = false;
+        const DEFAULT_HEIGHT = 500;
+        const MIN_HEIGHT = 55; // Tool bar + Mac Title bar safety
+
+        function toggleMinimize() {
+            isMinimized = !isMinimized;
+            const $icon = $('#minimize-icon');
+            if (isMinimized) {
+                $('#controls-max, .tree-container, .header, .status-bar').hide();
+                $('#controls-min').show();
+                $icon.attr('src', '../icons/box_section/dlg_show_secondary_view.png');
+                $('#minimize-btn').attr('title', 'Restore Manager');
+                // Resize window via Ruby
+                if (window.sketchup) {
+                    window.sketchup.resize_window(JSON.stringify({ width: 300, height: MIN_HEIGHT }));
+                } else {
+                    window.location.href = `skp:resize_window@${JSON.stringify({ width: 300, height: MIN_HEIGHT })}`;
+                }
+            } else {
+                $('#controls-max, .tree-container, .header, .status-bar').show();
+                $('#controls-min').hide();
+                $icon.attr('src', '../icons/box_section/dlg_hide_secondary_view.png');
+                $('#minimize-btn').attr('title', 'Minimize to Status Bar');
+                if (window.sketchup) {
+                    window.sketchup.resize_window(JSON.stringify({ width: 300, height: DEFAULT_HEIGHT }));
+                } else {
+                    window.location.href = `skp:resize_window@${JSON.stringify({ width: 300, height: DEFAULT_HEIGHT })}`;
+                }
+            }
+        }
+
+        function parseScaleValue(scaleStr) {
+            if (!scaleStr) return 50;
+            const ratioMatch = scaleStr.match(/\(1:([\d\.]+)\)$/) || scaleStr.match(/^1:([\d\.]+)$/);
+            if (ratioMatch) return parseFloat(ratioMatch[1]);
+            if (scaleStr.includes(':')) {
+                const parts = scaleStr.split(':');
+                if (parts.length === 2 && parseFloat(parts[0]) !== 0) return parseFloat(parts[1]) / parseFloat(parts[0]);
+            }
+            return 50;
+        }
+
+        function sortHierarchy(items) {
+            items.sort((a, b) => {
+                let valA, valB;
+                if (activeSort.col === 'name') {
+                    valA = a.type === 'folder' ? (a.name || '') : (currentState.boxes[a.id]?.name || '');
+                    valB = b.type === 'folder' ? (b.name || '') : (currentState.boxes[b.id]?.name || '');
+                    return activeSort.asc ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' }) : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+                } else if (activeSort.col === 'scale') {
+                    const getGroup = (item) => {
+                        if (item.type === 'folder') return 0;
+                        const box = currentState.boxes[item.id];
+                        if (!box) return 2;
+                        const s = (box.scale || '').toLowerCase();
+                        const isImp = s.includes('"') || s.includes("'") || s.includes('in') || s.includes('ft');
+                        return isImp ? 2 : 1;
+                    };
+                    const ratioA = a.type === 'folder' ? 0 : parseScaleValue(currentState.boxes[a.id]?.scale);
+                    const ratioB = b.type === 'folder' ? 0 : parseScaleValue(currentState.boxes[b.id]?.scale);
+                    const grpA = getGroup(a);
+                    const grpB = getGroup(b);
+
+                    if (grpA !== grpB) return grpA - grpB;
+                    return activeSort.asc ? ratioA - ratioB : ratioB - ratioA;
+                }
+                return 0;
+            });
+            items.forEach(i => {
+                if (i.children) sortHierarchy(i.children);
+            });
+        }
+        // ... (rest of methods)
+
+        function updateData(data) {
+            currentState = data;
+            renderTree();
+            updateStatus();
+        }
+
+        function renderTree() {
+            // Sort data before rendering
+            sortHierarchy(currentState.hierarchy);
+
+            const $tree = $('#tree');
+            $tree.empty();
+            // Remove old listeners to avoid accumulation
+            $tree.off('dragover dragleave drop');
+
+            // Root container drop zone (move to root)
+            $tree.on('dragover', e => { e.preventDefault(); $tree.addClass('drag-over'); });
+            $tree.on('dragleave', e => { if (e.target === $tree[0]) $tree.removeClass('drag-over'); });
+            $tree.on('drop', e => {
+                e.preventDefault(); e.stopPropagation();
+                $tree.removeClass('drag-over');
+                if (draggedDetails) safeCallback("move_item", JSON.stringify({ source: draggedDetails.id, target: "" }));
+                draggedDetails = null;
+            });
+
+            // Filter logic
+            const filterVal = $('#filter').val().toLowerCase();
+
+            function renderItem(item, depth = 0) {
+                // ... (filtering logic could go here)
+
+                if (item.type === 'folder') {
+                    const $folder = $(`<div class="tree-item folder ${item.id === selectedFolderId ? 'selected' : ''}" draggable="true"></div>`);
+                    $folder.css('padding-left', `${depth * 16}px`);
+                    $folder.append(`<div class="toggle">${item.open ? '&veebar;' : '&rsaquo;'}</div>`);
+                    $folder.append('<div class="icon">&#128193;</div>');
+                    $folder.append(`<div class="name-label">${item.name}</div>`);
+
+                    // Folder interactions
+                    $folder.on('click', (e) => {
+                        if ($(e.target).hasClass('toggle')) {
+                            e.stopPropagation(); window.location.href = `skp:toggle_folder@${item.id}`;
+                        } else {
+                            $('.tree-item').removeClass('selected'); $folder.addClass('selected'); selectedFolderId = item.id;
+                        }
+                    });
+                    $folder.on('contextmenu', (e) => {
+                        selectedFolderId = item.id; $('.tree-item').removeClass('selected'); $folder.addClass('selected');
+                        showContextMenu(e, 'folder', item.id);
+                    });
+
+                    // Drag events
+                    $folder.on('dragstart', e => { e.stopPropagation(); draggedDetails = { id: item.id, type: 'folder' }; });
+                    $folder.on('dragover', e => {
+                        e.preventDefault(); e.stopPropagation();
+                        // Prevent dropping into itself
+                        if (draggedDetails && draggedDetails.id !== item.id) $folder.addClass('drag-over');
+                    });
+                    $folder.on('dragleave', e => $folder.removeClass('drag-over'));
+                    $folder.on('drop', e => {
+                        e.preventDefault(); e.stopPropagation();
+                        $folder.removeClass('drag-over');
+                        if (draggedDetails && draggedDetails.id !== item.id) {
+                            window.location.href = `skp:move_item@${JSON.stringify({ source: draggedDetails.id, target: item.id })}`;
+                        }
+                        draggedDetails = null;
+                    });
+
+                    $tree.append($folder);
+                    if (item.open && item.children) item.children.forEach(child => renderItem(child, depth + 1));
+                } else {
+                    const box = currentState.boxes[item.id];
+                    if (!box) return;
+
+                    // Simple filter check
+                    if (filterVal && !box.name.toLowerCase().includes(filterVal)) return;
+
+                    const $item = $(`<div class="tree-item ${item.id === currentState.active_id ? 'active' : ''}" draggable="true" data-id="${item.id}"></div>`);
+                    $item.css('padding-left', `${depth * 16}px`);
+                    $item.append('<div class="toggle"></div>');
+                    $item.append('<div class="icon">&#9634;</div>');
+                    $item.append(`<div class="name-label">${box.name}</div>`);
+                    $item.append(`<div class="scale-label">${box.scale || ''}</div>`);
+
+                    $item.on('dblclick', (e) => { e.stopPropagation(); window.location.href = `skp:activate@${item.id}`; });
+                    $item.on('click', (e) => {
+                        e.stopPropagation();
+                        $('.tree-item').removeClass('selected'); $item.addClass('selected'); selectedFolderId = null;
+                    });
+                    $item.on('contextmenu', (e) => { showContextMenu(e, 'item', item.id); });
+
+                    // Drag events
+                    $item.on('dragstart', e => { e.stopPropagation(); draggedDetails = { id: item.id, type: 'item' }; });
+
+                    $tree.append($item);
+                }
+            }
+            currentState.hierarchy.forEach(item => renderItem(item));
+        }
+
+        function showContextMenu(e, type, id) {
+            e.preventDefault(); e.stopPropagation();
+            const $menu = $('#context-menu');
+            $menu.empty();
+            if (type === 'item') {
+                $menu.append(`<div class="menu-item" onclick="window.location.href='skp:activate@${id}'">Activate SectionBox</div>`);
+                $menu.append(`<div class="menu-item" onclick="window.location.href='skp:modify@${id}'">Modify SectionBox</div>`);
+                $menu.append('<div class="menu-sep"></div>');
+                $menu.append(`<div class="menu-item" onclick="window.location.href='skp:edit@${id}'">Edit Settings</div>`);
+                $menu.append(`<div class="menu-item" onclick="window.location.href='skp:rename@${id}'">Rename</div>`);
+                $menu.append(`<div class="menu-item" onclick="window.location.href='skp:delete@${id}'">Delete</div>`);
+            } else {
+                $menu.append(`<div class="menu-item" onclick="window.location.href='skp:rename_folder@${id}'">Rename folder</div>`);
+                $menu.append(`<div class="menu-item" onclick="window.location.href='skp:explode_folder@${id}'">Explode folder</div>`);
+            }
+            $menu.append('<div class="menu-sep"></div>');
+            $menu.append('<div class="menu-item" onclick="window.location.href=\'skp:expand_all\'">Expand all</div>');
+            $menu.append('<div class="menu-item" onclick="window.location.href=\'skp:collaps_all\'">Collaps all</div>');
+            $menu.css({ top: e.pageY + 'px', left: e.pageX + 'px', display: 'block' });
+            $(document).one('click', () => $menu.hide());
+        }
+
+        function updateStatus() {
+            const activeId = currentState.active_id;
+            const $statusBottom = $('#status-text-bottom');
+            const $statusTop = $('#controls-min');
+            let text = "SectionBox: None";
+            if (activeId && currentState.boxes[activeId]) {
+                const box = currentState.boxes[activeId];
+                text = `SectionBox: ${box.name} (${box.scale || '1:1'})`;
+            }
+            $statusBottom.text(text);
+            $statusTop.text(text);
+        }
+
+        function safeCallback(action, data = "") {
+            if (window.sketchup && window.sketchup[action]) {
+                window.sketchup[action](data);
+            } else {
+                window.location.href = `skp:${action}@${data}`;
+            }
+        }
+
+        $(document).ready(() => {
+            safeCallback("ready");
+            $('#add-box').on('click', () => safeCallback("add_box"));
+            $('#add-folder').on('click', () => {
+                safeCallback("add_folder", selectedFolderId || "");
+            });
+            $(document).on('contextmenu', e => { if (e.target === document.body || e.target === $('#tree')[0]) e.preventDefault(); });
+
+            // Clear selection when clicking empty space
+            $(document).on('click', (e) => {
+                if (!$(e.target).closest('.tree-item').length) {
+                    $('.tree-item').removeClass('selected');
+                    selectedFolderId = null;
+                }
+            });
+
+            // Minimize Handler
+            $('#minimize-btn').on('click', toggleMinimize);
+            $('#status-line').on('dblclick', toggleMinimize);
+
+            // Sort Handler
+            $('.sort-toggle').on('click', function () {
+                const col = $(this).data('col');
+                if (activeSort.col === col) {
+                    activeSort.asc = !activeSort.asc;
+                } else {
+                    activeSort.col = col;
+                    activeSort.asc = true;
+                }
+
+                // Update indicators
+                $('#sort-indicator-name, #sort-indicator-scale').text('');
+                const indicator = activeSort.asc ? '^' : 'v';
+                if (activeSort.col === 'name') $('#sort-indicator-name').text(indicator);
+                else $('#sort-indicator-scale').text(indicator);
+
+                renderTree();
+            });
+            // Filter handler
+            $('#filter').on('input', renderTree);
+        });
+    </script>
+</body>
+
+</html>
