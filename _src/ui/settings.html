@@ -153,25 +153,6 @@
             text-decoration: underline;
         }
 
-        .delete-btn {
-            background: none;
-            border: none;
-            color: #ccc;
-            cursor: pointer;
-            font-size: 16px;
-            padding: 0 4px;
-            line-height: 1;
-            margin-left: 2px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .delete-btn:hover {
-            color: #d00;
-        }
-
         /* Custom Scale Overlay */
         #custom-scale-overlay {
             position: absolute;
@@ -231,7 +212,6 @@
                 <div class="label">Drawing Scale</div>
                 <div class="input-wrapper">
                     <select id="scale-select"></select>
-                    <button type="button" class="delete-btn" id="delete-scale" title="Remove scale from list">×</button>
                 </div>
             </div>
             <div class="row">
@@ -356,7 +336,7 @@
                 $sel.append($opt);
             });
             $sel.append('<option disabled>──────────</option>');
-            $sel.append($('<option>').val('custom').text('Custom...'));
+            $sel.append($('<option>').val('manage').text('Manage Scales...'));
 
             if (selectValue && availableScales.includes(selectValue)) {
                 $sel.val(selectValue);
@@ -379,6 +359,7 @@
         }
 
         function loadDefaults(defaults) {
+            if (defaults.name) $('#name').val(defaults.name);
             if (defaults.scale) {
                 const val = parseFloat(defaults.scale.replace('1/', ''));
                 const found = availableScales.find(s => Math.abs(parseScaleValue(s) - val) < 0.001);
@@ -458,16 +439,11 @@
 
             $('#scale-select').on('change', function () {
                 if ($(this).val() === 'custom') $('#custom-scale-overlay').css('display', 'flex');
-            });
-
-            $('#delete-scale').on('click', () => {
-                const current = $('#scale-select').val();
-                if (!current || current === 'custom') return;
-                const idx = availableScales.indexOf(current);
-                if (idx > -1) {
-                    availableScales.splice(idx, 1);
-                    renderScaleSelect();
-                    callRuby("save_scales", availableScales);
+                else if ($(this).val() === 'manage') {
+                    callRuby('open_scale_manager');
+                    // Reset to valid value
+                    const defaultScale = availableScales.find(s => s.includes("1:50"));
+                    $(this).val(defaultScale || availableScales[0]);
                 }
             });
 
@@ -559,6 +535,7 @@
         });
 
         function setName(name) { $('#name').val(name); }
+        function setSubmitText(text) { $('#save').text(text); }
     </script>
 </body>
 

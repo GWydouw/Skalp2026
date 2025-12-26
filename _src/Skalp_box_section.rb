@@ -8,11 +8,16 @@ module Skalp
 
     # Persistence Layer
     module Data
-      DICTIONARY = 'Skalp_BoxSection_Data'
+      DICTIONARY = 'Skalp_BoxSection_Data' unless defined?(DICTIONARY)
       
       def self.get_config(model)
-        json = model.get_attribute(DICTIONARY, 'config', '{}')
-        JSON.parse(json) rescue {}
+        val = model.get_attribute(DICTIONARY, 'config', '{}')
+        return val if val.is_a?(Hash) # Mac auto-eval
+        begin
+          JSON.parse(val)
+        rescue
+          {}
+        end
       end
 
       def self.save_config(model, config)
@@ -20,8 +25,13 @@ module Skalp
       end
 
       def self.get_hierarchy(model)
-        json = model.get_attribute(DICTIONARY, 'hierarchy', '[]')
-        JSON.parse(json) rescue []
+        val = model.get_attribute(DICTIONARY, 'hierarchy', '[]')
+        return val if val.is_a?(Array) # Mac auto-eval
+        begin
+          JSON.parse(val)
+        rescue
+          []
+        end
       end
 
       def self.save_hierarchy(model, hierarchy)
@@ -30,10 +40,19 @@ module Skalp
       
       def self.safe_read_default(key, default_val = nil)
         begin
-          Sketchup.read_default("Skalp", key, default_val)
-        rescue Exception => e
-          # Catches SyntaxError from auto-eval on Mac
-          puts "Skalp: Recovering from read_default error for #{key}: #{e}"
+          val = Sketchup.read_default("Skalp", key, default_val)
+          return val if val.is_a?(Array) || val.is_a?(Hash)
+          if val.is_a?(String)
+            begin
+              # Handle both pure JSON strings (Windows) and potential SB_JSON prefix
+              json_str = val.start_with?("SB_JSON:") ? val[8..-1] : val
+              return JSON.parse(json_str)
+            rescue
+              return val # Plain string
+            end
+          end
+          val
+        rescue Exception
           default_val
         end
       end
@@ -43,39 +62,24 @@ module Skalp
           "scale" => "1/50",
           "sides_all_same" => true,
           "rear_view_global" => "off",
-          "rear_view_projection" => "off", # Legacy/fallback
+          "rear_view_projection" => "off",
           "section_cut_width" => true,
           "style_rule" => "combined",
           "sides" => { "all" => { "cut_width" => true, "style_rule" => "combined", "rear_view" => "off" } }
         }
-        begin
-          # Use versioned keys to avoid corrupted / auto-evaluating old data on Mac
-          saved = safe_read_default("SectionBoxDefaults_v3")
-          if saved
-            if saved.is_a?(String) && saved.start_with?("SB_JSON:")
-              saved_data = JSON.parse(saved[8..-1])
-            elsif saved.is_a?(Hash)
-              saved_data = saved
-            else
-              saved_data = JSON.parse(saved) rescue nil
-            end
-            defaults.merge!(saved_data) if saved_data.is_a?(Hash)
-          end
-        rescue Exception => e
-          puts "Skalp: Error parsing defaults: #{e}"
-        end
+        saved = safe_read_default("SectionBoxDefaults_v6")
+        defaults.merge!(saved) if saved.is_a?(Hash)
         defaults
       end
 
       def self.save_defaults(settings)
-        # Store essential defaults
-        defaults = {
+        data = {
           "scale" => settings["scale"],
           "sides_all_same" => settings["sides_all_same"],
           "rear_view_global" => settings["rear_view_global"],
           "sides" => settings["sides"]
         }
-        Sketchup.write_default("Skalp", "SectionBoxDefaults_v3", "SB_JSON:" + defaults.to_json)
+        Sketchup.write_default("Skalp", "SectionBoxDefaults_v6", data)
       end
 
       def self.get_scales
@@ -84,26 +88,13 @@ module Skalp
           "1\" = 1' (1:12)", "1/8\" = 1' (1:96)", "1/4\" = 1' (1:48)", "1/2\" = 1' (1:24)",
           "3/4\" = 1' (1:16)", "3\" = 1' (1:4)"
         ]
-        begin
-          # Use versioned keys to avoid corrupted / auto-evaluating old data on Mac
-          saved = safe_read_default("SectionBoxScales_v3")
-          if saved
-            if saved.is_a?(String) && saved.start_with?("SB_JSON:")
-              return JSON.parse(saved[8..-1])
-            elsif saved.is_a?(Array)
-              return saved
-            else
-              return JSON.parse(saved) rescue nil
-            end
-          end
-        rescue Exception => e
-          puts "Skalp: Error parsing scales: #{e}"
-        end
+        saved = safe_read_default("SectionBoxScales_v6")
+        return saved if saved.is_a?(Array)
         default_scales
       end
 
       def self.save_scales(scales_array)
-        Sketchup.write_default("Skalp", "SectionBoxScales_v3", "SB_JSON:" + scales_array.to_json)
+        Sketchup.write_default("Skalp", "SectionBoxScales_v6", scales_array)
       end
     end
 
@@ -111,9 +102,9 @@ module Skalp
     module DrawHelper
       def self.get_color(face_name)
         case face_name
-        when "top", "bottom" then Sketchup::Color.new(0, 0, 255)
-        when "front", "back" then Sketchup::Color.new(255, 0, 0)
-        when "left", "right" then Sketchup::Color.new(0, 255, 0)
+        when "top", "bottom" then Sketchup::Color.new(0, 0, 255) # Blue (Z)
+        when "left", "right" then Sketchup::Color.new(255, 0, 0) # Red (X)
+        when "front", "back" then Sketchup::Color.new(0, 255, 0) # Green (Y)
         else Sketchup::Color.new(74, 144, 226)
         end
       end
@@ -139,12 +130,13 @@ module Skalp
       def self.draw_face_highlight(view, face_vertices, face_name)
         return unless face_vertices && face_vertices.length >= 3
         color = get_color(face_name)
+        # 10% transparent = alpha 25
         view.drawing_color = Sketchup::Color.new(color.red, color.green, color.blue, 25)
         view.draw(GL_POLYGON, face_vertices)
       end
 
-      def self.draw_plus(view, center, normal, face_name, highlighted, color_override = nil)
-        arm = 15.0
+      def self.draw_plus(view, center, normal, face_name, highlighted, arm_size = 15.0, color_override = nil)
+        arm = arm_size
         width = highlighted ? 4 : 2
         color = highlighted && color_override ? color_override : get_color(face_name)
         axes = normal.axes
@@ -165,36 +157,59 @@ module Skalp
       root = get_active_box_section_group
       return nil unless root && root.valid?
       
+      trans = root.transformation
       planes_data = []
       root.entities.each do |ent|
         if ent.is_a?(Sketchup::SectionPlane)
           match = ent.name.match(/\[SkalpSectionBox\]-(.+)/)
           face_name = match ? match[1] : "unknown"
           pa = ent.get_plane
-          norm = Geom::Vector3d.new(pa[0], pa[1], pa[2])
-          # Point retrieval (stored or calculated)
+          
+          # Local to World
+          local_norm = Geom::Vector3d.new(pa[0], pa[1], pa[2])
+          world_norm = local_norm.transform(trans)
+          
           stored = ent.get_attribute(DICTIONARY_NAME, 'original_point')
-          pos = stored ? Geom::Point3d.new(stored) : Geom::Point3d.new(norm.x * -pa[3], norm.y * -pa[3], norm.z * -pa[3])
-          planes_data << { name: face_name, plane: ent, original_point: pos, normal: norm, parent_trans: Geom::Transformation.new }
+          local_pos = stored ? Geom::Point3d.new(stored) : Geom::Point3d.new(local_norm.x * -pa[3], local_norm.y * -pa[3], local_norm.z * -pa[3])
+          world_pos = trans * local_pos
+          
+          planes_data << { name: face_name, plane: ent, original_point: world_pos, normal: world_norm, parent_trans: trans, local_point: local_pos }
         end
       end
       
-      # Calc dynamic bounds (simplified for top-level root)
+      # Calc dynamic bounds in WORLD space
       plane_map = {}
       planes_data.each { |d| plane_map[d[:name]] = d }
       if ["top", "bottom", "right", "left", "back", "front"].all? { |k| plane_map.key?(k) }
-        x_max = plane_map["right"][:original_point].x; x_min = plane_map["left"][:original_point].x
-        y_max = plane_map["back"][:original_point].y;  y_min = plane_map["front"][:original_point].y
-        z_max = plane_map["top"][:original_point].z;   z_min = plane_map["bottom"][:original_point].z
-        bounds = {
-          "top" => [[x_min, y_min, z_max], [x_max, y_min, z_max], [x_max, y_max, z_max], [x_min, y_max, z_max]],
-          "bottom" => [[x_min, y_max, z_min], [x_max, y_max, z_min], [x_max, y_min, z_min], [x_min, y_min, z_min]],
-          "right" => [[x_max, y_min, z_min], [x_max, y_max, z_min], [x_max, y_max, z_max], [x_max, y_min, z_max]],
-          "left" => [[x_min, y_max, z_min], [x_min, y_min, z_min], [x_min, y_min, z_max], [x_min, y_max, z_max]],
-          "front" => [[x_min, y_min, z_min], [x_max, y_min, z_min], [x_max, y_min, z_max], [x_min, y_min, z_max]],
-          "back" => [[x_max, y_max, z_min], [x_min, y_max, z_min], [x_min, y_max, z_max], [x_max, y_max, z_max]]
+        # Need to be careful with world bounds if box is rotated.
+        # It's better to calculate local bounds and transform them.
+        local_pts = {
+          "x_max" => plane_map["right"][:local_point].x, "x_min" => plane_map["left"][:local_point].x,
+          "y_max" => plane_map["back"][:local_point].y,  "y_min" => plane_map["front"][:local_point].y,
+          "z_max" => plane_map["top"][:local_point].z,   "z_min" => plane_map["bottom"][:local_point].z
         }
-        planes_data.each { |d| d[:face_vertices] = bounds[d[:name]].map { |a| Geom::Point3d.new(a) } if bounds[d[:name]] }
+        
+        lp = local_pts
+        local_bounds = {
+          "top" => [[lp["x_min"], lp["y_min"], lp["z_max"]], [lp["x_max"], lp["y_min"], lp["z_max"]], [lp["x_max"], lp["y_max"], lp["z_max"]], [lp["x_min"], lp["y_max"], lp["z_max"]]],
+          "bottom" => [[lp["x_min"], lp["y_max"], lp["z_min"]], [lp["x_max"], lp["y_max"], lp["z_min"]], [lp["x_max"], lp["y_min"], lp["z_min"]], [lp["x_min"], lp["y_min"], lp["z_min"]]],
+          "right" => [[lp["x_max"], lp["y_min"], lp["z_min"]], [lp["x_max"], lp["y_max"], lp["z_min"]], [lp["x_max"], lp["y_max"], lp["z_max"]], [lp["x_max"], lp["y_min"], lp["z_max"]]],
+          "left" => [[lp["x_min"], lp["y_max"], lp["z_min"]], [lp["x_min"], lp["y_min"], lp["z_min"]], [lp["x_min"], lp["y_min"], lp["z_max"]], [lp["x_min"], lp["y_max"], lp["z_max"]]],
+          "front" => [[lp["x_min"], lp["y_min"], lp["z_min"]], [lp["x_max"], lp["y_min"], lp["z_min"]], [lp["x_max"], lp["y_min"], lp["z_max"]], [lp["x_min"], lp["y_min"], lp["z_max"]]],
+          "back" => [[lp["x_max"], lp["y_max"], lp["z_min"]], [lp["x_min"], lp["y_max"], lp["z_min"]], [lp["x_min"], lp["y_max"], lp["z_max"]], [lp["x_max"], lp["y_max"] , lp["z_max"]]]
+        }
+        
+        # Calculate scale factor for grips (e.g. 5% of largest dimension, min 10", max 100")
+        dims = [lp["x_max"] - lp["x_min"], lp["y_max"] - lp["y_min"], lp["z_max"] - lp["z_min"]]
+        max_dim = dims.max
+        arm_size = (max_dim * 0.05).clamp(10, 100)
+        
+        planes_data.each do |d|
+          d[:arm_size] = arm_size
+          if local_bounds[d[:name]]
+            d[:face_vertices] = local_bounds[d[:name]].map { |a| trans * Geom::Point3d.new(a) }
+          end
+        end
       end
       planes_data
     end
@@ -212,29 +227,34 @@ module Skalp
         path = File.join(File.dirname(__FILE__), 'ui', 'settings.html')
         @dialog = UI::HtmlDialog.new({:dialog_title => "SectionBox Settings", :preferences_key => "com.skalp.sectionbox.settings", :scrollable => false, :resizable => false, :width => 350, :height => 450, :style => UI::HtmlDialog::STYLE_DIALOG})
         @dialog.set_file(path)
+        @dialog.set_file(path)
         @dialog.add_action_callback("ready") do 
-           defaults = Skalp::BoxSection::Data.get_defaults
-           scales = Skalp::BoxSection::Data.get_scales
+           defaults = Data.get_defaults
+           scales = Data.get_scales
            @dialog.execute_script("initScales(#{scales.to_json})")
-           @dialog.execute_script("loadDefaults(#{defaults.to_json})")
-           @dialog.execute_script("setName('#{@default_name}')")
+           # If editing existing, @default_name is actually the settings hash or we pass it differently?
+           # Actually, let's keep it simple: if @default_name is a Hash, use it as settings
+           if @default_name.is_a?(Hash)
+             @dialog.execute_script("loadDefaults(#{@default_name.to_json})")
+             @dialog.execute_script("setName(#{@default_name['name'].to_json})") if @default_name['name']
+             @dialog.execute_script("setSubmitText('Save')")
+           else
+             @dialog.execute_script("loadDefaults(#{defaults.to_json})")
+             @dialog.execute_script("setName(#{@default_name.to_json})")
+             @dialog.execute_script("setSubmitText('Create')")
+           end
         end
         @dialog.add_action_callback("save") { |d, json| save(json) }
-        @dialog.add_action_callback("save_default") do |d, data| 
-          parsed = data.is_a?(String) ? JSON.parse(data) : data
-          Skalp::BoxSection::Data.save_defaults(parsed) if parsed.is_a?(Hash)
-        end
-        @dialog.add_action_callback("save_scales") do |d, data| 
-          parsed = data.is_a?(String) ? JSON.parse(data) : data
-          Skalp::BoxSection::Data.save_scales(parsed) if parsed.is_a?(Array)
-        end
+        @dialog.add_action_callback("save_default") { |d, data| Data.save_defaults(data.is_a?(String) ? JSON.parse(data) : data) }
+        @dialog.add_action_callback("save_scales") { |d, data| Data.save_scales(data.is_a?(String) ? JSON.parse(data) : data) }
+        @dialog.add_action_callback("open_scale_manager") { |d, p| ScaleManager.new }
         @dialog.add_action_callback("close") { close }
         @dialog.center
         @dialog.show
       end
       
-      def save(json_data)
-        data = JSON.parse(json_data)
+      def save(json)
+        data = json.is_a?(String) ? JSON.parse(json) : json
         # Construct the settings hash matching the new UI structure
         settings = {
           "name" => data['name'],
@@ -253,6 +273,43 @@ module Skalp
       def close; @dialog.close if @dialog; @dialog = nil; end
     end
 
+    # Scale Manager Dialog
+    class ScaleManager
+      def initialize
+        @dialog = nil
+        show
+      end
+      
+      def show
+        if @dialog && @dialog.visible?; @dialog.bring_to_front; return; end
+        path = File.join(File.dirname(__FILE__), 'ui', 'scale_manager.html')
+        @dialog = UI::HtmlDialog.new({:dialog_title => "Drawing Scale Manager", :preferences_key => "com.skalp.sectionbox.scale_manager", :scrollable => false, :resizable => true, :width => 400, :height => 500, :style => UI::HtmlDialog::STYLE_DIALOG})
+        @dialog.set_file(path)
+        @dialog.add_action_callback("ready") do
+          scales = Data.get_scales
+          @dialog.execute_script("loadScales(#{scales.to_json})")
+        end
+        @dialog.add_action_callback("save_scales") do |d, data|
+          scales_array = data.is_a?(String) ? JSON.parse(data) : data
+          Data.save_scales(scales_array)
+        end
+        @dialog.add_action_callback("restore_defaults") do
+          default_scales = [
+            "1:1", "1:2", "1:5", "1:10", "1:20", "1:50", "1:100", "1:200", "1:500", "1:1000",
+            "1\" = 1' (1:12)", "1/8\" = 1' (1:96)", "1/4\" = 1' (1:48)", "1/2\" = 1' (1:24)",
+            "3/4\" = 1' (1:16)", "3\" = 1' (1:4)"
+          ]
+          Data.save_scales(default_scales)
+          @dialog.execute_script("loadScales(#{default_scales.to_json})")
+        end
+        @dialog.set_on_closed { @dialog = nil }
+        @dialog.center
+        @dialog.show
+      end
+      
+      def close; @dialog.close if @dialog; @dialog = nil; end
+    end
+
     # Dialog Manager
     class Manager
       def initialize; @dialog = nil; end
@@ -264,17 +321,23 @@ module Skalp
         @dialog.add_action_callback("ready") { |d, p| sync_data }
         @dialog.add_action_callback("sync") { |d, p| sync_data }
         @dialog.add_action_callback("close") { |d, p| @dialog.close }
-        @dialog.add_action_callback("resize_window") { |d, json| dim = JSON.parse(json); @dialog.set_size(dim['width'], dim['height']) }
+        @dialog.add_action_callback("resize_window") { |d, data| dim = data.is_a?(String) ? JSON.parse(data) : data; @dialog.set_size(dim['width'], dim['height']) }
         @dialog.add_action_callback("activate") { |d, id| Engine.activate(id) }
         @dialog.add_action_callback("modify") { |d, id| Engine.modify(id) }
         @dialog.add_action_callback("add_box") { |d, p| Engine.create_from_model_bounds }
         @dialog.add_action_callback("add_folder") { |d, parent_id| Engine.create_folder(parent_id.empty? ? nil : parent_id) }
-        @dialog.add_action_callback("move_item") { |d, json| data = JSON.parse(json); Engine.move_item(data['source'], data['target'].empty? ? nil : data['target']) }
+        @dialog.add_action_callback("move_item") { |d, data| move_data = data.is_a?(String) ? JSON.parse(data) : data; Engine.move_item(move_data['source'], move_data['target'].empty? ? nil : move_data['target']) }
         @dialog.add_action_callback("toggle_folder") { |d, folder_id| Engine.toggle_folder(folder_id) }
         @dialog.add_action_callback("rename_folder") { |d, folder_id| Engine.rename_folder(folder_id) }
         @dialog.add_action_callback("explode_folder") { |d, folder_id| Engine.explode_folder(folder_id) }
         @dialog.add_action_callback("expand_all") { |d, p| Engine.expand_all }
         @dialog.add_action_callback("collaps_all") { |d, p| Engine.collapse_all }
+        
+        # Context Menu Callbacks
+        @dialog.add_action_callback("edit") { |d, id| Engine.edit(id) }
+        @dialog.add_action_callback("rename") { |d, id| Engine.rename(id) }
+        @dialog.add_action_callback("delete") { |d, id| Engine.delete(id) }
+        @dialog.add_action_callback("open_scale_manager") { |d, p| ScaleManager.new }
         @dialog.set_on_closed { @dialog = nil }
         @dialog.show
       end
@@ -336,14 +399,24 @@ module Skalp
         min = bbox.min
         max = bbox.max
         
-        planes_config = [
-          { "name" => "top",    "point" => [0, 0, max.z.to_f], "normal" => [0, 0, 1] },
-          { "name" => "bottom", "point" => [0, 0, min.z.to_f], "normal" => [0, 0, -1] },
-          { "name" => "right",  "point" => [max.x.to_f, 0, 0], "normal" => [1, 0, 0] },
-          { "name" => "left",   "point" => [min.x.to_f, 0, 0], "normal" => [-1, 0, 0] },
-          { "name" => "back",   "point" => [0, max.y.to_f, 0], "normal" => [0, 1, 0] },
-          { "name" => "front",  "point" => [0, min.y.to_f, 0], "normal" => [0, -1, 0] }
-        ]
+        cx = (min.x + max.x) / 2.0
+        cy = (min.y + max.y) / 2.0
+        cz = (min.z + max.z) / 2.0
+        
+        min_x = min.x.to_f
+        max_x = max.x.to_f
+        min_y = min.y.to_f
+        max_y = max.y.to_f
+        min_z = min.z.to_f
+        max_z = max.z.to_f
+        
+        planes_config = []
+        planes_config << { "name" => "top",    "point" => [cx, cy, max_z], "normal" => [0, 0, -1] }
+        planes_config << { "name" => "bottom", "point" => [cx, cy, min_z], "normal" => [0, 0, 1] }
+        planes_config << { "name" => "right",  "point" => [max_x, cy, cz], "normal" => [-1, 0, 0] }
+        planes_config << { "name" => "left",   "point" => [min_x, cy, cz], "normal" => [1, 0, 0] }
+        planes_config << { "name" => "front",  "point" => [cx, min_y, cz], "normal" => [0, 1, 0] }
+        planes_config << { "name" => "back",   "point" => [cx, max_y, cz], "normal" => [0, -1, 0] }
         
         # Create the SectionBox configuration
         id = "box_" + Time.now.to_i.to_s
@@ -401,7 +474,7 @@ module Skalp
           world_normal = local_normal.transform(trans)
           world_point = f.bounds.center.transform(trans)
           cnt = group.bounds.center.transform(trans)
-          world_normal.reverse! if world_normal.dot(cnt - world_point) < 0
+          world_normal.reverse! if world_normal.dot(cnt - world_point) > 0 # Point OUTWARDS
           planes_config << {
             "name" => Skalp::BoxSection.get_face_name(local_normal),
             "point" => world_point.to_a,
@@ -431,6 +504,119 @@ module Skalp
         @@manager.sync_data if @@manager && @@manager.visible?
         activate(id)
       end
+      
+      def self.rename(id)
+        model = Sketchup.active_model
+        config = Data.get_config(model)
+        box = config[id]
+        return unless box
+        
+        result = UI.inputbox(['Name:'], [box['name']], 'Rename SectionBox')
+        return unless result
+        new_name = result[0].strip
+        return if new_name.empty?
+        
+        box['name'] = new_name
+        config[id] = box
+        Data.save_config(model, config)
+        
+        @@manager.sync_data if @@manager && @@manager.visible?
+        # If active, might need to update scene/group name? For now just UI.
+        if @@active_box_id == id
+             # Update status text in UI will happen via sync_data
+        end
+      end
+      
+      def self.delete(id)
+        return unless UI.messagebox("Are you sure you want to delete this SectionBox?", MB_YESNO) == IDYES
+        
+        if @@active_box_id == id
+          deactivate_current
+        end
+        
+        model = Sketchup.active_model
+        config = Data.get_config(model)
+        config.delete(id)
+        Data.save_config(model, config)
+        
+        # Remove from hierarchy
+        hierarchy = Data.get_hierarchy(model)
+        
+        delete_recursive = lambda do |items|
+          items.each_with_index do |item, index|
+            if item["id"] == id
+              items.delete_at(index)
+              return true
+            elsif item["children"]
+              return true if delete_recursive.call(item["children"])
+            end
+          end
+          false
+        end
+        delete_recursive.call(hierarchy)
+        Data.save_hierarchy(model, hierarchy)
+        
+        @@manager.sync_data if @@manager && @@manager.visible?
+      end
+      
+      def self.edit(id)
+        model = Sketchup.active_model
+        config = Data.get_config(model)
+        box = config[id]
+        return unless box
+        
+        # Prepare settings for dialog
+        # SettingsDialog expects: name, scale (denominator), sides_all_same, rear_view_global, sides
+        # Our stored 'scale' is "1/50", dialog wants 50
+        scale_val = parse_scale(box['scale'])
+        
+        settings_payload = {
+          "name" => box['name'],
+          "scale" => scale_val,
+          "sides_all_same" => box['sides_all_same'],
+          "rear_view_global" => box['rear_view_global'],
+          "sides" => box['sides']
+        }
+        
+        SettingsDialog.new(settings_payload) do |new_settings|
+           do_update(id, new_settings)
+        end
+      end
+      
+      def self.parse_scale(scale_str)
+        return 50 unless scale_str
+        parts = scale_str.split('/')
+        return parts.last.to_f if parts.length == 2
+        parts = scale_str.split(':')
+        return parts.last.to_f if parts.length == 2
+        50
+      end
+      
+      def self.do_update(id, settings)
+        model = Sketchup.active_model
+        config = Data.get_config(model)
+        box = config[id]
+        return unless box
+        
+        # Merge new settings
+        box.merge!(settings)
+        
+        # If scale changed, might need logic to update things?
+        # For now just saving config.
+        # Note: If dimensions/planes need to change, that's complex (re-generation).
+        # SettingsDialog only changes styling/properties, not geometry (except maybe rear view projection).
+        
+        config[id] = box
+        Data.save_config(model, config)
+        @@manager.sync_data if @@manager && @@manager.visible?
+        
+        # If active, maybe refresh?
+        if @@active_box_id == id
+           # Re-activate to apply new styles/rear-view settings?
+           # Optimization: Only if specific things changed. For robustness: simple reactivate.
+           activate(id)
+        end
+      end
 
       def self.activate(id)
         deactivate_current if @@active_box_id
@@ -438,18 +624,58 @@ module Skalp
         model.start_operation('Activate SectionBox', true)
         begin
           @@active_box_id = id
-          root = model.entities.add_group; root.name = "[SkalpSectionBox]"; root.set_attribute(DICTIONARY_NAME, 'box_id', id)
-          all_ents = model.entities.to_a.reject { |e| e == root || e.attribute_dictionary('Skalp') }
-          model_group = root.entities.add_group(all_ents); model_group.name = "[SkalpSectionBox-Model]"
-          box_data["planes"].each do |pd|
-            pt = Geom::Point3d.new(pd["point"]); norm = Geom::Vector3d.new(pd["normal"])
-            sp = root.entities.add_section_plane([pt, norm]); sp.name = "[SkalpSectionBox]-#{pd['name']}"
-            sp.set_attribute(DICTIONARY_NAME, 'original_point', pt.to_a)
+          # 1. Group model geometry first
+          all_ents = model.entities.to_a.reject { |e| e.attribute_dictionary('Skalp_BoxSection') || e.attribute_dictionary('Skalp') }
+          current_container = model.entities.add_group(all_ents)
+          if current_container.nil?
+            # Fallback for empty models/selections
+            current_container = model.entities.add_group
           end
-          model.commit_operation; @@manager.sync_data if @@manager && @@manager.visible?
+          current_container.name = "[SkalpSectionBox-Model]"
+          
+          # 2. Recursive nesting: each level gets one SectionPlane
+          box_data["planes"].each_with_index do |pd, i|
+            # Create plane at root first to ensure world-space accuracy
+            pt = Geom::Point3d.new(pd["point"])
+            norm = Geom::Vector3d.new(pd["normal"])
+            sp = model.entities.add_section_plane([pt, norm])
+            sp.name = "[SkalpSectionBox]-#{pd['name']}"
+            sp.set_attribute(DICTIONARY_NAME, 'original_point', pt.to_a)
+            
+            # Wrap Plane + current container into a new group
+            wrapper = model.entities.add_group([sp, current_container])
+            
+            # Naming convention: 
+            # Outermost: [SkalpSectionBox]
+            # Intermediates: [SkalpSectionBox]-Side
+            if i == box_data["planes"].length - 1
+              wrapper.name = "[SkalpSectionBox]"
+              wrapper.set_attribute(DICTIONARY_NAME, 'box_id', id)
+            else
+              wrapper.name = "[SkalpSectionBox]-#{pd['name'].capitalize}"
+            end
+            current_container = wrapper
+          end
+          
+          model.commit_operation
+          @@manager.sync_data if @@manager && @@manager.visible?
         rescue => e
-          model.abort_operation; puts "Activation Error: #{e.message}"
+          model.abort_operation
+          puts "Activation Error: #{e.message}\n#{e.backtrace.join("\n")}"
         end
+      end
+
+      def self.explode_recursive(group)
+        return unless group && group.valid? && group.is_a?(Sketchup::Group)
+        
+        # Erase Skalp SectionPlanes in this group context
+        group.entities.grep(Sketchup::SectionPlane).each do |sp|
+          sp.erase! if sp.name =~ /\[SkalpSectionBox\]/
+        end
+        
+        child_group = group.entities.find { |e| e.is_a?(Sketchup::Group) && e.name =~ /\[SkalpSectionBox/ }
+        group.explode
+        explode_recursive(child_group) if child_group
       end
 
       def self.deactivate_current
@@ -457,8 +683,7 @@ module Skalp
         model = Sketchup.active_model; root = model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == @@active_box_id }
         if root && root.valid?
           model.start_operation('Deactivate SectionBox', true)
-          model_group = root.entities.find { |e| e.name == "[SkalpSectionBox-Model]" }; model_group.explode if model_group && model_group.valid?
-          root.erase!
+          explode_recursive(root)
           model.commit_operation
         end
         @@active_box_id = nil; @@manager.sync_data if @@manager && @@manager.visible?
@@ -478,9 +703,38 @@ module Skalp
         opts = model.rendering_options; @@original_render_settings.each { |k, v| opts[k] = v }; @@original_render_settings = {}
       end
       
+      def self.get_unique_folder_name(hierarchy, base_name)
+        existing_names = []
+        gather_names = lambda do |items|
+          items.each do |item|
+            existing_names << item["name"] if item["type"] == "folder"
+            gather_names.call(item["children"]) if item["children"]
+          end
+        end
+        gather_names.call(hierarchy)
+        
+        return base_name unless existing_names.include?(base_name)
+        
+        idx = 1
+        new_name = "#{base_name} (#{idx})"
+        while existing_names.include?(new_name)
+          idx += 1
+          new_name = "#{base_name} (#{idx})"
+        end
+        new_name
+      end
+      
       def self.create_folder(parent_id = nil)
         model = Sketchup.active_model
         hierarchy = Data.get_hierarchy(model)
+        
+        # Determine suggest name
+        suggested = get_unique_folder_name(hierarchy, "New Folder")
+        
+        # Prompt for name
+        results = UI.inputbox(["Folder Name:"], [suggested], "Create Folder")
+        return unless results
+        name = get_unique_folder_name(hierarchy, results[0])
         
         # Determine where to add
         target_list = hierarchy
@@ -499,20 +753,6 @@ module Skalp
           end
           found_list = find_list.call(hierarchy)
           target_list = found_list if found_list
-        end
-
-        # Generate unique name
-        base_name = "New Folder"
-        name = base_name
-        counter = 1
-        
-        name_exists = lambda do |n, list|
-          list.any? { |i| i["type"] == "folder" && i["name"] == n }
-        end
-        
-        while name_exists.call(name, target_list)
-          name = "#{base_name} (#{counter})"
-          counter += 1
         end
         
         # Create
