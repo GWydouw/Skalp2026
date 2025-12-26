@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0" y="0" width="24" height="24" viewBox="0, 0, 24, 24">
-  <g id="Background">
-    <rect x="0" y="0" width="24" height="24" fill="#FFFFFF"/>
-  </g>
+  <g id="Background"/>
   <g id="Layer_1">
     <path d="M21.629,14.81 L10.603,21.252 L2.813,14.279 L2.565,12.59 L12.609,9.36 L12.616,7.797 L0.985,11.611 L1.483,14.995 L10.426,23 L22.98,15.665 L23.265,12.361 L12.616,7.797 L12.609,9.36 L21.756,13.335 L21.629,14.81 z" fill="#A1A1A1"/>
     <path d="M10.478,21.252 L21.504,14.81 L21.631,13.335 L12.484,9.36 L2.44,12.59 L2.688,14.279 L10.478,21.252 z" fill="#FFFFFF"/>

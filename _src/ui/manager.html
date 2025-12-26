@@ -212,6 +212,7 @@
 
         .tree-item.active {
             font-weight: 600;
+            color: #3875d7;
         }
 
         .toggle {
@@ -286,7 +287,8 @@
             background: #ebebeb;
             border: none;
             margin: 0 8px;
-            color: #444;
+            color: #999;
+            font-style: italic;
             font-size: 11px;
             font-weight: normal;
             white-space: nowrap;
@@ -310,7 +312,8 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            color: #444;
+            color: #999;
+            font-style: italic;
             font-size: 11px;
             font-weight: normal;
             padding-left: 10px;
@@ -560,7 +563,7 @@
                         }
                     });
                     $item.on('mouseleave', (e) => {
-                        safeCallback('clear_preview');
+                        if (!isContextMenuOpen) safeCallback('clear_preview');
                     });
 
                     $item.on('click', (e) => { e.stopPropagation(); $('.tree-item').removeClass('selected'); $item.addClass('selected'); selectedFolderId = null; });
@@ -572,8 +575,11 @@
             currentState.hierarchy.forEach(item => renderItem(item));
         }
 
+        let isContextMenuOpen = false;
+
         function showContextMenu(e, type, id) {
             e.preventDefault(); e.stopPropagation();
+            isContextMenuOpen = true;
             const $menu = $('#context-menu').empty();
             if (type === 'item') {
                 const isActive = (id === currentState.active_id);
@@ -595,7 +601,12 @@
             $menu.append('<div class="menu-item" onclick="safeCallback(\'expand_all\')">Expand all</div>');
             $menu.append('<div class="menu-item" onclick="safeCallback(\'collaps_all\')">Collapse all</div>');
             $menu.css({ top: e.pageY + 'px', left: e.pageX + 'px', display: 'block' });
-            $(document).one('click', () => $menu.hide());
+
+            $(document).one('click', () => {
+                $menu.hide();
+                isContextMenuOpen = false;
+                safeCallback('clear_preview');
+            });
         }
 
         function updateStatus() {

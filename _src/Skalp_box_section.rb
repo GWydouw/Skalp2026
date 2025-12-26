@@ -96,6 +96,19 @@ module Skalp
       def self.save_scales(scales_array)
         Sketchup.write_default("Skalp", "SectionBoxScales_v6", scales_array)
       end
+      
+      def self.get_active_id(model)
+        model.get_attribute(DICTIONARY, 'active_box_id', nil)
+      end
+      
+      def self.save_active_id(model, id)
+        if id.nil?
+          dict = model.attribute_dictionary(DICTIONARY)
+          dict.delete_key('active_box_id') if dict
+        else
+          model.set_attribute(DICTIONARY, 'active_box_id', id)
+        end
+      end
     end
 
     # Preview Overlay (SketchUp 2024+ / Overlays API)
@@ -311,61 +324,140 @@ module Skalp
       Sketchup.active_model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == Engine.active_box_id }
     end
 
-    def self.get_section_planes_data
-      root = get_active_box_section_group
+    def self.get_section_planes_data(root = nil)
+      root ||= get_active_box_section_group
       return nil unless root && root.valid?
-      
-      trans = root.transformation
+      # The group structure is nested: Group(Plane, Group(Plane, ...))
+      # We need to traverse down to find all 6 planes.
       planes_data = []
-      root.entities.each do |ent|
-        if ent.is_a?(Sketchup::SectionPlane)
-          match = ent.name.match(/\[SkalpSectionBox\]-(.+)/)
-          face_name = match ? match[1] : "unknown"
-          pa = ent.get_plane
+      current_group = root
+      parent_trans = root.transformation
+      
+      # Safety limit to prevent infinite loops (max 10 levels deep for 6 planes)
+      10.times do
+        break unless current_group.is_a?(Sketchup::Group)
+        
+        found_plane = nil
+        next_group = nil
+        
+        current_group.entities.each do |ent|
+           if ent.is_a?(Sketchup::SectionPlane)
+             found_plane = ent
+           elsif ent.is_a?(Sketchup::Group)
+             next_group = ent
+           end
+        end
+        
+        if found_plane
+          match = found_plane.name.match(/\[SkalpSectionBox\]-(.+)/)
+          face_name = match ? match[1].downcase : "unknown"
+          pa = found_plane.get_plane
           
-          # Local to World
+          # Transformations are cumulative. 
+          # The outermost group has 'trans' (parent_trans). 
+          # Inner wrapping groups *usually* have Identity, but we should chain them to be safe.
+          # However, calculate_planes_from_bounds creates them at World Pos, wraps them.
+          # So Local Pos inside wrapper = World Pos.
+          # Wrapper Trans = Identity.
+          # Only the Root might be moved/scaled.
+          # So 'parent_trans' is likely sufficient if inner ones are identity.
+          # But let's accumulate 'current_group.transformation' if we were recursive.
+          # WAIT: 'root' is the current context context for 'ModifyTool'. 
+          # ModifyTool works in Model context? 
+          # ModifyTool.active uses Sketchup.active_model.active_view.
+          # If we are strictly outside, we need total transform.
+             
+          # Current accumulated transform
+          # Note: root.transformation is already applied to 'parent_trans'. 
+          # We need to multiply by inner group transforms as we go down?
+          # The 'root' passed here IS the outermost. 
+          # If we go inside 'next_group', coordinates are local to THAT group.
+          
+          # Let's simplify: 
+          # We are iterating.
+          
+          # Plane Logic:
           local_norm = Geom::Vector3d.new(pa[0], pa[1], pa[2])
-          world_norm = local_norm.transform(trans)
+          world_norm = local_norm.transform(parent_trans)
           
-          stored = ent.get_attribute(DICTIONARY_NAME, 'original_point')
-          local_pos = stored ? Geom::Point3d.new(stored) : Geom::Point3d.new(local_norm.x * -pa[3], local_norm.y * -pa[3], local_norm.z * -pa[3])
-          world_pos = trans * local_pos
+          # Derive a valid point on the plane purely from the plane equation (ignoring stored attributes to avoid double-transform issues)
+          # Plane: ax + by + cz + d = 0. Closest point to origin is -d * normal.
+          local_pos = Geom::Point3d.new(local_norm.x * -pa[3], local_norm.y * -pa[3], local_norm.z * -pa[3])
           
-          planes_data << { name: face_name, plane: ent, original_point: world_pos, normal: world_norm, parent_trans: trans, local_point: local_pos }
+          world_pos = parent_trans * local_pos
+          
+          planes_data << { name: face_name, plane: found_plane, original_point: world_pos, normal: world_norm, parent_trans: parent_trans, local_point: local_pos }
+        end
+        
+        break unless next_group
+        
+        # Prepare for next level
+        # Update transform: combine with next_group's transform
+        parent_trans = parent_trans * next_group.transformation
+        current_group = next_group
+        
+        # Stop if we hit the Model container (which has name [SkalpSectionBox-Model])
+        if current_group.name == "[SkalpSectionBox-Model]"
+           break
         end
       end
       
       # Calc dynamic bounds in WORLD space
       plane_map = {}
       planes_data.each { |d| plane_map[d[:name]] = d }
+      
       if ["top", "bottom", "right", "left", "back", "front"].all? { |k| plane_map.key?(k) }
-        # Need to be careful with world bounds if box is rotated.
-        # It's better to calculate local bounds and transform them.
-        local_pts = {
-          "x_max" => plane_map["right"][:local_point].x, "x_min" => plane_map["left"][:local_point].x,
-          "y_max" => plane_map["back"][:local_point].y,  "y_min" => plane_map["front"][:local_point].y,
-          "z_max" => plane_map["top"][:local_point].z,   "z_min" => plane_map["bottom"][:local_point].z
-        }
+        # Intersection helper to find robust corners in World Space
+        intersect_planes = lambda do |p1, p2, p3|
+          n1 = p1[:normal]; n2 = p2[:normal]; n3 = p3[:normal]
+          pl1 = [p1[:original_point], n1]
+          pl2 = [p2[:original_point], n2]
+          pl3 = [p3[:original_point], n3]
+          
+          line = Geom.intersect_plane_plane(pl1, pl2)
+          return nil unless line
+          Geom.intersect_line_plane(line, pl3)
+        end
         
-        lp = local_pts
-        local_bounds = {
-          "top" => [[lp["x_min"], lp["y_min"], lp["z_max"]], [lp["x_max"], lp["y_min"], lp["z_max"]], [lp["x_max"], lp["y_max"], lp["z_max"]], [lp["x_min"], lp["y_max"], lp["z_max"]]],
-          "bottom" => [[lp["x_min"], lp["y_max"], lp["z_min"]], [lp["x_max"], lp["y_max"], lp["z_min"]], [lp["x_max"], lp["y_min"], lp["z_min"]], [lp["x_min"], lp["y_min"], lp["z_min"]]],
-          "right" => [[lp["x_max"], lp["y_min"], lp["z_min"]], [lp["x_max"], lp["y_max"], lp["z_min"]], [lp["x_max"], lp["y_max"], lp["z_max"]], [lp["x_max"], lp["y_min"], lp["z_max"]]],
-          "left" => [[lp["x_min"], lp["y_max"], lp["z_min"]], [lp["x_min"], lp["y_min"], lp["z_min"]], [lp["x_min"], lp["y_min"], lp["z_max"]], [lp["x_min"], lp["y_max"], lp["z_max"]]],
-          "front" => [[lp["x_min"], lp["y_min"], lp["z_min"]], [lp["x_max"], lp["y_min"], lp["z_min"]], [lp["x_max"], lp["y_min"], lp["z_max"]], [lp["x_min"], lp["y_min"], lp["z_max"]]],
-          "back" => [[lp["x_max"], lp["y_max"], lp["z_min"]], [lp["x_min"], lp["y_max"], lp["z_min"]], [lp["x_min"], lp["y_max"], lp["z_max"]], [lp["x_max"], lp["y_max"] , lp["z_max"]]]
-        }
+        pm = plane_map
+        c_rt_bk_tp = intersect_planes.call(pm["right"], pm["back"], pm["top"])
+        c_lf_bk_tp = intersect_planes.call(pm["left"], pm["back"], pm["top"])
+        c_rt_fr_tp = intersect_planes.call(pm["right"], pm["front"], pm["top"])
+        c_lf_fr_tp = intersect_planes.call(pm["left"], pm["front"], pm["top"])
         
-        # Calculate scale factor for grips (e.g. 5% of largest dimension, min 10", max 100")
-        dims = [lp["x_max"] - lp["x_min"], lp["y_max"] - lp["y_min"], lp["z_max"] - lp["z_min"]]
-        max_dim = dims.max
-        arm_size = (max_dim * 0.05).clamp(10, 100)
+        c_rt_bk_bt = intersect_planes.call(pm["right"], pm["back"], pm["bottom"])
+        c_lf_bk_bt = intersect_planes.call(pm["left"], pm["back"], pm["bottom"])
+        c_rt_fr_bt = intersect_planes.call(pm["right"], pm["front"], pm["bottom"])
+        c_lf_fr_bt = intersect_planes.call(pm["left"], pm["front"], pm["bottom"])
+        
+        # Calculate dynamic arm size based on diagonal
+        arm_size = 15.0 # fallback
+        if c_rt_bk_tp && c_lf_fr_bt
+            diag = c_rt_bk_tp.distance(c_lf_fr_bt)
+            arm_size = (diag * 0.05).clamp(10, 100)
+        end
+  
+        # Construct Faces (World Space)
+        faces = {}
+        # Order vertices to form valid loop (CCW/CW)
+        faces["top"]    = [c_lf_fr_tp, c_rt_fr_tp, c_rt_bk_tp, c_lf_bk_tp].compact
+        faces["bottom"] = [c_lf_fr_bt, c_rt_fr_bt, c_rt_bk_bt, c_lf_bk_bt].reverse.compact
+        faces["front"]  = [c_lf_fr_bt, c_rt_fr_bt, c_rt_fr_tp, c_lf_fr_tp].compact
+        faces["back"]   = [c_lf_bk_bt, c_rt_bk_bt, c_rt_bk_tp, c_lf_bk_tp].reverse.compact
+        faces["left"]   = [c_lf_bk_bt, c_lf_fr_bt, c_lf_fr_tp, c_lf_bk_tp].compact
+        faces["right"]  = [c_rt_bk_bt, c_rt_fr_bt, c_rt_fr_tp, c_rt_bk_tp].reverse.compact
         
         planes_data.each do |d|
           d[:arm_size] = arm_size
-          if local_bounds[d[:name]]
-            d[:face_vertices] = local_bounds[d[:name]].map { |a| trans * Geom::Point3d.new(a) }
+          if faces[d[:name]]
+            d[:face_vertices] = faces[d[:name]]
+            
+            # Recalculate the handle position (original_point) to be the CENTER of the face
+            # This ensures the plus is always centered regardless of how the box was created/moved.
+            center_pt = Geom::Point3d.new(0,0,0)
+            d[:face_vertices].each { |v| center_pt = center_pt + v.to_a }
+            center = Geom::Point3d.new(center_pt.x / 4.0, center_pt.y / 4.0, center_pt.z / 4.0)
+            d[:original_point] = center
           end
         end
       end
@@ -523,9 +615,11 @@ module Skalp
       @@active_box_id = nil; @@manager = nil; @@observers_active = false; @@model_observer = nil; @@selection_observer = nil; @@original_render_settings = {}
       @@overlay = nil
       
-      def self.active_box_id; @@active_box_id; end
+      def self.active_box_id
+        @@active_box_id ||= Data.get_active_id(Sketchup.active_model)
+      end
       def self.manager; @@manager; end
-      def self.run; @@manager ||= Manager.new; @@manager.show; start_observers; add_overlay; end
+      def self.run; @@manager ||= Manager.new; @@active_box_id ||= Data.get_active_id(Sketchup.active_model); @@manager.show; start_observers; add_overlay; end
       def self.stop; @@manager.close if @@manager; stop_observers; deactivate_current if @@active_box_id; end
       def self.start_observers
         return if @@observers_active
@@ -578,8 +672,14 @@ module Skalp
       end
 
       def self.create_from_model_bounds
-        SettingsDialog.new("SectionBox##{Data.get_config(Sketchup.active_model).length + 1}") do |settings|
-          do_create_from_model_bounds(settings)
+        model = Sketchup.active_model
+        selection = model.selection
+        SettingsDialog.new("SectionBox##{Data.get_config(model).length + 1}") do |settings|
+          if !selection.empty?
+            do_create_from_selection(settings)
+          else
+            do_create_from_model_bounds(settings)
+          end
         end
       end
 
@@ -614,7 +714,6 @@ module Skalp
         faces = group.entities.grep(Sketchup::Face)
         trans = group.transformation
         planes_config = []
-        padding = 0.1.mm # User requested offset
         
         faces.each do |f|
           local_normal = f.normal
@@ -628,9 +727,6 @@ module Skalp
           # Point INWARDS: normal should have same direction as vector to center
           world_normal.reverse! if world_normal.dot(world_cnt - world_point) < 0
           
-          # Apply padding: Move point OUTWARD (opposite to inward normal)
-          world_point.offset!(world_normal.reverse, padding)
-          
           planes_config << {
             "name" => Skalp::BoxSection.get_face_name(local_normal),
             "point" => world_point.to_a,
@@ -640,23 +736,38 @@ module Skalp
         
         id = "box_" + Time.now.to_i.to_s
         finalize_creation(id, planes_config, settings, :activate)
-        group.erase! if group.valid?
-      end
-
-      def self.create_from_bounding_box(ent)
-        model = Sketchup.active_model
-        SettingsDialog.new("SectionBox##{Data.get_config(model).length + 1}") do |settings|
-           do_create_from_bounding_box(ent, settings)
+        
+        # Deletion Safety Prompt
+        if UI.messagebox("Delete the original object (solid)?", MB_YESNO) == IDYES
+          group.erase! if group.valid?
         end
       end
 
-      def self.do_create_from_bounding_box(ent, settings)
-        return unless ent.valid?
+      def self.create_from_selection
         model = Sketchup.active_model
+        SettingsDialog.new("SectionBox##{Data.get_config(model).length + 1}") do |settings|
+           do_create_from_selection(settings)
+        end
+      end
+
+      def self.do_create_from_selection(settings)
+        model = Sketchup.active_model
+        selection = model.selection
+        return if selection.empty?
+        
+        # Calculate combined bounds
+        bbox = Geom::BoundingBox.new
+        selection.each do |ent|
+            bbox.add(ent.bounds) if ent.respond_to?(:bounds)
+        end
+        return if bbox.empty?
+
         id = "box_" + Time.now.to_i.to_s
-        planes_config = calculate_planes_from_bounds(ent.bounds)
+        planes_config = calculate_planes_from_bounds(bbox)
         finalize_creation(id, planes_config, settings, :activate)
-        model.selection.remove(ent)
+        
+        # Deselect used entities to show the result clearly? 
+        # Or leave selected. User didn't specify. Keeping selection is usually safer.
       end
 
       private
@@ -665,10 +776,9 @@ module Skalp
         min = bbox.min; max = bbox.max
         cx = (min.x + max.x) / 2.0; cy = (min.y + max.y) / 2.0; cz = (min.z + max.z) / 2.0
         
-        padding = 0.1.mm
-        min_x = min.x.to_f - padding; max_x = max.x.to_f + padding
-        min_y = min.y.to_f - padding; max_y = max.y.to_f + padding
-        min_z = min.z.to_f - padding; max_z = max.z.to_f + padding
+        min_x = min.x.to_f; max_x = max.x.to_f
+        min_y = min.y.to_f; max_y = max.y.to_f
+        min_z = min.z.to_f; max_z = max.z.to_f
         
         planes = []
         planes << { "name" => "top",    "point" => [cx, cy, max_z], "normal" => [0, 0, -1] }
@@ -798,6 +908,62 @@ module Skalp
         50
       end
       
+      def self.update_planes_from_entities(id)
+        model = Sketchup.active_model
+        config = Data.get_config(model)
+        box = config[id]
+        return unless box
+        
+        # Find the active SectionBox group
+        box_group = model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == id }
+        return unless box_group
+        
+        # Collect all planes from the nested structure
+        updated_planes = []
+        
+        # Recursively find all section planes while tracking transformation
+        find_planes = lambda do |container, current_trans|
+          return unless container && container.respond_to?(:entities)
+          container.entities.each do |ent|
+            if ent.is_a?(Sketchup::SectionPlane)
+              # Get the stored position attribute (local to its parent group)
+              stored_pt = ent.get_attribute(DICTIONARY_NAME, 'original_point')
+              next unless stored_pt
+              
+              # Convert to world space using the cumulative transformation
+              local_pt = Geom::Point3d.new(stored_pt)
+              world_pt = current_trans * local_pt
+              
+              # Get current plane data: SectionPlane.get_plane returns [a, b, c, d]
+              p = ent.get_plane
+              next unless p && p.is_a?(Array) && p.length == 4
+              
+              # Extract face name from plane name
+              match = ent.name.match(/\[SkalpSectionBox\]-(.+)/)
+              face_name = match ? match[1] : "unknown"
+              
+              updated_planes << {
+                "name" => face_name,
+                "point" => world_pt.to_a,
+                "normal" => [p[0], p[1], p[2]]
+              }
+            elsif ent.is_a?(Sketchup::Group)
+              # Recurse with updated cumulative transformation
+              find_planes.call(ent, current_trans * ent.transformation)
+            end
+          end
+        end
+        
+        find_planes.call(box_group, box_group.transformation)
+        
+        # Update the config with new plane positions
+        if updated_planes.any?
+          box["planes"] = updated_planes
+          config[id] = box
+          Data.save_config(model, config)
+        end
+      end
+      
       def self.do_update(id, settings)
         model = Sketchup.active_model
         config = Data.get_config(model)
@@ -827,11 +993,33 @@ module Skalp
       def self.activate(id)
         deactivate_current if @@active_box_id
         model = Sketchup.active_model; config = Data.get_config(model); box_data = config[id]; return unless box_data
+        
+        # Filter entities BEFORE starting operation (performance optimization)
+        # ONLY exclude Skalp-specific markers: <skalp_materials>, Skalp sections, [Skalp
+        all_ents = model.entities.to_a.reject do |e|
+          # Skip if has Skalp attributes
+          next true if e.attribute_dictionary('Skalp_BoxSection') || e.attribute_dictionary('Skalp')
+          
+          # Skip specific Skalp-named folders/groups
+          if e.respond_to?(:name) && e.name && !e.name.empty?
+            n = e.name
+            next true if n.include?('<skalp_materials>') || n.include?('Skalp sections') || n.start_with?('[Skalp')
+          end
+          
+          # Skip entities on Skalp layers
+          if e.respond_to?(:layer) && e.layer && e.layer.respond_to?(:name)
+            ln = e.layer.name
+            next true if ln && (ln.include?('Skalp') || ln.include?('skalp'))
+          end
+          
+          false
+        end
+        
         model.start_operation('Activate SectionBox', true)
         begin
           @@active_box_id = id
-          # 1. Group model geometry first
-          all_ents = model.entities.to_a.reject { |e| e.attribute_dictionary('Skalp_BoxSection') || e.attribute_dictionary('Skalp') }
+          Data.save_active_id(model, id)
+          # 1. Group model geometry
           current_container = model.entities.add_group(all_ents)
           if current_container.nil?
             # Fallback for empty models/selections
@@ -846,11 +1034,18 @@ module Skalp
             norm = Geom::Vector3d.new(pd["normal"])
             sp = model.entities.add_section_plane([pt, norm])
             sp.activate
-            sp.name = "[SkalpSectionBox]-#{pd['name']}"
-            sp.set_attribute(DICTIONARY_NAME, 'original_point', pt.to_a)
             
-            # Wrap Plane + current container into a new group
+            # Wrapper: Group the plane with the current contents
+            # model.entities.add_group(entities) moves entities into a new group at the origin.
             wrapper = model.entities.add_group([sp, current_container])
+            
+            # CRITICAL: Now that the plane is inside the group, we MUST store the local coordinate.
+            # We store the local center point for tool handles to prevent World/Local drift.
+            local_pt = wrapper.transformation.inverse * pt
+            sp.set_attribute(DICTIONARY_NAME, 'original_point', local_pt.to_a)
+            
+            # Name the plane for consistent identification
+            sp.name = "[SkalpSectionBox]-#{pd['name']}"
             
             # Naming convention: 
             # Outermost: [SkalpSectionBox]
@@ -886,14 +1081,25 @@ module Skalp
       end
 
       def self.deactivate_current
-        return unless @@active_box_id
-        model = Sketchup.active_model; root = model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == @@active_box_id }
-        if root && root.valid?
-          model.start_operation('Deactivate SectionBox', true)
-          explode_recursive(root)
-          model.commit_operation
+        return unless active_box_id
+        model = Sketchup.active_model
+        
+        begin
+          root = model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == active_box_id }
+          if root && root.valid?
+            model.start_operation('Deactivate SectionBox', true)
+            explode_recursive(root)
+            model.commit_operation
+          end
+        rescue => e
+          model.abort_operation
+          puts "Deactivation Error: #{e.message}"
+        ensure
+          # Always clear active state, even if geometry failed
+          @@active_box_id = nil
+          Data.save_active_id(model, nil) 
+          @@manager.sync_data if @@manager && @@manager.visible?
         end
-        @@active_box_id = nil; @@manager.sync_data if @@manager && @@manager.visible?
       end
 
       def self.modify(id)
@@ -1197,7 +1403,7 @@ module Skalp
     def self.reload
       load __FILE__
       load File.join(File.dirname(__FILE__), 'Skalp_box_section_tool.rb')
-      puts "✓ Skalp SectionBox System reloaded!"
+
     end
 
     # UI Initialization
@@ -1219,25 +1425,34 @@ module Skalp
 
       UI.add_context_menu_handler do |menu|
         selection = Sketchup.active_model.selection
-        if selection.length == 1
-          ent = selection.first
-          if ent.is_a?(Sketchup::Group) || ent.is_a?(Sketchup::ComponentInstance)
-            # Check if it's already an active SectionBox
-            box_id = ent.get_attribute(DICTIONARY_NAME, 'box_id')
-            if box_id && box_id == Engine.active_box_id
-              menu.add_separator
-              menu.add_item("[Skalp SectionBox] Deactivate",5) { Fiber.new { Engine.deactivate_current }.resume }
-              menu.add_separator
-            elsif is_valid_box_group?(ent)
-              menu.add_separator
-              menu.add_item("[Skalp SectionBox]Create from Box",5) { Fiber.new { Engine.create_from_box(ent) }.resume }
-              menu.add_separator
-            else
-              menu.add_separator
-              menu.add_item("[Skalp SectionBox]Create from BoundingBox",5) { Fiber.new { Engine.create_from_bounding_box(ent) }.resume }
-              menu.add_separator
-            end
+        if selection.length > 0
+          # Check for single item special cases
+          if selection.length == 1
+              ent = selection.first
+              if (ent.is_a?(Sketchup::Group) || ent.is_a?(Sketchup::ComponentInstance))
+                 # 1. Deactivate logic
+                 box_id = ent.get_attribute(DICTIONARY_NAME, 'box_id')
+                 if box_id && box_id == Engine.active_box_id
+                   menu.add_separator
+                   menu.add_item("[Skalp SectionBox] Deactivate",5) { Fiber.new { Engine.deactivate_current }.resume }
+                   menu.add_separator
+                   next # Stop here
+                 end
+                 
+                 # 2. Create from Box logic
+                 if is_valid_box_group?(ent)
+                   menu.add_separator
+                   menu.add_item("[Skalp SectionBox] Create from Box",5) { Fiber.new { Engine.create_from_box(ent) }.resume }
+                   menu.add_separator
+                   next # Stop here
+                 end
+              end
           end
+          
+          # Default for any other selection (> 0): Create from BoundingBox
+          menu.add_separator
+          menu.add_item("[Skalp SectionBox] Create from BoundingBox",5) { Fiber.new { Engine.create_from_selection }.resume }
+          menu.add_separator
         end
       end
       @@ui_loaded = true
