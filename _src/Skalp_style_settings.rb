@@ -187,11 +187,15 @@ module Skalp
     end
 
     def save_rearview_status(status, object = Sketchup.active_model)
-      style_settings(object)[:rearview_status] = status
+      settings = style_settings(object)
+      settings[:rearview_status] = status
+      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
     end
 
     def save_rearview_linestyle(linetype, object = Sketchup.active_model)
-      style_settings(object)[:rearview_linestyle] = linetype
+      settings = style_settings(object)
+      settings[:rearview_linestyle] = linetype
+      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
     end
 
     def rearview_linestyle(object = Sketchup.active_model)
@@ -223,7 +227,9 @@ module Skalp
     end
 
     def save_lineweights_status(status, object = Sketchup.active_model)
-      style_settings(object)[:section_cut_width_status] = status
+      settings = style_settings(object)
+      settings[:section_cut_width_status] = status
+      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
     end
 
     def rear_view_status(object = Sketchup.active_model)
@@ -235,7 +241,9 @@ module Skalp
     end
 
     def save_drawing_scale(scale, object = Sketchup.active_model)
-      style_settings(object)[:drawing_scale] = scale.to_f
+      settings = style_settings(object)
+      settings[:drawing_scale] = scale.to_f
+      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
     end
 
     def drawing_scale(object = Sketchup.active_model)
@@ -243,7 +251,9 @@ module Skalp
     end
 
     def save_fog_status(status, object = Sketchup.active_model)
-      style_settings(object)[:depth_clipping_status] = status
+      settings = style_settings(object)
+      settings[:depth_clipping_status] = status
+      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
     end
 
     def fog_status(object = Sketchup.active_model)
@@ -255,7 +265,9 @@ module Skalp
     end
 
     def save_fog_distance(distance, object = Sketchup.active_model)
-      distance.class == Distance ? style_settings(object)[:depth_clipping_distance] = distance : style_settings(object)[:depth_clipping_distance] = Distance.new(distance)
+      settings = style_settings(object)
+      settings[:depth_clipping_distance] = (distance.class == Distance ? distance : Distance.new(distance))
+      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
     end
 
     def fog_action
@@ -285,7 +297,9 @@ module Skalp
     end
 
     def save_style_rules(rules, object = Sketchup.active_model)
-      style_settings(object)[:style_rules] = rules
+      settings = style_settings(object)
+      settings[:style_rules] = rules
+      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
     end
 
     #DIALOG CALLBACK ACTIONS

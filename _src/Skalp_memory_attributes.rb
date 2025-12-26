@@ -134,10 +134,12 @@ module Skalp
     end
 
     def read_from_model
+      puts "\n=== SKALP: Start Reading Memory Attributes (MIGRATION CHECK) ==="
       saved_memory_attributes = @skpModel.attribute_dictionary('Skalp_memory_attributes')
 
       to_check = []
       if saved_memory_attributes
+        puts "[LOG] Found 'Skalp_memory_attributes' dictionary with #{saved_memory_attributes.count} entries."
         saved_memory_attributes.each_pair do |key, value|
           key_array = key.split('|')
           object = key_array[0]
@@ -145,27 +147,39 @@ module Skalp
 
           case object
             when 'skpModel'
+              puts "[LOG] Validating Model attribute: #{key_name} = #{value}"
               to_check << @skpModel
               process_attributes_for_read(@mem_attributes[@skpModel], key_name, value)
             else
               skpPage = find_page(object)
 
               if skpPage &&  @mem_attributes[skpPage]
+                puts "[LOG] Validating Page attribute for '#{skpPage.name}': #{key_name} = #{value}"
                 to_check << skpPage
                 process_attributes_for_read(@mem_attributes[skpPage], key_name, value)
+              else
+                puts "[LOG] WARNING: Could not find page for ID '#{object}' (Key: #{key}). Skipping."
               end
           end
         end
 
         check_attributes(to_check)
       else
+        puts "[LOG] No 'Skalp_memory_attributes' dictionary found. initializing defaults."
         @mem_attributes[Sketchup.active_model]={}
         @mem_attributes[Sketchup.active_model]['style_settings'] = default_settings
         save_to_model
       end
       
       # MIGRATION SU2026: Sync migrated data to native page attributes
+      puts "\n=== SKALP: Syncing to Native Attributes ==="
       sync_to_native_attributes
+      
+      puts "\n=== SKALP: Final Active Memory Attributes State ==="
+      log_current_state
+      
+      puts "\n=== SKALP: VERIFICATION - Native Attributes State ==="
+      log_native_attributes_state
     end
 
     # MIGRATION SU2026: Write @mem_attributes to native page attributes
@@ -175,16 +189,61 @@ module Skalp
         next unless object && object.valid? rescue next
         next unless attrs.is_a?(Hash)
         
+        object_name = object.is_a?(Sketchup::Model) ? "Model" : "Page '#{object.name}'"
+        
         attrs.each_pair do |key, value|
           next if key == 'commit'
           next if value.is_a?(Hash) && key == 'style_settings'  # Skip complex hashes for now
           begin
-            object.set_attribute('Skalp', key, value) if value
+            if value
+              puts "[LOG] Transferring #{object_name}: '#{key}' -> '#{value}'"
+              object.set_attribute('Skalp', key, value) 
+            end
           rescue => e
-            # Skip invalid writes silently
+            puts "[ERROR] Failed to transfer #{object_name}: '#{key}' -> '#{value}': #{e.message}"
           end
         end
       end
+    end
+
+    def log_current_state
+      @mem_attributes.each_pair do |object, attrs|
+        next unless object && object.valid? rescue next
+        object_name = object.is_a?(Sketchup::Model) ? "Model" : "Page '#{object.name}'"
+        puts "--- #{object_name} ---"
+        if attrs.is_a?(Hash)
+          attrs.each do |k, v|
+             if k == 'style_settings' && v.is_a?(Hash)
+               puts "  #{k}:"
+               v.each { |sk, sv| puts "    #{sk}: #{sv}" }
+             else
+               puts "  #{k}: #{v}"
+             end
+          end
+        else
+          puts "  #{attrs.inspect}"
+        end
+      end
+      puts "=================================================\n"
+    end
+    
+    def log_native_attributes_state
+      objects = []
+      objects << @skpModel if @skpModel
+      objects.concat(@skpModel.pages.to_a) if @skpModel.pages
+
+      objects.each do |obj|
+        next unless obj && obj.valid?
+        dict = obj.attribute_dictionary('Skalp')
+        if dict
+          object_name = obj.is_a?(Sketchup::Model) ? "Model" : "Page '#{obj.name}'"
+          puts "--- Native Attributes: #{object_name} ---"
+          dict.each_pair do |k, v|
+            puts "  #{k}: #{v}"
+          end
+        end
+      end
+      puts "=================================================\n"
     end
     
     def check_attributes(objects)
@@ -224,7 +283,13 @@ module Skalp
         when 'fog_distance'
           style_settings[:depth_clipping_distance] = Distance.new(value)
         when 'style_rules'
-          value ? style_settings[:style_rules] = StyleRules.new(eval(value)) : style_settings[:style_rules] = StyleRules.new
+          begin
+            value ? style_settings[:style_rules] = StyleRules.new(eval(value)) : style_settings[:style_rules] = StyleRules.new
+          rescue => e
+            puts "Skalp Debug: Error evaluating style_rules in memory_attributes: #{e.message}"
+            puts e.backtrace.first(3).join("\n")
+            style_settings[:style_rules] = StyleRules.new
+          end
         when 'style'
           style_rules = StyleRules.new
           (value.class == Array) ? style_rules.load_from_attribute_style(value) : style_rules.setup_default

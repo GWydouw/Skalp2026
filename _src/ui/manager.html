@@ -547,7 +547,22 @@
                     $item.append(`<div class="name-label">${box.name}</div>`);
                     $item.append(`<div class="scale-label">${box.scale || ''}</div>`);
 
-                    $item.on('dblclick', (e) => { e.stopPropagation(); safeCallback("activate", item.id); });
+                    $item.on('dblclick', (e) => {
+                        e.stopPropagation();
+                        const action = (item.id === currentState.active_id) ? "deactivate" : "activate";
+                        safeCallback(action, item.id);
+                    });
+
+                    // Preview Overlay Events
+                    $item.on('mouseenter', (e) => {
+                        if (!currentState.active_id) {
+                            safeCallback('preview', item.id);
+                        }
+                    });
+                    $item.on('mouseleave', (e) => {
+                        safeCallback('clear_preview');
+                    });
+
                     $item.on('click', (e) => { e.stopPropagation(); $('.tree-item').removeClass('selected'); $item.addClass('selected'); selectedFolderId = null; });
                     $item.on('contextmenu', (e) => { showContextMenu(e, 'item', item.id); });
                     $item.on('dragstart', e => { e.stopPropagation(); draggedDetails = { id: item.id, type: 'item' }; });
@@ -561,7 +576,12 @@
             e.preventDefault(); e.stopPropagation();
             const $menu = $('#context-menu').empty();
             if (type === 'item') {
-                $menu.append(`<div class="menu-item" onclick="safeCallback('activate', '${id}')">Activate</div>`);
+                const isActive = (id === currentState.active_id);
+                if (isActive) {
+                    $menu.append(`<div class="menu-item" onclick="safeCallback('deactivate', '${id}')">Deactivate</div>`);
+                } else {
+                    $menu.append(`<div class="menu-item" onclick="safeCallback('activate', '${id}')">Activate</div>`);
+                }
                 $menu.append(`<div class="menu-item" onclick="safeCallback('modify', '${id}')">Modify</div>`);
                 $menu.append('<div class="menu-sep"></div>');
                 $menu.append(`<div class="menu-item" onclick="safeCallback('edit', '${id}')">Edit Settings</div>`);

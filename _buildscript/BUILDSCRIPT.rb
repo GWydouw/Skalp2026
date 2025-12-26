@@ -16,6 +16,7 @@ module Skalp_Buildscript
   @debugger = ARGV[1] == 'debugger'
   @windows = ARGV[2] == 'windows'
   @rebuild_C = ARGV[0] == 'rebuild_C'
+  @include_lic = ARGV.include?('lic')
 
   SKALP_BUILD_DATE = Time.now.strftime('%d %B %Y')
 

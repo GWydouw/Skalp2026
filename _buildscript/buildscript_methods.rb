@@ -45,6 +45,8 @@ module Skalp_Buildscript
     files_not_lic << 'Skalp_API.rb'
     #files_not_lic << 'Skalp_lines.rb'
     #files_not_lic << 'Skalp_sectiongroup.rb'
+    files_not_lic << 'Skalp_box_section.rb'
+    files_not_lic << 'Skalp_box_section_tool.rb'
 
     files_not_lic_rails = []
     files_not_lic_rails << 'Skalp_license.rb'
@@ -349,7 +351,15 @@ module Skalp_Buildscript
     FileUtils.copy(File.join(@result_from_encoder_path, 'Skalp_translator.rb'), File.join(@build_path, 'Skalp_Skalp', 'Skalp_translator.rb'))
     FileUtils.copy(File.join(@result_from_encoder_path, 'Skalp_update.rb'), File.join(@build_path, 'Skalp_Skalp', 'Skalp_update.rb'))
     FileUtils.copy(File.join(@result_from_encoder_path, 'Skalp_white_mode.rb'), File.join(@build_path, 'Skalp_Skalp', 'Skalp_white_mode.rb'))
+    FileUtils.copy(File.join(@result_from_encoder_path, 'Skalp_box_section.rb'), File.join(@build_path, 'Skalp_Skalp', 'Skalp_box_section.rb'))
+    FileUtils.copy(File.join(@result_from_encoder_path, 'Skalp_box_section_tool.rb'), File.join(@build_path, 'Skalp_Skalp', 'Skalp_box_section_tool.rb'))
     #FileUtils.copy(File.join(@result_from_encoder_path, 'Skalp_overlay.rb'), File.join(@build_path, 'Skalp_Skalp', 'Skalp_overlay.rb'))
+    
+    # Copy icons directory for box section
+    icons_source = File.join(@skalp_path, '_src', 'icons')
+    icons_dest = File.join(@build_path, 'Skalp_Skalp', 'icons')
+    FileUtils.mkdir_p(icons_dest) unless Dir.exist?(icons_dest)
+    FileUtils.cp_r(icons_source, File.dirname(icons_dest)) if Dir.exist?(icons_source)
 
     FileUtils.copy(File.join(@c_path, 'windows/SkalpC.so'), File.join(@build_path, 'Skalp_Skalp', 'SkalpC.win')) unless @fast_build
 
@@ -442,8 +452,16 @@ module Skalp_Buildscript
       FileUtils.copy(File.join(@build_path, 'Skalp_Skalp.rb'), File.join(plugin_sketchup_path, 'Skalp_Skalp.rb'))
 
       # skalp.lic
-      # FileUtils.copy(File.join(@skalp_path,'dev_license_files/Guy.lic'), File.join(skalp_sketchup_path,'Skalp.lic')) if @skalp_path.include?('guy')
-      FileUtils.copy(File.join(@skalp_path, 'dev_license_files/Jeroen.lic'), File.join(skalp_sketchup_path, 'Skalp.lic')) if @skalp_path.include?('jeroen') #if  File.exist?(File.join(@skalp_path,'Skalp.lic'))
+      if @include_lic
+        lic_file = File.join(@skalp_path, 'dev_license_files/Skalp.lic')
+        lic_file = File.join(@skalp_path, 'dev_license_files/Guy.lic') unless File.exist?(lic_file)
+        if File.exist?(lic_file)
+          FileUtils.copy(lic_file, File.join(skalp_sketchup_path, 'Skalp.lic'))
+          puts "License file copied from #{File.basename(lic_file)}"
+        else
+          puts "Warning: No license file found in dev_license_files/ (Skalp.lic or Guy.lic)"
+        end
+      end
     end
   end
 

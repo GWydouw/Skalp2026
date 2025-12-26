@@ -439,7 +439,7 @@ module Skalp
     # MIGRATION: Updated to use native SketchUp attributes (SU 2026 compatibility)
     # Writes directly to object.set_attribute() instead of in-memory dictionary
     # STYLE_SETTINGS keys that should be flattened to native attributes
-    STYLE_SETTINGS_KEYS = [:drawing_scale, :rearview_status, :rearview_linestyle, :section_cut_width_status, :depth_clipping_status, :depth_clipping_distance]
+    STYLE_SETTINGS_KEYS = [:drawing_scale, :rearview_status, :rearview_linestyle, :section_cut_width_status, :depth_clipping_status, :depth_clipping_distance, :style_rules]
     
     def set_memory_attribute(object, dict_name, key, value)
       return unless object  # Guard against nil object
@@ -452,8 +452,9 @@ module Skalp
       if key == 'style_settings' && value.is_a?(Hash)
         STYLE_SETTINGS_KEYS.each do |style_key|
           style_value = value[style_key]
-          # Convert to string for storage, skip style_rules (too complex)
-          if style_value && !style_value.is_a?(Hash) && style_key != :style_rules
+          if style_key == :style_rules && style_value.respond_to?(:rules)
+            object.set_attribute(dict_name, "ss_#{style_key}", style_value.rules.inspect)
+          elsif (!style_value.is_a?(Hash))
             object.set_attribute(dict_name, "ss_#{style_key}", style_value.to_s)
           end
         end
@@ -481,9 +482,31 @@ module Skalp
               reconstructed[style_key] = native_value.to_f
             when :rearview_status, :section_cut_width_status, :depth_clipping_status
               reconstructed[style_key] = (native_value == 'true' || native_value == true)
+            when :style_rules
+              reconstructed[style_key] = native_value ? Skalp::StyleRules.new(eval(native_value)) : nil
             else
               reconstructed[style_key] = native_value
             end
+          end
+        end
+
+        # MIGRATION FALLBACK: If some keys are missing from native attributes, try to fill them from the old style_settings blob
+        old_blob = object.get_attribute(dict_name, 'style_settings')
+        if old_blob.is_a?(String) || old_blob.is_a?(Hash)
+          begin
+            old_hash = old_blob.is_a?(String) ? eval(old_blob) : old_blob
+            if old_hash.is_a?(Hash)
+              STYLE_SETTINGS_KEYS.each do |style_key|
+                if !reconstructed.key?(style_key) && old_hash.key?(style_key)
+                  reconstructed[style_key] = old_hash[style_key]
+                  has_any = true
+                end
+              end
+            end
+          rescue => e
+            puts "Skalp Debug: Error migrating old style_settings blob: #{e.message}"
+            puts e.backtrace.first(3).join("\n")
+            # Ignore eval errors for old blob migration
           end
         end
 
@@ -492,28 +515,8 @@ module Skalp
            @memory_attributes[object]['style_settings'] = reconstructed
            return reconstructed
         end
+        return nil # No settings found in native or old blob
 
-        # MIGRATION FALLBACK (PRIORITY 2): If no new ss_* keys, check for old style_settings blob
-        old_blob = object.get_attribute(dict_name, 'style_settings')
-        if old_blob.is_a?(String) || old_blob.is_a?(Hash)
-          begin
-             old_hash = old_blob.is_a?(String) ? eval(old_blob) : old_blob
-             if old_hash.is_a?(Hash)
-                puts "Skalp: Migrating legacy style_settings for #{object}..."
-                old_hash.each do |k,v| 
-                   sym_k = k.to_sym
-                   reconstructed[sym_k] = v
-                   # Auto-save migration
-                   object.set_attribute(dict_name, "ss_#{sym_k}", v.to_s)
-                end
-                @memory_attributes[object] = {} unless @memory_attributes.include?(object)
-                @memory_attributes[object]['style_settings'] = reconstructed
-                return reconstructed
-             end
-          rescue => e
-             puts "Skalp: Migration error: #{e.message}"
-          end
-        end
 
         # Then try memory_attributes (for in-session data or initialized defaults)
         if @memory_attributes.include?(object) && @memory_attributes[object]['style_settings'].is_a?(Hash)
@@ -1234,6 +1237,11 @@ module Skalp
         skalp_pages.each { |skpPage| sectionplane_by_id(get_memory_attribute(skpPage, 'Skalp', 'sectionplaneID')).calculate_section(false, skpPage) }
 
         manage_sections(skalp_pages, no_skalp_pages)
+        skalp_pages.each do |skpPage|
+          Skalp.update_page(skpPage)
+          sectionplaneID = get_memory_attribute(skpPage, 'Skalp', 'sectionplaneID')
+          set_memory_attribute(skpPage, 'Skalp', 'sectionplaneID', sectionplaneID) # Ensure it's persisted as native ss_ key if possible
+        end
         commit
 
         start('Skalp - Processing rear lines', true)
@@ -1282,6 +1290,11 @@ module Skalp
                 start('Skalp - adding rear lines', true)
                 @hiddenlines.add_rear_lines_to_model(:all)
                 manage_sections(skalp_pages, no_skalp_pages)
+                skalp_pages.each do |skpPage|
+                  Skalp.update_page(skpPage)
+                  sectionplaneID = get_memory_attribute(skpPage, 'Skalp', 'sectionplaneID')
+                  set_memory_attribute(skpPage, 'Skalp', 'sectionplaneID', sectionplaneID)
+                end
                 commit
 
                 if save

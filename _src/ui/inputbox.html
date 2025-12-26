@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Skalp Input</title>
+    <style>
+        :root {
+            --primary-color: #0078d4;
+            --bg-color: #f3f3f3;
+            --text-color: #333;
+            --border-color: #ccc;
+            --input-bg: #fff;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-grow: 1;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        select {
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            background-color: var(--input-bg);
+            width: 100%;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        input[type="text"]:focus,
+        select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+        }
+
+        #footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            min-width: 80px;
+        }
+
+        button.primary {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+        }
+
+        button.primary:hover {
+            background-color: #106ebe;
+        }
+
+        button.secondary {
+            background-color: white;
+            color: var(--text-color);
+        }
+
+        button.secondary:hover {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <!-- Inputs will be injected here -->
+    </div>
+    <div id="footer">
+        <button class="secondary" id="cancel-btn">Cancel</button>
+        <button class="primary" id="ok-btn">OK</button>
+    </div>
+
+    <script>
+        function init(data) {
+            const container = document.getElementById('container');
+            container.innerHTML = '';
+
+            data.prompts.forEach((prompt, index) => {
+                const group = document.createElement('div');
+                group.className = 'input-group';
+
+                const label = document.createElement('label');
+                label.textContent = prompt;
+                group.appendChild(label);
+
+                const val = data.defaults[index] || '';
+                const list = data.lists ? data.lists[index] : null;
+
+                if (list && list.length > 0) {
+                    const select = document.createElement('select');
+                    select.id = `input-${index}`;
+                    const options = list.split('|');
+                    options.forEach(opt => {
+                        const o = document.createElement('option');
+                        o.value = opt;
+                        o.textContent = opt;
+                        if (opt === val) o.selected = true;
+                        select.appendChild(o);
+                    });
+                    group.appendChild(select);
+                } else {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.id = `input-${index}`;
+                    input.value = val;
+                    group.appendChild(input);
+
+                    if (index === 0) {
+                        setTimeout(() => input.focus(), 100);
+                        input.select();
+                    }
+                }
+
+                container.appendChild(group);
+            });
+        }
+
+        document.getElementById('ok-btn').addEventListener('click', () => {
+            const inputs = document.querySelectorAll('input, select');
+            const results = Array.from(inputs).map(i => i.value);
+            sketchup.submit(results);
+        });
+
+        document.getElementById('cancel-btn').addEventListener('click', () => {
+            sketchup.cancel();
+        });
+
+        // Initialize once DOM is ready
+        window.onload = () => {
+            sketchup.ready();
+        };
+
+        // Handle Enter key
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('ok-btn').click();
+            } else if (e.key === 'Escape') {
+                document.getElementById('cancel-btn').click();
+            }
+        });
+    </script>
+</body>
+
+</html>
