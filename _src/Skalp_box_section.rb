@@ -149,9 +149,10 @@ module Skalp
         view.drawing_color = Sketchup::Color.new(base_color.red, base_color.green, base_color.blue, alpha); view.draw(GL_POLYGON, face_vertices)
       end
       def self.draw_plus(view, center, normal, face_name, highlighted, arm_size = 15.0, color_override = nil)
-        arm = arm_size; width = highlighted ? 4 : 2; color = highlighted && color_override ? color_override : get_color(face_name)
+        arm = arm_size || 15.0; width = highlighted ? 4 : 2; color = highlighted && color_override ? color_override : get_color(face_name)
         axes = normal.axes; v1 = axes[0]; v2 = axes[1]; v1.length = v2.length = arm / 2.0; view.drawing_color = color; view.line_width = width
         view.draw(GL_LINES, [center.offset(v1), center.offset(v1.reverse)])
+        view.draw(GL_LINES, [center.offset(v2), center.offset(v2.reverse)])
       end
     end
 
@@ -191,6 +192,10 @@ module Skalp
       faces << { :name => "left", :face_vertices => [c_lf_bk_bt, c_lf_fr_bt, c_lf_fr_tp, c_lf_bk_tp] }
       faces << { :name => "right", :face_vertices => [c_rt_bk_bt, c_rt_fr_bt, c_rt_fr_tp, c_rt_bk_tp].reverse }
       faces.each { |f| f[:original_point] = pm[f[:name]][:point]; f[:normal] = pm[f[:name]][:normal] }; faces
+    end
+
+    def self.get_active_box_section_group
+      Sketchup.active_model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == Engine.active_box_id }
     end
 
     def self.get_section_planes_data(root = nil)
@@ -259,6 +264,7 @@ module Skalp
         @dialog.add_action_callback("add_box") { |d, p| Fiber.new { Engine.create_from_model_bounds }.resume }; @dialog.add_action_callback("add_folder") { |d, parent_id| Fiber.new { Engine.create_folder(parent_id.empty? ? nil : parent_id) }.resume }
         @dialog.add_action_callback("toggle_folder") { |d, folder_id| Fiber.new { Engine.toggle_folder(folder_id) }.resume }; @dialog.add_action_callback("rename_folder") { |d, folder_id| Fiber.new { Engine.rename_folder(folder_id) }.resume }
         @dialog.add_action_callback("edit") { |d, id| Fiber.new { Engine.edit(id) }.resume }; @dialog.add_action_callback("rename") { |d, id| Fiber.new { Engine.rename(id) }.resume }; @dialog.add_action_callback("delete") { |d, id| Fiber.new { Engine.delete(id) }.resume }
+        @dialog.add_action_callback("move_item") { |d, json| Fiber.new { Engine.move_item(json) }.resume }
         @dialog.set_on_closed { @dialog = nil }; @dialog.show
       end
       def sync_data; return unless @dialog && @dialog.visible?; model = Sketchup.active_model; data = { :boxes => Data.get_config(model), :hierarchy => Data.get_hierarchy(model), :active_id => Engine.active_box_id }; @dialog.execute_script("updateData(#{data.to_json})"); end
@@ -289,7 +295,7 @@ module Skalp
         id = "box_" + Time.now.to_i.to_s; finalize_creation(id, planes_config, settings, :activate); group.erase! if UI.messagebox("Delete original?", MB_YESNO) == IDYES; end
       def self.create_from_selection; model = Sketchup.active_model; SettingsDialog.new("SectionBox##{Data.get_config(model).length + 1}") { |settings| do_create_from_selection(settings) }; end
       def self.do_create_from_selection(settings); model = Sketchup.active_model; selection = model.selection; return if selection.empty?; bbox = Geom::BoundingBox.new; selection.each { |ent| bbox.add(ent.bounds) if ent.respond_to?(:bounds) }; id = "box_" + Time.now.to_i.to_s; finalize_creation(id, calculate_planes_from_bounds(bbox), settings, :activate); end
-      def self.calculate_planes_from_bounds(bbox); min = bbox.min; max = bbox.max; cx = (min.x + max.x) / 2.0; cy = (min.y + max.y) / 2.0; cz = (min.z + max.z) / 2.0; min_x, max_x, min_y, max_y, min_z, max_z = min.x.to_f, max.x.to_f, min.y.to_f, max.y.to_f, min.z.to_f, max_z.to_f
+      def self.calculate_planes_from_bounds(bbox); min = bbox.min; max = bbox.max; cx = (min.x + max.x) / 2.0; cy = (min.y + max.y) / 2.0; cz = (min.z + max.z) / 2.0; min_x, max_x, min_y, max_y, min_z, max_z = min.x.to_f, max.x.to_f, min.y.to_f, max.y.to_f, min.z.to_f, max.z.to_f
         [{ "name" => "top", "point" => [cx, cy, max_z], "normal" => [0, 0, -1] }, { "name" => "bottom", "point" => [cx, cy, min_z], "normal" => [0, 0, 1] }, { "name" => "right", "point" => [max_x, cy, cz], "normal" => [-1, 0, 0] }, { "name" => "left", "point" => [min_x, cy, cz], "normal" => [1, 0, 0] }, { "name" => "front", "point" => [cx, min_y, cz], "normal" => [0, 1, 0] }, { "name" => "back", "point" => [cx, max_y, cz], "normal" => [0, -1, 0] }]; end
       def self.finalize_creation(id, planes, settings, mode = :activate); model = Sketchup.active_model; config = Data.get_config(model); box_config = Data.get_defaults.merge(settings).merge({ "name" => settings["name"], "planes" => planes, "created_at" => Time.now.to_s }); config[id] = box_config; Data.save_config(model, config); (Data.get_hierarchy(model) << { "id" => id, "type" => "item" }) && Data.save_hierarchy(model, Data.get_hierarchy(model)); @@manager.sync_data if @@manager; activate(id); modify(id) if mode == :modify; end
       def self.rename(id); model = Sketchup.active_model; config = Data.get_config(model); box = config[id]; return unless box; result = Skalp::InputBox.ask(['Name:'], [box['name']], [], 'Rename'); (box['name'] = result[0].strip; config[id] = box; Data.save_config(model, config); @@manager.sync_data) if result && !result[0].empty?; end
@@ -300,6 +306,14 @@ module Skalp
           box["planes"].each_with_index { |pd, i| pt = Geom::Point3d.new(pd["point"]); sp = model.entities.add_section_plane([pt, Geom::Vector3d.new(pd["normal"])]); sp.activate; wrapper = model.entities.add_group([sp, current]); sp.set_attribute(DICTIONARY_NAME, 'original_point', (wrapper.transformation.inverse * pt).to_a); sp.name = "[SkalpSectionBox]-#{pd['name']}"; if i == box["planes"].length - 1; wrapper.name = "[SkalpSectionBox]"; wrapper.set_attribute(DICTIONARY_NAME, 'box_id', id); else; wrapper.name = "[SkalpSectionBox]-#{pd['name'].capitalize}"; end; current = wrapper }; model.commit_operation; @@manager.sync_data if @@manager; rescue => e; model.abort_operation; puts "Err: #{e.message}"; end; end
       def self.deactivate_current; return unless active_box_id; model = Sketchup.active_model; root = model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == active_box_id }; if root; model.start_operation('Deactivate', true); (e_rec = lambda { |g| return unless g && g.valid?; g.entities.grep(Sketchup::SectionPlane).each { |sp| sp.erase! if sp.name =~ /\[SkalpSectionBox\]/ }; child = g.entities.find { |e| e.is_a?(Sketchup::Group) && e.name =~ /\[SkalpSectionBox/ }; g.explode; e_rec.call(child) if child }).call(root); model.commit_operation; end; exit_edit_inside_mode; @@active_box_id = nil; Data.save_active_id(model, nil); @@manager.sync_data if @@manager; end
       def self.modify(id); activate(id) unless @@active_box_id == id; Sketchup.active_model.select_tool(Skalp::BoxSectionAdjustTool.new); end
+      def self.update_planes_from_entities(id)
+        # Update saved plane configurations from current section plane positions
+        model = Sketchup.active_model; config = Data.get_config(model); box = config[id]; return unless box
+        root = model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == id }; return unless root && root.valid?
+        planes_data = Skalp::BoxSection.get_section_planes_data(root); return unless planes_data
+        updated_planes = planes_data.map { |pd| { "name" => pd[:name], "point" => pd[:original_point].to_a, "normal" => pd[:normal].to_a } }
+        box["planes"] = updated_planes; config[id] = box; Data.save_config(model, config)
+      end
       def self.on_enter_box_context(model)
         begin
           add_overlay if @@interaction_overlay.nil?
@@ -362,6 +376,33 @@ module Skalp
         end
       end
       def self.toggle_folder(fid); h = Data.get_hierarchy(Sketchup.active_model); (t_rec = lambda { |items| items.each { |i| if i["id"] == fid; i["open"] = !i["open"]; return true; end; return true if i["children"] && t_rec.call(i["children"]) }; false }).call(h); Data.save_hierarchy(Sketchup.active_model, h); @@manager.sync_data if @@manager; end
+      def self.move_item(json)
+         data = json.is_a?(String) ? JSON.parse(json) : json
+         source_id = data["source"]; target_id = data["target"]
+         return unless source_id
+         model = Sketchup.active_model; h = Data.get_hierarchy(model)
+         # Find and remove source item
+         source_item = nil
+         remove_item = lambda { |items| items.each_with_index { |i, idx| 
+            if i["id"] == source_id; source_item = items.delete_at(idx); return true; end
+            return true if i["children"] && remove_item.call(i["children"])
+         }; false }
+         remove_item.call(h)
+         return unless source_item
+         # Insert into target
+         if target_id.nil? || target_id.empty?
+            h << source_item
+         else
+            insert_into = lambda { |items| items.each { |i|
+               if i["id"] == target_id && i["type"] == "folder"
+                  i["children"] ||= []; i["children"] << source_item; return true
+               end
+               return true if i["children"] && insert_into.call(i["children"])
+            }; false }
+            insert_into.call(h) || h << source_item
+         end
+         Data.save_hierarchy(model, h); @@manager.sync_data if @@manager
+      end
     end
     class SectionBoxModelObserver < Sketchup::ModelObserver
       def onActivePathChanged(model); path = model.active_path || []; in_box = path.any? { |e| n = e.name.to_s; m = n.include?("[SkalpSectionBox-Model]"); m ||= e.definition.name.include?("[SkalpSectionBox-Model]") if !m && e.respond_to?(:definition); m }
@@ -373,7 +414,18 @@ module Skalp
     end
     def self.reload; load __FILE__; load File.join(File.dirname(__FILE__), 'Skalp_box_section_tool.rb'); end
     unless defined?(@@ui_loaded)
-      tb = UI::Toolbar.new('Skalp SectionBox'); cmd = UI::Command.new('Manager') { (Engine.manager && Engine.manager.visible?) ? Engine.stop : Engine.run }; cmd.set_validation_proc { (Engine.manager && Engine.manager.visible?) ? MF_CHECKED : MF_UNCHECKED }; cmd.small_icon = cmd.large_icon = File.join(File.dirname(__FILE__), 'icons', 'box_section', 'icon_box_section_create.svg'); tb.add_item(cmd); tb.show
+      tb = UI::Toolbar.new('Skalp SectionBox')
+      cmd = UI::Command.new('Manager') { (Engine.manager && Engine.manager.visible?) ? Engine.stop : Engine.run }
+      cmd.set_validation_proc { (Engine.manager && Engine.manager.visible?) ? MF_CHECKED : MF_UNCHECKED }
+      cmd.small_icon = cmd.large_icon = File.join(File.dirname(__FILE__), 'icons', 'box_section', 'icon_box_section_create.svg')
+      tb.add_item(cmd)
+      
+      reload_cmd = UI::Command.new('Reload') { Skalp::BoxSection.reload; UI.messagebox('SectionBox reloaded!') }
+      reload_cmd.tooltip = 'Reload SectionBox Plugin'
+      reload_cmd.small_icon = reload_cmd.large_icon = File.join(File.dirname(__FILE__), 'icons', 'box_section', 'icon_reload.svg')
+      tb.add_item(reload_cmd)
+      
+      tb.show
       UI.add_context_menu_handler do |menu|; s = Sketchup.active_model.selection; if s.length == 1; e = s.first; if (e.is_a?(Sketchup::Group) && e.get_attribute(DICTIONARY_NAME, 'box_id') == Engine.active_box_id); menu.add_item("Deactivate") { Fiber.new { Engine.deactivate_current }.resume }; end; end; end; @@ui_loaded = true
     end
   end
