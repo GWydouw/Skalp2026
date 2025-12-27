@@ -44,11 +44,10 @@ module Skalp
           return val if val.is_a?(Array) || val.is_a?(Hash)
           if val.is_a?(String)
             begin
-              # Handle both pure JSON strings (Windows) and potential SB_JSON prefix
               json_str = val.start_with?("SB_JSON:") ? val[8..-1] : val
               return JSON.parse(json_str)
             rescue
-              return val # Plain string
+              return val
             end
           end
           val
@@ -111,1351 +110,271 @@ module Skalp
       end
     end
 
-    # Preview Overlay (SketchUp 2024+ / Overlays API)
+    # Preview Overlay
     if defined?(Sketchup::Overlay)
       class PreviewOverlay < Sketchup::Overlay
         OVERLAY_ID = 'skalp.sectionbox.preview' unless defined?(OVERLAY_ID)
         OVERLAY_NAME = 'SectionBox Preview' unless defined?(OVERLAY_NAME)
-        
-        def initialize
-          super(OVERLAY_ID, OVERLAY_NAME)
-          @data = []
-          @enabled = true
-        end
-        
-        def set_data(data)
-          @data = data
-        end
-        
+        def initialize; super(OVERLAY_ID, OVERLAY_NAME); @data = []; @enabled = true; end
+        def set_data(data); @data = data; end
         def draw(view)
           return unless @data && !@data.empty?
           magenta = Sketchup::Color.new(255, 0, 255)
-          
-          # Draw faces (Magenta 10%)
-          @data.each do |d|
-            Skalp::BoxSection::DrawHelper.draw_face_highlight(view, d[:face_vertices], d[:name], 25, magenta)
-          end
-          # Draw Bounds on top (Magenta, 3px, solid)
-          Skalp::BoxSection::DrawHelper.draw_bounds(view, @data, :color => magenta, :width => 3, :stipple => "")
+          @data.each { |d| Skalp::BoxSection::SkalpDrawHelper.draw_face_highlight(view, d[:face_vertices], d[:name], 25, magenta) }
+          Skalp::BoxSection::SkalpDrawHelper.draw_bounds(view, @data, :color => magenta, :width => 3, :stipple => "")
         end
       end
     end
 
-    # Shared drawing utilities
-    module DrawHelper
+    module SkalpDrawHelper
       def self.get_color(face_name)
         case face_name
-        when "top", "bottom" then Sketchup::Color.new(0, 0, 255) # Blue (Z)
-        when "left", "right" then Sketchup::Color.new(255, 0, 0) # Red (X)
-        when "front", "back" then Sketchup::Color.new(0, 255, 0) # Green (Y)
+        when "top", "bottom" then Sketchup::Color.new(0, 0, 255)
+        when "left", "right" then Sketchup::Color.new(255, 0, 0)
+        when "front", "back" then Sketchup::Color.new(0, 255, 0)
         else Sketchup::Color.new(74, 144, 226)
         end
       end
-      
-      # ... [Methods omitted for brevity] ...
-    
-    # ... inside Engine ...
-      def self.add_overlay
-        if defined?(Sketchup::Overlay)
-           model = Sketchup.active_model
-           # Check if already exists to preserve user state (Enabled/Disabled)
-           existing = model.overlays.find { |o| o.respond_to?(:overlay_id) && o.overlay_id == PreviewOverlay::OVERLAY_ID }
-           
-           if existing
-             # Reuse existing to preserve state
-             @@overlay = existing
-           else
-             # Create FRESH instance and add
-             @@overlay = PreviewOverlay.new
-             model.overlays.add(@@overlay)
-           end
-        end
-      end
-      def self.get_color(face_name)
-        case face_name
-        when "top", "bottom" then Sketchup::Color.new(0, 0, 255) # Blue (Z)
-        when "left", "right" then Sketchup::Color.new(255, 0, 0) # Red (X)
-        when "front", "back" then Sketchup::Color.new(0, 255, 0) # Green (Y)
-        else Sketchup::Color.new(74, 144, 226)
-        end
-      end
-
       def self.draw_bounds(view, planes_data, options = {})
-        color = options[:color] || Sketchup::Color.new(128, 128, 128)
-        width = options[:width] || 1
-        stipple = options.key?(:stipple) ? options[:stipple] : "_"
-        
+        color = options[:color] || Sketchup::Color.new(128, 128, 128); width = options[:width] || 1; stipple = options.key?(:stipple) ? options[:stipple] : "_"
         unique_edges = {}
         planes_data.each do |data|
-          verts = data[:face_vertices]
-          next unless verts && verts.length >= 3
-          verts.each_with_index do |v, i|
-            v2 = verts[(i + 1) % verts.length]
-            key = [[v.x.round(2), v.y.round(2), v.z.round(2)], [v2.x.round(2), v2.y.round(2), v2.z.round(2)]].sort.to_s
-            unique_edges[key] ||= [v, v2]
-          end
+          verts = data[:face_vertices]; next unless verts && verts.length >= 3
+          verts.each_with_index { |v, i| v2 = verts[(i + 1) % verts.length]; key = [[v.x.round(2), v.y.round(2), v.z.round(2)], [v2.x.round(2), v2.y.round(2), v2.z.round(2)]].sort.to_s; unique_edges[key] ||= [v, v2] }
         end
-        view.drawing_color = color
-        view.line_width = width
-        view.line_stipple = stipple
-        unique_edges.each_value { |edge| view.draw(GL_LINES, edge) }
-        view.line_stipple = ""
+        view.drawing_color = color; view.line_width = width; view.line_stipple = stipple; unique_edges.each_value { |edge| view.draw(GL_LINES, edge) }; view.line_stipple = ""
       end
-
       def self.draw_face_highlight(view, face_vertices, face_name, alpha = 25, color_override = nil)
-        return unless face_vertices && face_vertices.length >= 3
-        base_color = color_override || get_color(face_name)
-        # alpha 25 = ~10%, alpha 5 = ~2%
-        view.drawing_color = Sketchup::Color.new(base_color.red, base_color.green, base_color.blue, alpha)
-        view.draw(GL_POLYGON, face_vertices)
+        return unless face_vertices && face_vertices.length >= 3; base_color = color_override || get_color(face_name)
+        view.drawing_color = Sketchup::Color.new(base_color.red, base_color.green, base_color.blue, alpha); view.draw(GL_POLYGON, face_vertices)
       end
-
       def self.draw_plus(view, center, normal, face_name, highlighted, arm_size = 15.0, color_override = nil)
-        arm = arm_size
-        width = highlighted ? 4 : 2
-        color = highlighted && color_override ? color_override : get_color(face_name)
-        axes = normal.axes
-        v1 = axes[0]; v2 = axes[1]
-        v1.length = v2.length = arm / 2.0
-        view.drawing_color = color
-        view.line_width = width
+        arm = arm_size; width = highlighted ? 4 : 2; color = highlighted && color_override ? color_override : get_color(face_name)
+        axes = normal.axes; v1 = axes[0]; v2 = axes[1]; v1.length = v2.length = arm / 2.0; view.drawing_color = color; view.line_width = width
         view.draw(GL_LINES, [center.offset(v1), center.offset(v1.reverse)])
-        view.draw(GL_LINES, [center.offset(v2), center.offset(v2.reverse)])
       end
     end
-    
+
+    if defined?(Sketchup::Overlay)
+       class InteractionOverlay < Sketchup::Overlay
+        OVERLAY_ID = 'skalp.sectionbox.interaction' unless defined?(OVERLAY_ID)
+        OVERLAY_NAME = 'Skalp SectionBox Status' unless defined?(OVERLAY_NAME)
+        attr_accessor :highlight_data, :active_mode_text
+        def initialize; super(OVERLAY_ID, OVERLAY_NAME); @highlight_data = nil; @active_mode_text = nil; @enabled = true; end
+        def can_capture_mouse?(view); false; end
+        def draw(view); draw_status_text(view, @active_mode_text) if @active_mode_text; end
+        def draw_status_text(view, text)
+           pt = [view.vpwidth - 180, 40]
+           begin; view.draw_text(pt, text, color: 'Black', size: 12, bold: true); rescue; view.draw_text(pt, text); end
+        end
+      end
+    end
+
     def self.calculate_virtual_planes_data(box_config)
-      return [] unless box_config && box_config["planes"]
-      
-      # For preview, we assume an orthogonal definition relative to the transformation 
-      # implied by the planes. If the box was created aligned to axes, it's simple.
-      # If created from a rotated box, the planes define the rotation.
-      
-      # Reconstruct planes map
-      plane_map = {}
-      box_config["planes"].each do |pd| 
-         plane_map[pd["name"]] = { 
-           :point => Geom::Point3d.new(pd["point"]), 
-           :normal => Geom::Vector3d.new(pd["normal"]) 
-         } 
-      end
-      
+      return [] unless box_config && box_config["planes"]; plane_map = {}; box_config["planes"].each { |pd| plane_map[pd["name"]] = { :point => Geom::Point3d.new(pd["point"]), :normal => Geom::Vector3d.new(pd["normal"]) } }
       return [] unless ["top", "bottom", "right", "left", "back", "front"].all? { |k| plane_map.key?(k) }
-      
-      # Determine bounding points by intersecting planes?
-      # Simplification: Calculate extent on X, Y, Z axes defined by the normals.
-      # Assuming perfect orthogonality for standard boxes.
-      
-      # In 'World' space (relative to stored coords)
-      # Right plane: point R, normal (-1,0,0) usually.
-      # Distance to origin?
-      # Let's project points onto major axes if aligned, OR reconstruct local bounds.
-      
-      # Strategy: Use one plane (e.g. Front) as base to define rotation?
-      # Or just use the points.
-      # R_pt.x is max_x? Only if aligned.
-      
-      # Let's assume standard creation logic holds:
-      # Right/Left define X extents. Top/Bottom define Z. Front/Back define Y.
-      # Verify alignment?
-      
-      # Let's compute center and dimensions assuming orthogonality between pairs.
-      
-      # Project all points onto the normal of 'Right' (or Left) to find width interval?
-      # Actually simpler: The corners of the box are the intersections of the planes.
-      # Corner 1 (Max X, Max Y, Max Z) = Intersection of Right, Back, Top
-      # This works for rotated boxes too.
-      
-      intersects = []
-      
-      # Helper to intersect 3 planes: each defined by [point, normal]
-      # Plane eq: ax + by + cz = d where d = point . normal
       intersect_planes = lambda do |p1, p2, p3|
-        n1 = p1[:normal]
-        n2 = p2[:normal]
-        n3 = p3[:normal]
-        
-        # Geom::intersect_plane_plane_plane needs [point, normal] or [a,b,c,d]
-        # API: Geom.intersect_plane_plane(plane1, plane2) -> line
-        # Geom.intersect_line_plane(line, plane3) -> point
-        
-        pl1 = [p1[:point], n1]
-        pl2 = [p2[:point], n2]
-        pl3 = [p3[:point], n3]
-        
-        line = Geom.intersect_plane_plane(pl1, pl2)
-        return nil unless line
-        Geom.intersect_line_plane(line, pl3)
+        n1 = p1[:normal]; n2 = p2[:normal]; n3 = p3[:normal]; pl1 = [p1[:point], n1]; pl2 = [p2[:point], n2]; pl3 = [p3[:point], n3]; line = Geom.intersect_plane_plane(pl1, pl2)
+        return nil unless line; Geom.intersect_line_plane(line, pl3)
       end
-      
       pm = plane_map
-      # 8 Corners
-      c_rt_bk_tp = intersect_planes.call(pm["right"], pm["back"], pm["top"])
-      c_lf_bk_tp = intersect_planes.call(pm["left"], pm["back"], pm["top"])
-      c_rt_fr_tp = intersect_planes.call(pm["right"], pm["front"], pm["top"])
-      c_lf_fr_tp = intersect_planes.call(pm["left"], pm["front"], pm["top"])
-      
-      c_rt_bk_bt = intersect_planes.call(pm["right"], pm["back"], pm["bottom"])
-      c_lf_bk_bt = intersect_planes.call(pm["left"], pm["back"], pm["bottom"])
-      c_rt_fr_bt = intersect_planes.call(pm["right"], pm["front"], pm["bottom"])
-      c_lf_fr_bt = intersect_planes.call(pm["left"], pm["front"], pm["bottom"])
-      
+      c_rt_bk_tp = intersect_planes.call(pm["right"], pm["back"], pm["top"]); c_lf_bk_tp = intersect_planes.call(pm["left"], pm["back"], pm["top"])
+      c_rt_fr_tp = intersect_planes.call(pm["right"], pm["front"], pm["top"]); c_lf_fr_tp = intersect_planes.call(pm["left"], pm["front"], pm["top"])
+      c_rt_bk_bt = intersect_planes.call(pm["right"], pm["back"], pm["bottom"]); c_lf_bk_bt = intersect_planes.call(pm["left"], pm["back"], pm["bottom"])
+      c_rt_fr_bt = intersect_planes.call(pm["right"], pm["front"], pm["bottom"]); c_lf_fr_bt = intersect_planes.call(pm["left"], pm["front"], pm["bottom"])
       return [] if [c_rt_bk_tp, c_lf_bk_tp, c_rt_fr_tp, c_lf_fr_tp, c_rt_bk_bt, c_lf_bk_bt, c_rt_fr_bt, c_lf_fr_bt].any?(&:nil?)
-      
-      # Construct faces
       faces = []
       faces << { :name => "top", :face_vertices => [c_lf_fr_tp, c_rt_fr_tp, c_rt_bk_tp, c_lf_bk_tp] }
-      faces << { :name => "bottom", :face_vertices => [c_lf_fr_bt, c_rt_fr_bt, c_rt_bk_bt, c_lf_bk_bt].reverse } # Reverse for CCW/CW consistency?
+      faces << { :name => "bottom", :face_vertices => [c_lf_fr_bt, c_rt_fr_bt, c_rt_bk_bt, c_lf_bk_bt].reverse }
       faces << { :name => "front", :face_vertices => [c_lf_fr_bt, c_rt_fr_bt, c_rt_fr_tp, c_lf_fr_tp] }
       faces << { :name => "back", :face_vertices => [c_lf_bk_bt, c_rt_bk_bt, c_rt_bk_tp, c_lf_bk_tp].reverse }
       faces << { :name => "left", :face_vertices => [c_lf_bk_bt, c_lf_fr_bt, c_lf_fr_tp, c_lf_bk_tp] }
       faces << { :name => "right", :face_vertices => [c_rt_bk_bt, c_rt_fr_bt, c_rt_fr_tp, c_rt_bk_tp].reverse }
-      
-      # Add original plain info to hashes so they match 'planes_data' structure
-      faces.each do |f|
-        f[:original_point] = pm[f[:name]][:point]
-        f[:normal] = pm[f[:name]][:normal]
-      end
-      
-      faces
-    end
-
-    def self.get_active_box_section_group
-      Sketchup.active_model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == Engine.active_box_id }
+      faces.each { |f| f[:original_point] = pm[f[:name]][:point]; f[:normal] = pm[f[:name]][:normal] }; faces
     end
 
     def self.get_section_planes_data(root = nil)
-      root ||= get_active_box_section_group
-      return nil unless root && root.valid?
-      # The group structure is nested: Group(Plane, Group(Plane, ...))
-      # We need to traverse down to find all 6 planes.
-      planes_data = []
-      current_group = root
-      parent_trans = root.transformation
-      
-      # Safety limit to prevent infinite loops (max 10 levels deep for 6 planes)
+      root ||= Sketchup.active_model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == Engine.active_box_id }
+      return nil unless root && root.valid?; planes_data = []; current_group = root; parent_trans = root.transformation
       10.times do
-        break unless current_group.is_a?(Sketchup::Group)
-        
-        found_plane = nil
-        next_group = nil
-        
-        current_group.entities.each do |ent|
-           if ent.is_a?(Sketchup::SectionPlane)
-             found_plane = ent
-           elsif ent.is_a?(Sketchup::Group)
-             next_group = ent
-           end
-        end
-        
+        break unless current_group.is_a?(Sketchup::Group); found_plane = nil; next_group = nil
+        current_group.entities.each { |ent| if ent.is_a?(Sketchup::SectionPlane); found_plane = ent; elsif ent.is_a?(Sketchup::Group); next_group = ent; end }
         if found_plane
-          match = found_plane.name.match(/\[SkalpSectionBox\]-(.+)/)
-          face_name = match ? match[1].downcase : "unknown"
-          pa = found_plane.get_plane
-          
-          # Transformations are cumulative. 
-          # The outermost group has 'trans' (parent_trans). 
-          # Inner wrapping groups *usually* have Identity, but we should chain them to be safe.
-          # However, calculate_planes_from_bounds creates them at World Pos, wraps them.
-          # So Local Pos inside wrapper = World Pos.
-          # Wrapper Trans = Identity.
-          # Only the Root might be moved/scaled.
-          # So 'parent_trans' is likely sufficient if inner ones are identity.
-          # But let's accumulate 'current_group.transformation' if we were recursive.
-          # WAIT: 'root' is the current context context for 'ModifyTool'. 
-          # ModifyTool works in Model context? 
-          # ModifyTool.active uses Sketchup.active_model.active_view.
-          # If we are strictly outside, we need total transform.
-             
-          # Current accumulated transform
-          # Note: root.transformation is already applied to 'parent_trans'. 
-          # We need to multiply by inner group transforms as we go down?
-          # The 'root' passed here IS the outermost. 
-          # If we go inside 'next_group', coordinates are local to THAT group.
-          
-          # Let's simplify: 
-          # We are iterating.
-          
-          # Plane Logic:
-          local_norm = Geom::Vector3d.new(pa[0], pa[1], pa[2])
-          world_norm = local_norm.transform(parent_trans)
-          
-          # Derive a valid point on the plane purely from the plane equation (ignoring stored attributes to avoid double-transform issues)
-          # Plane: ax + by + cz + d = 0. Closest point to origin is -d * normal.
-          local_pos = Geom::Point3d.new(local_norm.x * -pa[3], local_norm.y * -pa[3], local_norm.z * -pa[3])
-          
-          world_pos = parent_trans * local_pos
-          
+          match = found_plane.name.match(/\[SkalpSectionBox\]-(.+)/); face_name = match ? match[1].downcase : "unknown"
+          pa = found_plane.get_plane; local_norm = Geom::Vector3d.new(pa[0], pa[1], pa[2]); world_norm = local_norm.transform(parent_trans)
+          local_pos = Geom::Point3d.new(local_norm.x * -pa[3], local_norm.y * -pa[3], local_norm.z * -pa[3]); world_pos = parent_trans * local_pos
           planes_data << { name: face_name, plane: found_plane, original_point: world_pos, normal: world_norm, parent_trans: parent_trans, local_point: local_pos }
         end
-        
-        break unless next_group
-        
-        # Prepare for next level
-        # Update transform: combine with next_group's transform
-        parent_trans = parent_trans * next_group.transformation
-        current_group = next_group
-        
-        # Stop if we hit the Model container (which has name [SkalpSectionBox-Model])
-        if current_group.name == "[SkalpSectionBox-Model]"
-           break
-        end
+        break unless next_group; parent_trans = parent_trans * next_group.transformation; current_group = next_group; break if current_group.name == "[SkalpSectionBox-Model]"
       end
-      
-      # Calc dynamic bounds in WORLD space
-      plane_map = {}
-      planes_data.each { |d| plane_map[d[:name]] = d }
-      
+      plane_map = {}; planes_data.each { |d| plane_map[d[:name]] = d }
       if ["top", "bottom", "right", "left", "back", "front"].all? { |k| plane_map.key?(k) }
-        # Intersection helper to find robust corners in World Space
         intersect_planes = lambda do |p1, p2, p3|
-          n1 = p1[:normal]; n2 = p2[:normal]; n3 = p3[:normal]
-          pl1 = [p1[:original_point], n1]
-          pl2 = [p2[:original_point], n2]
-          pl3 = [p3[:original_point], n3]
-          
-          line = Geom.intersect_plane_plane(pl1, pl2)
-          return nil unless line
-          Geom.intersect_line_plane(line, pl3)
+          n1 = p1[:normal]; n2 = p2[:normal]; n3 = p3[:normal]; pl1 = [p1[:original_point], n1]; pl2 = [p2[:original_point], n2]; pl3 = [p3[:original_point], n3]; line = Geom.intersect_plane_plane(pl1, pl2)
+          return nil unless line; Geom.intersect_line_plane(line, pl3)
         end
-        
-        pm = plane_map
-        c_rt_bk_tp = intersect_planes.call(pm["right"], pm["back"], pm["top"])
-        c_lf_bk_tp = intersect_planes.call(pm["left"], pm["back"], pm["top"])
-        c_rt_fr_tp = intersect_planes.call(pm["right"], pm["front"], pm["top"])
-        c_lf_fr_tp = intersect_planes.call(pm["left"], pm["front"], pm["top"])
-        
-        c_rt_bk_bt = intersect_planes.call(pm["right"], pm["back"], pm["bottom"])
-        c_lf_bk_bt = intersect_planes.call(pm["left"], pm["back"], pm["bottom"])
-        c_rt_fr_bt = intersect_planes.call(pm["right"], pm["front"], pm["bottom"])
-        c_lf_fr_bt = intersect_planes.call(pm["left"], pm["front"], pm["bottom"])
-        
-        # Calculate dynamic arm size based on diagonal
-        arm_size = 15.0 # fallback
-        if c_rt_bk_tp && c_lf_fr_bt
-            diag = c_rt_bk_tp.distance(c_lf_fr_bt)
-            arm_size = (diag * 0.05).clamp(10, 100)
-        end
-  
-        # Construct Faces (World Space)
-        faces = {}
-        # Order vertices to form valid loop (CCW/CW)
-        faces["top"]    = [c_lf_fr_tp, c_rt_fr_tp, c_rt_bk_tp, c_lf_bk_tp].compact
-        faces["bottom"] = [c_lf_fr_bt, c_rt_fr_bt, c_rt_bk_bt, c_lf_bk_bt].reverse.compact
-        faces["front"]  = [c_lf_fr_bt, c_rt_fr_bt, c_rt_fr_tp, c_lf_fr_tp].compact
-        faces["back"]   = [c_lf_bk_bt, c_rt_bk_bt, c_rt_bk_tp, c_lf_bk_tp].reverse.compact
-        faces["left"]   = [c_lf_bk_bt, c_lf_fr_bt, c_lf_fr_tp, c_lf_bk_tp].compact
-        faces["right"]  = [c_rt_bk_bt, c_rt_fr_bt, c_rt_fr_tp, c_rt_bk_tp].reverse.compact
-        
-        planes_data.each do |d|
-          d[:arm_size] = arm_size
-          if faces[d[:name]]
-            d[:face_vertices] = faces[d[:name]]
-            
-            # Recalculate the handle position (original_point) to be the CENTER of the face
-            # This ensures the plus is always centered regardless of how the box was created/moved.
-            center_pt = Geom::Point3d.new(0,0,0)
-            d[:face_vertices].each { |v| center_pt = center_pt + v.to_a }
-            center = Geom::Point3d.new(center_pt.x / 4.0, center_pt.y / 4.0, center_pt.z / 4.0)
-            d[:original_point] = center
-          end
-        end
+        pm = plane_map; c_rt_bk_tp = intersect_planes.call(pm["right"], pm["back"], pm["top"]); c_lf_bk_tp = intersect_planes.call(pm["left"], pm["back"], pm["top"])
+        c_rt_fr_tp = intersect_planes.call(pm["right"], pm["front"], pm["top"]); c_lf_fr_tp = intersect_planes.call(pm["left"], pm["front"], pm["top"])
+        c_rt_bk_bt = intersect_planes.call(pm["right"], pm["back"], pm["bottom"]); c_lf_bk_bt = intersect_planes.call(pm["left"], pm["back"], pm["bottom"])
+        c_rt_fr_bt = intersect_planes.call(pm["right"], pm["front"], pm["bottom"]); c_lf_fr_bt = intersect_planes.call(pm["left"], pm["front"], pm["bottom"])
+        arm_size = 15.0; arm_size = (c_rt_bk_tp.distance(c_lf_fr_bt) * 0.05).clamp(10, 100) if c_rt_bk_tp && c_lf_fr_bt
+        faces = {}; faces["top"] = [c_lf_fr_tp, c_rt_fr_tp, c_rt_bk_tp, c_lf_bk_tp].compact; faces["bottom"] = [c_lf_fr_bt, c_rt_fr_bt, c_rt_bk_bt, c_lf_bk_bt].reverse.compact
+        faces["front"] = [c_lf_fr_bt, c_rt_fr_bt, c_rt_fr_tp, c_lf_fr_tp].compact; faces["back"] = [c_lf_bk_bt, c_rt_bk_bt, c_rt_bk_tp, c_lf_bk_tp].reverse.compact
+        faces["left"] = [c_lf_bk_bt, c_lf_fr_bt, c_lf_fr_tp, c_lf_bk_tp].compact; faces["right"] = [c_rt_bk_bt, c_rt_fr_bt, c_rt_fr_tp, c_rt_bk_tp].reverse.compact
+        planes_data.each { |d| d[:arm_size] = arm_size; if faces[d[:name]]; d[:face_vertices] = faces[d[:name]]; center_pt = Geom::Point3d.new(0,0,0); d[:face_vertices].each { |v| center_pt = center_pt + v.to_a }; center = Geom::Point3d.new(center_pt.x / 4.0, center_pt.y / 4.0, center_pt.z / 4.0); d[:original_point] = center; end }
       end
       planes_data
     end
 
-    # Dialog Classes
     class SettingsDialog
-      def initialize(default_name = "SectionBox", &block)
-        @default_name = default_name
-        @on_save = block
-        @dialog = nil
-        show
-      end
-      
+      def initialize(default_name = "SectionBox", &block); @default_name = default_name; @on_save = block; @dialog = nil; show; end
       def show
-        path = File.join(File.dirname(__FILE__), 'ui', 'settings.html')
-        @dialog = UI::HtmlDialog.new({:dialog_title => "SectionBox Settings", :preferences_key => "com.skalp.sectionbox.settings", :scrollable => false, :resizable => false, :width => 350, :height => 450, :style => UI::HtmlDialog::STYLE_DIALOG})
-        @dialog.set_file(path)
-        @dialog.set_file(path)
-        @dialog.add_action_callback("ready") do 
-           defaults = Data.get_defaults
-           scales = Data.get_scales
-           @dialog.execute_script("initScales(#{scales.to_json})")
-           # If editing existing, @default_name is actually the settings hash or we pass it differently?
-           # Actually, let's keep it simple: if @default_name is a Hash, use it as settings
-           if @default_name.is_a?(Hash)
-             @dialog.execute_script("loadDefaults(#{@default_name.to_json})")
-             @dialog.execute_script("setName(#{@default_name['name'].to_json})") if @default_name['name']
-             @dialog.execute_script("setSubmitText('Save')")
-           else
-             @dialog.execute_script("loadDefaults(#{defaults.to_json})")
-             @dialog.execute_script("setName(#{@default_name.to_json})")
-             @dialog.execute_script("setSubmitText('Create')")
-           end
+        path = File.join(File.dirname(__FILE__), 'ui', 'settings.html'); @dialog = UI::HtmlDialog.new({:dialog_title => "SectionBox Settings", :preferences_key => "com.skalp.sectionbox.settings", :scrollable => false, :resizable => false, :width => 350, :height => 450, :style => UI::HtmlDialog::STYLE_DIALOG}); @dialog.set_file(path)
+        @dialog.add_action_callback("ready") do; defaults = Data.get_defaults; scales = Data.get_scales; @dialog.execute_script("initScales(#{scales.to_json})")
+           if @default_name.is_a?(Hash); @dialog.execute_script("loadDefaults(#{@default_name.to_json})"); @dialog.execute_script("setName(#{@default_name['name'].to_json})") if @default_name['name']; @dialog.execute_script("setSubmitText('Save')")
+           else; @dialog.execute_script("loadDefaults(#{defaults.to_json})"); @dialog.execute_script("setName(#{@default_name.to_json})"); @dialog.execute_script("setSubmitText('Create')"); end
         end
-        @dialog.add_action_callback("save") { |d, json| save(json) }
-        @dialog.add_action_callback("save_default") { |d, data| Data.save_defaults(data.is_a?(String) ? JSON.parse(data) : data) }
-        @dialog.add_action_callback("save_scales") { |d, data| Data.save_scales(data.is_a?(String) ? JSON.parse(data) : data) }
-        @dialog.add_action_callback("open_scale_manager") { |d, p| ScaleManager.new }
-        @dialog.add_action_callback("close") { close }
-        @dialog.center
-        @dialog.show
+        @dialog.add_action_callback("save") { |d, json| save(json) }; @dialog.add_action_callback("save_default") { |d, data| Data.save_defaults(data.is_a?(String) ? JSON.parse(data) : data) }
+        @dialog.add_action_callback("save_scales") { |d, data| Data.save_scales(data.is_a?(String) ? JSON.parse(data) : data) }; @dialog.add_action_callback("open_scale_manager") { |d, p| ScaleManager.new }; @dialog.add_action_callback("close") { close }; @dialog.center; @dialog.show
       end
-      
-      def save(json)
-        data = json.is_a?(String) ? JSON.parse(json) : json
-        # Construct the settings hash matching the new UI structure
-        settings = {
-          "name" => data['name'],
-          "scale" => "1/#{data['scale']}",
-          "rear_view_global" => data['rear_view_global'],
-          "sides_all_same" => data['sides_all_same'],
-          "sides" => data['sides'] # Hash of side settings (or single 'all' key if same)
-        }
-        # Backward compatibility / flattening for simple access if needed (optional)
-        settings["style_rule"] = data['sides']['all']['style_rule'] if data['sides_all_same']
-        
-        @on_save.call(settings) if @on_save
-        close
-      end
-      
+      def save(json); data = json.is_a?(String) ? JSON.parse(json) : json; settings = { "name" => data['name'], "scale" => "1/#{data['scale']}", "rear_view_global" => data['rear_view_global'], "sides_all_same" => data['sides_all_same'], "sides" => data['sides'] }; settings["style_rule"] = data['sides']['all']['style_rule'] if data['sides_all_same']; @on_save.call(settings) if @on_save; close; end
       def close; @dialog.close if @dialog; @dialog = nil; end
     end
-
-    # Scale Manager Dialog
     class ScaleManager
-      def initialize
-        @dialog = nil
-        show
-      end
-      
+      def initialize; @dialog = nil; show; end
       def show
-        if @dialog && @dialog.visible?; @dialog.bring_to_front; return; end
-        path = File.join(File.dirname(__FILE__), 'ui', 'scale_manager.html')
-        @dialog = UI::HtmlDialog.new({:dialog_title => "Drawing Scale Manager", :preferences_key => "com.skalp.sectionbox.scale_manager", :scrollable => false, :resizable => true, :width => 400, :height => 500, :style => UI::HtmlDialog::STYLE_DIALOG})
-        @dialog.set_file(path)
-        @dialog.add_action_callback("ready") do
-          scales = Data.get_scales
-          @dialog.execute_script("loadScales(#{scales.to_json})")
-        end
-        @dialog.add_action_callback("save_scales") do |d, data|
-          scales_array = data.is_a?(String) ? JSON.parse(data) : data
-          Data.save_scales(scales_array)
-        end
-        @dialog.add_action_callback("restore_defaults") do
-          default_scales = [
-            "1:1", "1:2", "1:5", "1:10", "1:20", "1:50", "1:100", "1:200", "1:500", "1:1000",
-            "1\" = 1' (1:12)", "1/8\" = 1' (1:96)", "1/4\" = 1' (1:48)", "1/2\" = 1' (1:24)",
-            "3/4\" = 1' (1:16)", "3\" = 1' (1:4)"
-          ]
-          Data.save_scales(default_scales)
-          @dialog.execute_script("loadScales(#{default_scales.to_json})")
-        end
-        @dialog.set_on_closed { @dialog = nil }
-        @dialog.center
-        @dialog.show
+        if @dialog && @dialog.visible?; @dialog.bring_to_front; return; end; path = File.join(File.dirname(__FILE__), 'ui', 'scale_manager.html'); @dialog = UI::HtmlDialog.new({:dialog_title => "Drawing Scale Manager", :preferences_key => "com.skalp.sectionbox.scale_manager", :scrollable => false, :resizable => true, :width => 400, :height => 500, :style => UI::HtmlDialog::STYLE_DIALOG}); @dialog.set_file(path)
+        @dialog.add_action_callback("ready") { scales = Data.get_scales; @dialog.execute_script("loadScales(#{scales.to_json})") }; @dialog.add_action_callback("save_scales") { |d, data| Data.save_scales(data.is_a?(String) ? JSON.parse(data) : data) }
+        @dialog.add_action_callback("restore_defaults") { default_scales = ["1:1", "1:2", "1:5", "1:10", "1:20", "1:50", "1:100", "1:200", "1:500", "1:1000", "1\" = 1' (1:12)", "1/8\" = 1' (1:96)", "1/4\" = 1' (1:48)", "1/2\" = 1' (1:24)", "3/4\" = 1' (1:16)", "3\" = 1' (1:4)"]; Data.save_scales(default_scales); @dialog.execute_script("loadScales(#{default_scales.to_json})") }
+        @dialog.set_on_closed { @dialog = nil }; @dialog.center; @dialog.show
       end
-      
-      def close; @dialog.close if @dialog; @dialog = nil; end
     end
-
-    # Dialog Manager
     class Manager
       def initialize; @dialog = nil; end
       def show
-        if @dialog && @dialog.visible?; @dialog.bring_to_front; return; end
-        path = File.join(File.dirname(__FILE__), 'ui', 'manager.html')
-        @dialog = UI::HtmlDialog.new({:dialog_title => "Skalp SectionBox Manager", :preferences_key => "com.skalp.sectionbox.manager", :scrollable => false, :resizable => true, :width => 300, :height => 500, :style => UI::HtmlDialog::STYLE_DIALOG})
-        @dialog.set_file(path)
-        @dialog.add_action_callback("ready") { |d, p| sync_data }
-        @dialog.add_action_callback("sync") { |d, p| sync_data }
-        @dialog.add_action_callback("close") { |d, p| @dialog.close }
-        @dialog.add_action_callback("resize_window") { |d, data| dim = data.is_a?(String) ? JSON.parse(data) : data; @dialog.set_size(dim['width'], dim['height']) }
-        @dialog.add_action_callback("activate") { |d, id| Fiber.new { Engine.activate(id) }.resume }
-        @dialog.add_action_callback("deactivate") { |d, id| Fiber.new { Engine.deactivate_current }.resume }
-        @dialog.add_action_callback("preview") { |d, id| Engine.preview(id) }
-        @dialog.add_action_callback("clear_preview") { |d, p| Engine.clear_preview }
-        @dialog.add_action_callback("modify") { |d, id| Fiber.new { Engine.modify(id) }.resume }
-        @dialog.add_action_callback("add_box") { |d, p| Fiber.new { Engine.create_from_model_bounds }.resume }
-        @dialog.add_action_callback("add_folder") { |d, parent_id| Fiber.new { Engine.create_folder(parent_id.empty? ? nil : parent_id) }.resume }
-        @dialog.add_action_callback("move_item") { |d, data| Fiber.new { move_data = data.is_a?(String) ? JSON.parse(data) : data; Engine.move_item(move_data['source'], move_data['target'].empty? ? nil : move_data['target']) }.resume }
-        @dialog.add_action_callback("toggle_folder") { |d, folder_id| Fiber.new { Engine.toggle_folder(folder_id) }.resume }
-        @dialog.add_action_callback("rename_folder") { |d, folder_id| Fiber.new { Engine.rename_folder(folder_id) }.resume }
-        @dialog.add_action_callback("explode_folder") { |d, folder_id| Fiber.new { Engine.explode_folder(folder_id) }.resume }
-        @dialog.add_action_callback("expand_all") { |d, p| Fiber.new { Engine.expand_all }.resume }
-        @dialog.add_action_callback("collaps_all") { |d, p| Fiber.new { Engine.collapse_all }.resume }
-        
-        # Context Menu Callbacks
-        @dialog.add_action_callback("edit") { |d, id| Fiber.new { Engine.edit(id) }.resume }
-        @dialog.add_action_callback("rename") { |d, id| Fiber.new { Engine.rename(id) }.resume }
-        @dialog.add_action_callback("delete") { |d, id| Fiber.new { Engine.delete(id) }.resume }
-        @dialog.add_action_callback("open_scale_manager") { |d, p| ScaleManager.new }
-        @dialog.set_on_closed { @dialog = nil }
-        @dialog.show
+        if @dialog && @dialog.visible?; @dialog.bring_to_front; return; end; path = File.join(File.dirname(__FILE__), 'ui', 'manager.html'); @dialog = UI::HtmlDialog.new({:dialog_title => "Skalp SectionBox Manager", :preferences_key => "com.skalp.sectionbox.manager", :scrollable => false, :resizable => true, :width => 300, :height => 500, :style => UI::HtmlDialog::STYLE_DIALOG}); @dialog.set_file(path)
+        @dialog.add_action_callback("ready") { |d, p| sync_data }; @dialog.add_action_callback("sync") { |d, p| sync_data }; @dialog.add_action_callback("close") { |d, p| @dialog.close }
+        @dialog.add_action_callback("activate") { |d, id| Fiber.new { Engine.activate(id) }.resume }; @dialog.add_action_callback("deactivate") { |d, id| Fiber.new { Engine.deactivate_current }.resume }
+        @dialog.add_action_callback("preview") { |d, id| Engine.preview(id) }; @dialog.add_action_callback("clear_preview") { |d, p| Engine.clear_preview }; @dialog.add_action_callback("modify") { |d, id| Fiber.new { Engine.modify(id) }.resume }
+        @dialog.add_action_callback("add_box") { |d, p| Fiber.new { Engine.create_from_model_bounds }.resume }; @dialog.add_action_callback("add_folder") { |d, parent_id| Fiber.new { Engine.create_folder(parent_id.empty? ? nil : parent_id) }.resume }
+        @dialog.add_action_callback("toggle_folder") { |d, folder_id| Fiber.new { Engine.toggle_folder(folder_id) }.resume }; @dialog.add_action_callback("rename_folder") { |d, folder_id| Fiber.new { Engine.rename_folder(folder_id) }.resume }
+        @dialog.add_action_callback("edit") { |d, id| Fiber.new { Engine.edit(id) }.resume }; @dialog.add_action_callback("rename") { |d, id| Fiber.new { Engine.rename(id) }.resume }; @dialog.add_action_callback("delete") { |d, id| Fiber.new { Engine.delete(id) }.resume }
+        @dialog.set_on_closed { @dialog = nil }; @dialog.show
       end
-      def sync_data
-        return unless @dialog && @dialog.visible?
-        model = Sketchup.active_model; data = { :boxes => Data.get_config(model), :hierarchy => Data.get_hierarchy(model), :active_id => Engine.active_box_id }
-        @dialog.execute_script("updateData(#{data.to_json})")
-      end
-      def close
-        @dialog.close if @dialog
-        @dialog = nil
-      end
-      def visible?
-        @dialog && @dialog.visible?
-      rescue
-        false
-      end
+      def sync_data; return unless @dialog && @dialog.visible?; model = Sketchup.active_model; data = { :boxes => Data.get_config(model), :hierarchy => Data.get_hierarchy(model), :active_id => Engine.active_box_id }; @dialog.execute_script("updateData(#{data.to_json})"); end
+      def visible?; @dialog && @dialog.visible? rescue false; end
     end
-
-    # Core Engine
     module Engine
-      @@active_box_id = nil; @@manager = nil; @@observers_active = false; @@model_observer = nil; @@selection_observer = nil; @@original_render_settings = {}
-      @@overlay = nil
-      
-      def self.active_box_id
-        @@active_box_id ||= Data.get_active_id(Sketchup.active_model)
-      end
-      def self.manager; @@manager; end
-      def self.run; @@manager ||= Manager.new; @@active_box_id ||= Data.get_active_id(Sketchup.active_model); @@manager.show; start_observers; add_overlay; end
-      def self.stop; @@manager.close if @@manager; stop_observers; deactivate_current if @@active_box_id; end
-      def self.start_observers
-        return if @@observers_active
-        model = Sketchup.active_model; @@model_observer ||= SectionBoxModelObserver.new; @@selection_observer ||= SectionBoxSelectionObserver.new
-        model.add_observer(@@model_observer); model.selection.add_observer(@@selection_observer); @@observers_active = true
-      end
-      
+      @@interaction_overlay ||= nil; @@active_box_id ||= nil; @@manager ||= nil; @@observers_active ||= false; @@model_observer ||= nil; @@selection_observer ||= nil; @@original_render_settings ||= {}; @@overlay ||= nil; @@ignore_next_selection ||= false; @@edit_inside_render_settings ||= nil
+      def self.active_box_id; @@active_box_id ||= Data.get_active_id(Sketchup.active_model); end; def self.manager; @@manager; end; def self.observers_active?; @@observers_active; end; def self.run; @@manager ||= Manager.new; @@active_box_id ||= Data.get_active_id(Sketchup.active_model); @@manager.show; start_observers; add_overlay; end
+      def self.stop; @@manager.close if @@manager; stop_observers; exit_edit_inside_mode; deactivate_current if @@active_box_id; end
+      def self.start_observers; return if @@observers_active; model = Sketchup.active_model; @@model_observer ||= SectionBoxModelObserver.new; @@selection_observer ||= SectionBoxSelectionObserver.new; model.add_observer(@@model_observer); model.selection.add_observer(@@selection_observer); @@observers_active = true; end
       def self.add_overlay
-        if defined?(Sketchup::Overlay)
-           model = Sketchup.active_model
-           
-           # Check for existing overlay to preserve user state (Enabled/Disabled)
-           existing = model.overlays.find { |o| o.respond_to?(:overlay_id) && o.overlay_id == PreviewOverlay::OVERLAY_ID }
-           
-           was_enabled = true
-           if existing
-             was_enabled = existing.enabled?
-             model.overlays.remove(existing)
-           end
-           
-           # Always create fresh instance to avoid stale C++ object access on reload
-           @@overlay = PreviewOverlay.new
-           model.overlays.add(@@overlay)
-           @@overlay.enabled = was_enabled
-        end
+        if defined?(Sketchup::Overlay); model = Sketchup.active_model; existing = model.overlays.find { |o| o.respond_to?(:overlay_id) && o.overlay_id == PreviewOverlay::OVERLAY_ID }; was_enabled = true; if existing; was_enabled = existing.enabled?; model.overlays.remove(existing); end
+           @@overlay = PreviewOverlay.new; model.overlays.add(@@overlay); @@overlay.enabled = was_enabled; existing_int = model.overlays.find { |o| o.respond_to?(:overlay_id) && o.overlay_id == InteractionOverlay::OVERLAY_ID }; model.overlays.remove(existing_int) if existing_int
+           @@interaction_overlay = InteractionOverlay.new; model.overlays.add(@@interaction_overlay); @@interaction_overlay.enabled = true; end
       end
-      
-      def self.preview(id)
-        return unless @@overlay
-        model = Sketchup.active_model
-        config = Data.get_config(model)
-        box = config[id]
-        if box
-          virtual_data = Skalp::BoxSection.calculate_virtual_planes_data(box)
-          @@overlay.set_data(virtual_data)
-          # Force redraw?
-          model.active_view.invalidate
-        end
-      end
-      
-      def self.clear_preview
-        return unless @@overlay
-        @@overlay.set_data([])
-        Sketchup.active_model.active_view.invalidate
-      end
-      
-      def self.stop_observers
-        return unless @@observers_active
-        model = Sketchup.active_model; model.remove_observer(@@model_observer) if @@model_observer; model.selection.remove_observer(@@selection_observer) if @@selection_observer; @@observers_active = false
-      end
-
-      def self.create_from_model_bounds
-        model = Sketchup.active_model
-        selection = model.selection
-        SettingsDialog.new("SectionBox##{Data.get_config(model).length + 1}") do |settings|
-          if !selection.empty?
-            do_create_from_selection(settings)
-          else
-            do_create_from_model_bounds(settings)
-          end
-        end
-      end
-
-      def self.do_create_from_model_bounds(settings)
-        model = Sketchup.active_model
-        bbox = Geom::BoundingBox.new
-        model.entities.each do |ent|
-          next if ent.get_attribute(DICTIONARY_NAME, 'box_id')
-          bbox.add(ent.bounds) if ent.respond_to?(:bounds)
-        end
-        
-        if bbox.empty?
-          UI.messagebox("Model appears to be empty. Cannot create SectionBox.")
-          return
-        end
-        
-        id = "box_" + Time.now.to_i.to_s
-        planes_config = calculate_planes_from_bounds(bbox)
-        finalize_creation(id, planes_config, settings, :modify)
-      end
-
-      def self.create_from_box(group)
-        model = Sketchup.active_model
-        SettingsDialog.new("SectionBox##{Data.get_config(model).length + 1}") do |settings|
-           do_create_from_box(group, settings)
-        end
-      end
-
-      def self.do_create_from_box(group, settings)
-        return unless group.valid? 
-        model = Sketchup.active_model
-        faces = group.entities.grep(Sketchup::Face)
-        trans = group.transformation
-        planes_config = []
-        
-        faces.each do |f|
-          local_normal = f.normal
-          world_normal = local_normal.transform(trans)
-          world_point = f.bounds.center.transform(trans)
-          
-          # Use local center transformed to world for accuracy
-          local_cnt = group.definition.bounds.center
-          world_cnt = trans * local_cnt
-          
-          # Point INWARDS: normal should have same direction as vector to center
-          world_normal.reverse! if world_normal.dot(world_cnt - world_point) < 0
-          
-          planes_config << {
-            "name" => Skalp::BoxSection.get_face_name(local_normal),
-            "point" => world_point.to_a,
-            "normal" => world_normal.to_a
-          }
-        end
-        
-        id = "box_" + Time.now.to_i.to_s
-        finalize_creation(id, planes_config, settings, :activate)
-        
-        # Deletion Safety Prompt
-        if UI.messagebox("Delete the original object (solid)?", MB_YESNO) == IDYES
-          group.erase! if group.valid?
-        end
-      end
-
-      def self.create_from_selection
-        model = Sketchup.active_model
-        SettingsDialog.new("SectionBox##{Data.get_config(model).length + 1}") do |settings|
-           do_create_from_selection(settings)
-        end
-      end
-
-      def self.do_create_from_selection(settings)
-        model = Sketchup.active_model
-        selection = model.selection
-        return if selection.empty?
-        
-        # Calculate combined bounds
-        bbox = Geom::BoundingBox.new
-        selection.each do |ent|
-            bbox.add(ent.bounds) if ent.respond_to?(:bounds)
-        end
-        return if bbox.empty?
-
-        id = "box_" + Time.now.to_i.to_s
-        planes_config = calculate_planes_from_bounds(bbox)
-        finalize_creation(id, planes_config, settings, :activate)
-        
-        # Deselect used entities to show the result clearly? 
-        # Or leave selected. User didn't specify. Keeping selection is usually safer.
-      end
-
-      private
-
-      def self.calculate_planes_from_bounds(bbox)
-        min = bbox.min; max = bbox.max
-        cx = (min.x + max.x) / 2.0; cy = (min.y + max.y) / 2.0; cz = (min.z + max.z) / 2.0
-        
-        min_x = min.x.to_f; max_x = max.x.to_f
-        min_y = min.y.to_f; max_y = max.y.to_f
-        min_z = min.z.to_f; max_z = max.z.to_f
-        
-        planes = []
-        planes << { "name" => "top",    "point" => [cx, cy, max_z], "normal" => [0, 0, -1] }
-        planes << { "name" => "bottom", "point" => [cx, cy, min_z], "normal" => [0, 0, 1] }
-        planes << { "name" => "right",  "point" => [max_x, cy, cz], "normal" => [-1, 0, 0] }
-        planes << { "name" => "left",   "point" => [min_x, cy, cz], "normal" => [1, 0, 0] }
-        planes << { "name" => "front",  "point" => [cx, min_y, cz], "normal" => [0, 1, 0] }
-        planes << { "name" => "back",   "point" => [cx, max_y, cz], "normal" => [0, -1, 0] }
-        planes
-      end
-
-      def self.finalize_creation(id, planes_config, settings, mode = :activate)
-        model = Sketchup.active_model
-        config = Data.get_config(model)
-        box_config = Data.get_defaults.merge(settings)
-        box_config.merge!({
-          "name" => settings["name"],
-          "planes" => planes_config,
-          "created_at" => Time.now.to_s
-        })
-        config[id] = box_config
-        Data.save_config(model, config)
-        
-        hierarchy = Data.get_hierarchy(model)
-        hierarchy << { "id" => id, "type" => "item" }
-        Data.save_hierarchy(model, hierarchy)
-        
-        @@manager.sync_data if @@manager && @@manager.visible?
-        
-        if mode == :modify
-          activate(id)
-          modify(id)
-        else
-          activate(id)
-        end
-      end
-
-      public
-      
-      
-      def self.rename(id)
-        model = Sketchup.active_model
-        config = Data.get_config(model)
-        box = config[id]
-        return unless box
-        
-        result = Skalp::InputBox.ask(['Name:'], [box['name']], [], 'Rename SectionBox')
-        return unless result
-        
-        new_name = result[0].strip
-        return if new_name.empty?
-        
-        # Re-fetch config to be safe in async context
-        config = Data.get_config(model)
-        box = config[id]
-        return unless box
-        
-        box['name'] = new_name
-        config[id] = box
-        Data.save_config(model, config)
-        
-        @@manager.sync_data if @@manager && @@manager.visible?
-      end
-      
-      def self.delete(id)
-        return unless UI.messagebox("Are you sure you want to delete this SectionBox?", MB_YESNO) == IDYES
-        
-        if @@active_box_id == id
-          deactivate_current
-        end
-        
-        model = Sketchup.active_model
-        config = Data.get_config(model)
-        config.delete(id)
-        Data.save_config(model, config)
-        
-        # Remove from hierarchy
-        hierarchy = Data.get_hierarchy(model)
-        
-        delete_recursive = lambda do |items|
-          items.each_with_index do |item, index|
-            if item["id"] == id
-              items.delete_at(index)
-              return true
-            elsif item["children"]
-              return true if delete_recursive.call(item["children"])
-            end
-          end
-          false
-        end
-        delete_recursive.call(hierarchy)
-        Data.save_hierarchy(model, hierarchy)
-        
-        @@manager.sync_data if @@manager && @@manager.visible?
-      end
-      
-      def self.edit(id)
-        model = Sketchup.active_model
-        config = Data.get_config(model)
-        box = config[id]
-        return unless box
-        
-        # Prepare settings for dialog
-        # SettingsDialog expects: name, scale (denominator), sides_all_same, rear_view_global, sides
-        # Our stored 'scale' is "1/50", dialog wants 50
-        scale_val = parse_scale(box['scale'])
-        
-        settings_payload = {
-          "name" => box['name'],
-          "scale" => scale_val,
-          "sides_all_same" => box['sides_all_same'],
-          "rear_view_global" => box['rear_view_global'],
-          "sides" => box['sides']
-        }
-        
-        SettingsDialog.new(settings_payload) do |new_settings|
-           do_update(id, new_settings)
-        end
-      end
-      
-      def self.parse_scale(scale_str)
-        return 50 unless scale_str
-        parts = scale_str.split('/')
-        return parts.last.to_f if parts.length == 2
-        parts = scale_str.split(':')
-        return parts.last.to_f if parts.length == 2
-        50
-      end
-      
-      def self.update_planes_from_entities(id)
-        model = Sketchup.active_model
-        config = Data.get_config(model)
-        box = config[id]
-        return unless box
-        
-        # Find the active SectionBox group
-        box_group = model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == id }
-        return unless box_group
-        
-        # Collect all planes from the nested structure
-        updated_planes = []
-        
-        # Recursively find all section planes while tracking transformation
-        find_planes = lambda do |container, current_trans|
-          return unless container && container.respond_to?(:entities)
-          container.entities.each do |ent|
-            if ent.is_a?(Sketchup::SectionPlane)
-              # Get the stored position attribute (local to its parent group)
-              stored_pt = ent.get_attribute(DICTIONARY_NAME, 'original_point')
-              next unless stored_pt
-              
-              # Convert to world space using the cumulative transformation
-              local_pt = Geom::Point3d.new(stored_pt)
-              world_pt = current_trans * local_pt
-              
-              # Get current plane data: SectionPlane.get_plane returns [a, b, c, d]
-              p = ent.get_plane
-              next unless p && p.is_a?(Array) && p.length == 4
-              
-              # Extract face name from plane name
-              match = ent.name.match(/\[SkalpSectionBox\]-(.+)/)
-              face_name = match ? match[1] : "unknown"
-              
-              updated_planes << {
-                "name" => face_name,
-                "point" => world_pt.to_a,
-                "normal" => [p[0], p[1], p[2]]
-              }
-            elsif ent.is_a?(Sketchup::Group)
-              # Recurse with updated cumulative transformation
-              find_planes.call(ent, current_trans * ent.transformation)
-            end
-          end
-        end
-        
-        find_planes.call(box_group, box_group.transformation)
-        
-        # Update the config with new plane positions
-        if updated_planes.any?
-          box["planes"] = updated_planes
-          config[id] = box
-          Data.save_config(model, config)
-        end
-      end
-      
-      def self.do_update(id, settings)
-        model = Sketchup.active_model
-        config = Data.get_config(model)
-        box = config[id]
-        return unless box
-        
-        # Merge new settings
-        box.merge!(settings)
-        
-        # If scale changed, might need logic to update things?
-        # For now just saving config.
-        # Note: If dimensions/planes need to change, that's complex (re-generation).
-        # SettingsDialog only changes styling/properties, not geometry (except maybe rear view projection).
-        
-        config[id] = box
-        Data.save_config(model, config)
-        @@manager.sync_data if @@manager && @@manager.visible?
-        
-        # If active, maybe refresh?
-        if @@active_box_id == id
-           # Re-activate to apply new styles/rear-view settings?
-           # Optimization: Only if specific things changed. For robustness: simple reactivate.
-           activate(id)
-        end
-      end
-
-      def self.activate(id)
-        deactivate_current if @@active_box_id
-        model = Sketchup.active_model; config = Data.get_config(model); box_data = config[id]; return unless box_data
-        
-        # Filter entities BEFORE starting operation (performance optimization)
-        # ONLY exclude Skalp-specific markers: <skalp_materials>, Skalp sections, [Skalp
-        all_ents = model.entities.to_a.reject do |e|
-          # Skip if has Skalp attributes
-          next true if e.attribute_dictionary('Skalp_BoxSection') || e.attribute_dictionary('Skalp')
-          
-          # Skip specific Skalp-named folders/groups
-          if e.respond_to?(:name) && e.name && !e.name.empty?
-            n = e.name
-            next true if n.include?('<skalp_materials>') || n.include?('Skalp sections') || n.start_with?('[Skalp')
-          end
-          
-          # Skip entities on Skalp layers
-          if e.respond_to?(:layer) && e.layer && e.layer.respond_to?(:name)
-            ln = e.layer.name
-            next true if ln && (ln.include?('Skalp') || ln.include?('skalp'))
-          end
-          
-          false
-        end
-        
-        model.start_operation('Activate SectionBox', true)
-        begin
-          @@active_box_id = id
-          Data.save_active_id(model, id)
-          # 1. Group model geometry
-          current_container = model.entities.add_group(all_ents)
-          if current_container.nil?
-            # Fallback for empty models/selections
-            current_container = model.entities.add_group
-          end
-          current_container.name = "[SkalpSectionBox-Model]"
-          
-          # 2. Recursive nesting: each level gets one SectionPlane
-          box_data["planes"].each_with_index do |pd, i|
-            # Create plane at root first to ensure world-space accuracy
-            pt = Geom::Point3d.new(pd["point"])
-            norm = Geom::Vector3d.new(pd["normal"])
-            sp = model.entities.add_section_plane([pt, norm])
-            sp.activate
-            
-            # Wrapper: Group the plane with the current contents
-            # model.entities.add_group(entities) moves entities into a new group at the origin.
-            wrapper = model.entities.add_group([sp, current_container])
-            
-            # CRITICAL: Now that the plane is inside the group, we MUST store the local coordinate.
-            # We store the local center point for tool handles to prevent World/Local drift.
-            local_pt = wrapper.transformation.inverse * pt
-            sp.set_attribute(DICTIONARY_NAME, 'original_point', local_pt.to_a)
-            
-            # Name the plane for consistent identification
-            sp.name = "[SkalpSectionBox]-#{pd['name']}"
-            
-            # Naming convention: 
-            # Outermost: [SkalpSectionBox]
-            # Intermediates: [SkalpSectionBox]-Side
-            if i == box_data["planes"].length - 1
-              wrapper.name = "[SkalpSectionBox]"
-              wrapper.set_attribute(DICTIONARY_NAME, 'box_id', id)
-            else
-              wrapper.name = "[SkalpSectionBox]-#{pd['name'].capitalize}"
-            end
-            current_container = wrapper
-          end
-          
-          model.commit_operation
-          @@manager.sync_data if @@manager && @@manager.visible?
-        rescue => e
-          model.abort_operation
-          puts "Activation Error: #{e.message}\n#{e.backtrace.join("\n")}"
-        end
-      end
-
-      def self.explode_recursive(group)
-        return unless group && group.valid? && group.is_a?(Sketchup::Group)
-        
-        # Erase Skalp SectionPlanes in this group context
-        group.entities.grep(Sketchup::SectionPlane).each do |sp|
-          sp.erase! if sp.name =~ /\[SkalpSectionBox\]/
-        end
-        
-        child_group = group.entities.find { |e| e.is_a?(Sketchup::Group) && e.name =~ /\[SkalpSectionBox/ }
-        group.explode
-        explode_recursive(child_group) if child_group
-      end
-
-      def self.deactivate_current
-        return unless active_box_id
-        model = Sketchup.active_model
-        
-        begin
-          root = model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == active_box_id }
-          if root && root.valid?
-            model.start_operation('Deactivate SectionBox', true)
-            explode_recursive(root)
-            model.commit_operation
-          end
-        rescue => e
-          model.abort_operation
-          puts "Deactivation Error: #{e.message}"
-        ensure
-          # Always clear active state, even if geometry failed
-          @@active_box_id = nil
-          Data.save_active_id(model, nil) 
-          @@manager.sync_data if @@manager && @@manager.visible?
-        end
-      end
-
-      def self.modify(id)
-        activate(id) unless @@active_box_id == id
-        Sketchup.active_model.select_tool(Skalp::BoxSectionAdjustTool.new)
-      end
-
+      def self.enter_edit_inside_mode(box_group); return unless @@interaction_overlay; path_to_model = [box_group]
+         find_recursive = lambda do |container, current_path|; container.entities.each do |e|; next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance); is_match = e.name.include?("[SkalpSectionBox-Model]"); is_match = e.definition.name.include?("[SkalpSectionBox-Model]") if !is_match && e.respond_to?(:definition)
+               if is_match; current_path << e; return true; end; if e.respond_to?(:definition) && e.definition.entities.length > 0; current_path << e; return true if find_recursive.call(e.definition, current_path); current_path.pop; end; end; false; end
+         if find_recursive.call(box_group.definition, path_to_model); Sketchup.active_model.active_path = path_to_model; @@interaction_overlay.active_mode_text = "Edit Inside Mode"; else; UI.messagebox("Could not find inner model context."); end; Sketchup.active_model.active_view.invalidate; end
+      def self.exit_edit_inside_mode; return unless @@interaction_overlay; @@interaction_overlay.active_mode_text = nil; Sketchup.active_model.active_view.invalidate; end
+      def self.preview(id); return unless @@overlay; model = Sketchup.active_model; config = Data.get_config(model); box = config[id]; @@overlay.set_data(Skalp::BoxSection.calculate_virtual_planes_data(box)) if box; model.active_view.invalidate; end
+      def self.clear_preview; return unless @@overlay; @@overlay.set_data([]); Sketchup.active_model.active_view.invalidate; end
+      def self.stop_observers; return unless @@observers_active; model = Sketchup.active_model; model.remove_observer(@@model_observer) if @@model_observer; model.selection.remove_observer(@@selection_observer) if @@selection_observer; @@observers_active = false; end
+      def self.create_from_model_bounds; model = Sketchup.active_model; selection = model.selection; SettingsDialog.new("SectionBox##{Data.get_config(model).length + 1}") { |settings| if !selection.empty?; do_create_from_selection(settings); else; do_create_from_model_bounds(settings); end }; end
+      def self.do_create_from_model_bounds(settings); model = Sketchup.active_model; bbox = Geom::BoundingBox.new; model.entities.each { |ent| next if ent.get_attribute(DICTIONARY_NAME, 'box_id'); bbox.add(ent.bounds) if ent.respond_to?(:bounds) }; id = "box_" + Time.now.to_i.to_s; finalize_creation(id, calculate_planes_from_bounds(bbox), settings, :modify); end
+      def self.do_create_from_box(group, settings); return unless group.valid?; model = Sketchup.active_model; faces = group.entities.grep(Sketchup::Face); trans = group.transformation; planes_config = []
+        faces.each { |f| local_normal = f.normal; world_normal = local_normal.transform(trans); world_point = f.bounds.center.transform(trans); world_normal.reverse! if world_normal.dot((trans * group.definition.bounds.center) - world_point) < 0; planes_config << { "name" => Skalp::BoxSection.get_face_name(local_normal), "point" => world_point.to_a, "normal" => world_normal.to_a } }
+        id = "box_" + Time.now.to_i.to_s; finalize_creation(id, planes_config, settings, :activate); group.erase! if UI.messagebox("Delete original?", MB_YESNO) == IDYES; end
+      def self.create_from_selection; model = Sketchup.active_model; SettingsDialog.new("SectionBox##{Data.get_config(model).length + 1}") { |settings| do_create_from_selection(settings) }; end
+      def self.do_create_from_selection(settings); model = Sketchup.active_model; selection = model.selection; return if selection.empty?; bbox = Geom::BoundingBox.new; selection.each { |ent| bbox.add(ent.bounds) if ent.respond_to?(:bounds) }; id = "box_" + Time.now.to_i.to_s; finalize_creation(id, calculate_planes_from_bounds(bbox), settings, :activate); end
+      def self.calculate_planes_from_bounds(bbox); min = bbox.min; max = bbox.max; cx = (min.x + max.x) / 2.0; cy = (min.y + max.y) / 2.0; cz = (min.z + max.z) / 2.0; min_x, max_x, min_y, max_y, min_z, max_z = min.x.to_f, max.x.to_f, min.y.to_f, max.y.to_f, min.z.to_f, max_z.to_f
+        [{ "name" => "top", "point" => [cx, cy, max_z], "normal" => [0, 0, -1] }, { "name" => "bottom", "point" => [cx, cy, min_z], "normal" => [0, 0, 1] }, { "name" => "right", "point" => [max_x, cy, cz], "normal" => [-1, 0, 0] }, { "name" => "left", "point" => [min_x, cy, cz], "normal" => [1, 0, 0] }, { "name" => "front", "point" => [cx, min_y, cz], "normal" => [0, 1, 0] }, { "name" => "back", "point" => [cx, max_y, cz], "normal" => [0, -1, 0] }]; end
+      def self.finalize_creation(id, planes, settings, mode = :activate); model = Sketchup.active_model; config = Data.get_config(model); box_config = Data.get_defaults.merge(settings).merge({ "name" => settings["name"], "planes" => planes, "created_at" => Time.now.to_s }); config[id] = box_config; Data.save_config(model, config); (Data.get_hierarchy(model) << { "id" => id, "type" => "item" }) && Data.save_hierarchy(model, Data.get_hierarchy(model)); @@manager.sync_data if @@manager; activate(id); modify(id) if mode == :modify; end
+      def self.rename(id); model = Sketchup.active_model; config = Data.get_config(model); box = config[id]; return unless box; result = Skalp::InputBox.ask(['Name:'], [box['name']], [], 'Rename'); (box['name'] = result[0].strip; config[id] = box; Data.save_config(model, config); @@manager.sync_data) if result && !result[0].empty?; end
+      def self.delete(id); return unless UI.messagebox("Delete this SectionBox?", MB_YESNO) == IDYES; deactivate_current if @@active_box_id == id; model = Sketchup.active_model; config = Data.get_config(model); config.delete(id); Data.save_config(model, config); @@manager.sync_data if @@manager; end
+      def self.edit(id); model = Sketchup.active_model; config = Data.get_config(model); box = config[id]; return unless box; SettingsDialog.new({ "name" => box['name'], "scale" => (box['scale'] || "1/50").split(/[:\/]/).last.to_f, "sides_all_same" => box['sides_all_same'], "rear_view_global" => box['rear_view_global'], "sides" => box['sides'] }) { |s| box.merge!(s); config[id] = box; Data.save_config(model, config); @@manager.sync_data; activate(id) if @@active_box_id == id }; end
+      def self.activate(id); deactivate_current if @@active_box_id; model = Sketchup.active_model; config = Data.get_config(model); box = config[id]; return unless box
+        all_ents = model.entities.to_a.reject { |e| res = false; if e.attribute_dictionary('Skalp_BoxSection'); res = true; elsif e.respond_to?(:name) && e.name && !e.name.empty?; n = e.name; res = (n.include?('Skalp sections') || n.start_with?('[Skalp')); end; res }; model.start_operation('Activate', true); begin; @@active_box_id = id; Data.save_active_id(model, id); locked = {}; all_ents.each { |e| if e.respond_to?(:locked?) && e.locked?; e.locked = false; locked[e.entityID] = true; end }; current = model.entities.add_group(all_ents); current.entities.each { |e| e.locked = true if locked[e.entityID] }; current.name = "[SkalpSectionBox-Model]"
+          box["planes"].each_with_index { |pd, i| pt = Geom::Point3d.new(pd["point"]); sp = model.entities.add_section_plane([pt, Geom::Vector3d.new(pd["normal"])]); sp.activate; wrapper = model.entities.add_group([sp, current]); sp.set_attribute(DICTIONARY_NAME, 'original_point', (wrapper.transformation.inverse * pt).to_a); sp.name = "[SkalpSectionBox]-#{pd['name']}"; if i == box["planes"].length - 1; wrapper.name = "[SkalpSectionBox]"; wrapper.set_attribute(DICTIONARY_NAME, 'box_id', id); else; wrapper.name = "[SkalpSectionBox]-#{pd['name'].capitalize}"; end; current = wrapper }; model.commit_operation; @@manager.sync_data if @@manager; rescue => e; model.abort_operation; puts "Err: #{e.message}"; end; end
+      def self.deactivate_current; return unless active_box_id; model = Sketchup.active_model; root = model.entities.find { |e| e.get_attribute(DICTIONARY_NAME, 'box_id') == active_box_id }; if root; model.start_operation('Deactivate', true); (e_rec = lambda { |g| return unless g && g.valid?; g.entities.grep(Sketchup::SectionPlane).each { |sp| sp.erase! if sp.name =~ /\[SkalpSectionBox\]/ }; child = g.entities.find { |e| e.is_a?(Sketchup::Group) && e.name =~ /\[SkalpSectionBox/ }; g.explode; e_rec.call(child) if child }).call(root); model.commit_operation; end; exit_edit_inside_mode; @@active_box_id = nil; Data.save_active_id(model, nil); @@manager.sync_data if @@manager; end
+      def self.modify(id); activate(id) unless @@active_box_id == id; Sketchup.active_model.select_tool(Skalp::BoxSectionAdjustTool.new); end
       def self.on_enter_box_context(model)
-        opts = model.rendering_options; @@original_render_settings = { 'FadeInactive' => opts['FadeInactive'], 'HideContext' => opts['HideContext'] }
-        opts['FadeInactive'] = true; opts['HideContext'] = false
-      end
-
-      def self.on_exit_box_context(model)
-        opts = model.rendering_options; @@original_render_settings.each { |k, v| opts[k] = v }; @@original_render_settings = {}
-      end
-      
-      def self.get_unique_folder_name(hierarchy, base_name)
-        existing_names = []
-        gather_names = lambda do |items|
-          items.each do |item|
-            existing_names << item["name"] if item["type"] == "folder"
-            gather_names.call(item["children"]) if item["children"]
-          end
-        end
-        gather_names.call(hierarchy)
-        
-        return base_name unless existing_names.include?(base_name)
-        
-        idx = 1
-        new_name = "#{base_name} (#{idx})"
-        while existing_names.include?(new_name)
-          idx += 1
-          new_name = "#{base_name} (#{idx})"
-        end
-        new_name
-      end
-      
-      def self.create_folder(parent_id = nil)
-        model = Sketchup.active_model
-        hierarchy = Data.get_hierarchy(model)
-        
-        # Determine suggest name
-        suggested = get_unique_folder_name(hierarchy, "New Folder")
-        
-        # Prompt for name
-        results = Skalp::InputBox.ask(["Folder Name:"], [suggested], [], "Create Folder")
-        return unless results
-
-        # Refresh local context for async-safe (though Fiber is sequential)
-        model = Sketchup.active_model
-        hierarchy = Data.get_hierarchy(model)
-        name = get_unique_folder_name(hierarchy, results[0])
-        
-        # Determine where to add
-        target_list = hierarchy
-        if parent_id
-          find_list = lambda do |items|
-            items.each do |item|
-               if item["id"] == parent_id && item["type"] == "folder"
-                 item["children"] ||= []
-                 return item["children"]
-               elsif item["children"]
-                 found = find_list.call(item["children"])
-                 return found if found
-               end
-            end
-            nil
-          end
-          found_list = find_list.call(hierarchy)
-          target_list = found_list if found_list
-        end
-        
-        # Create
-        target_list << { "id" => "folder_#{Time.now.to_i}", "type" => "folder", "name" => name, "open" => true, "children" => [] }
-        Data.save_hierarchy(model, hierarchy)
-        
-        @@manager.sync_data if @@manager && @@manager.visible?
-      end
-      
-      def self.move_item(source_id, target_id)
-        model = Sketchup.active_model
-        hierarchy = Data.get_hierarchy(model)
-        
-        # 1. Find and remove source item
-        source_item = nil
-        remove_recursive = lambda do |items|
-          items.each_with_index do |item, index|
-            if item["id"] == source_id
-              source_item = items.delete_at(index)
-              return true
-            elsif item["children"]
-              return true if remove_recursive.call(item["children"])
-            end
-          end
-          false
-        end
-        
-        return unless remove_recursive.call(hierarchy)
-        
-        # 2. Find target folder (if target_id is valid folder) or add to root (if nil or not found)
-        target_added = false
-        if target_id
-           add_recursive = lambda do |items|
-             items.each do |item|
-               if item["id"] == target_id && item["type"] == "folder"
-                 item["children"] ||= []
-                 item["children"] << source_item
-                 item["open"] = true # Open target folder
-                 return true
-               elsif item["children"]
-                 return true if add_recursive.call(item["children"])
-               end
-             end
-             false
-           end
-           target_added = add_recursive.call(hierarchy)
-        end
-        
-        # If target not found or nil, add back to root
-        hierarchy << source_item unless target_added
-        
-        Data.save_hierarchy(model, hierarchy)
-        @@manager.sync_data if @@manager && @@manager.visible?
-      end
-
-      def self.toggle_folder(folder_id)
-        model = Sketchup.active_model
-        hierarchy = Data.get_hierarchy(model)
-        
-        toggle_recursive = lambda do |items|
-          items.each do |item|
-            if item["type"] == "folder" && item["id"] == folder_id
-              item["open"] = !item["open"]
-              return true
-            elsif item["children"]
-              return true if toggle_recursive.call(item["children"])
-            end
-          end
-          false
-        end
-        
-        toggle_recursive.call(hierarchy)
-        Data.save_hierarchy(model, hierarchy)
-        @@manager.sync_data if @@manager && @@manager.visible?
-      end
-      
-      def self.rename_folder(folder_id)
-        model = Sketchup.active_model
-        hierarchy = Data.get_hierarchy(model)
-        
-        # Find the folder
-        current_name = nil
-        find_folder = lambda do |items|
-          items.each do |item|
-            if item["type"] == "folder" && item["id"] == folder_id
-              current_name = item["name"]
-              return
-            elsif item["children"]
-              find_folder.call(item["children"])
-            end
-          end
-        end
-        
-        find_folder.call(hierarchy)
-        return unless current_name
-        
-        result = Skalp::InputBox.ask(['Folder Name:'], [current_name], [], 'Rename Folder')
-        return unless result
-        
-        new_name = result[0].strip
-        return if new_name.empty?
-        
-        # Refresh context
-        model = Sketchup.active_model
-        hierarchy = Data.get_hierarchy(model)
-        
-        # Update the folder name
-        rename_recursive = lambda do |items|
-          items.each do |item|
-            if item["type"] == "folder" && item["id"] == folder_id
-              item["name"] = new_name
-              return true
-            elsif item["children"]
-              return true if rename_recursive.call(item["children"])
-            end
-          end
-          false
-        end
-        
-        rename_recursive.call(hierarchy)
-        Data.save_hierarchy(model, hierarchy)
-        @@manager.sync_data if @@manager && @@manager.visible?
-      end
-      
-      def self.explode_folder(folder_id)
-        model = Sketchup.active_model
-        hierarchy = Data.get_hierarchy(model)
-        
-        # Find and remove folder, move children to parent level
-        explode_recursive = lambda do |items, parent|
-          items.each_with_index do |item, index|
-            if item["type"] == "folder" && item["id"] == folder_id
-              children = item["children"] || []
-              items.delete_at(index)
-              children.reverse.each { |child| items.insert(index, child) }
-              return true
-            elsif item["children"]
-              return true if explode_recursive.call(item["children"], items)
-            end
-          end
-          false
-        end
-        
-        explode_recursive.call(hierarchy, nil)
-        Data.save_hierarchy(model, hierarchy)
-        @@manager.sync_data if @@manager && @@manager.visible?
-      end
-      
-      def self.expand_all
-        model = Sketchup.active_model
-        hierarchy = Data.get_hierarchy(model)
-        
-        expand_recursive = lambda do |items|
-          items.each do |item|
-            if item["type"] == "folder"
-              item["open"] = true
-              expand_recursive.call(item["children"]) if item["children"]
-            end
-          end
-        end
-        
-        expand_recursive.call(hierarchy)
-        Data.save_hierarchy(model, hierarchy)
-        @@manager.sync_data if @@manager && @@manager.visible?
-      end
-      
-      def self.collapse_all
-        model = Sketchup.active_model
-        hierarchy = Data.get_hierarchy(model)
-        
-        collapse_recursive = lambda do |items|
-          items.each do |item|
-            if item["type"] == "folder"
-              item["open"] = false
-              collapse_recursive.call(item["children"]) if item["children"]
-            end
-          end
-        end
-        
-        collapse_recursive.call(hierarchy)
-        Data.save_hierarchy(model, hierarchy)
-        @@manager.sync_data if @@manager && @@manager.visible?
-      end
-    end
-
-    def self.get_face_name(normal)
-        if normal.parallel?(Geom::Vector3d.new(0,0,1)) then normal.z > 0 ? "top" : "bottom"
-        elsif normal.parallel?(Geom::Vector3d.new(1,0,0)) then normal.x > 0 ? "right" : "left"
-        elsif normal.parallel?(Geom::Vector3d.new(0,1,0)) then normal.y > 0 ? "back" : "front"
-        else "face"
-        end
-    end
-
-    def self.is_valid_box_group?(ent)
-      return false unless ent.is_a?(Sketchup::Group)
-      faces = ent.entities.grep(Sketchup::Face)
-      return false if faces.length != 6
-      # Must have 3 pairs of parallel faces
-      parallel_pairs = 0
-      used = []
-      faces.each_with_index do |f1, i|
-        next if used.include?(i)
-        faces.each_with_index do |f2, j|
-          next if i == j || used.include?(j)
-          if f1.normal.parallel?(f2.normal)
-            parallel_pairs += 1
-            used << i << j
-            break
-          end
-        end
-      end
-      parallel_pairs == 3
-    end
-
-    # OBSERVERS
-    class SectionBoxModelObserver < Sketchup::ModelObserver
-      def onActivePathChanged(model)
-        path = model.active_path || []; in_box = path.any? { |e| e.name == "[SkalpSectionBox-Model]" }
-        if in_box && !@in_context then Engine.on_enter_box_context(model); @in_context = true
-        elsif !in_box && @in_context then Engine.on_exit_box_context(model); @in_context = false
-        end
-      end
-    end
-
-    class SectionBoxSelectionObserver < Sketchup::SelectionObserver
-       def onSelectionBulkChange(selection); end
-    end
-
-    def self.set_overlay_visibility(visible); end # Legacy stub
-
-    def self.reload
-      load __FILE__
-      load File.join(File.dirname(__FILE__), 'Skalp_box_section_tool.rb')
-
-    end
-
-    # UI Initialization
-    unless defined?(@@ui_loaded)
-      toolbar = UI::Toolbar.new('Skalp SectionBox')
-      cmd_engine = UI::Command.new('SectionBox Manager') { (Engine.manager && Engine.manager.visible?) ? Engine.stop : Engine.run }
-      cmd_engine.small_icon = cmd_engine.large_icon = File.join(File.dirname(__FILE__), 'icons', 'box_section', 'icon_box_section_create.svg')
-      cmd_engine.tooltip = 'Toggle SectionBox Manager'
-      cmd_engine.set_validation_proc { (Engine.manager && Engine.manager.visible?) ? MF_CHECKED : MF_UNCHECKED }
-      toolbar.add_item(cmd_engine)
-      
-      # Temporary reload button for development
-      cmd_reload = UI::Command.new('Reload SectionBox') { reload }
-      cmd_reload.small_icon = cmd_reload.large_icon = File.join(File.dirname(__FILE__), 'icons', 'box_section', 'icon_reload.svg')
-      cmd_reload.tooltip = 'Reload SectionBox (Dev)'
-      toolbar.add_item(cmd_reload)
-      
-      toolbar.show
-
-      UI.add_context_menu_handler do |menu|
-        selection = Sketchup.active_model.selection
-        if selection.length > 0
-          # Check for single item special cases
-          if selection.length == 1
-              ent = selection.first
-              if (ent.is_a?(Sketchup::Group) || ent.is_a?(Sketchup::ComponentInstance))
-                 # 1. Deactivate logic
-                 box_id = ent.get_attribute(DICTIONARY_NAME, 'box_id')
-                 if box_id && box_id == Engine.active_box_id
-                   menu.add_separator
-                   menu.add_item("[Skalp SectionBox] Deactivate",5) { Fiber.new { Engine.deactivate_current }.resume }
-                   menu.add_separator
-                   next # Stop here
-                 end
-                 
-                 # 2. Create from Box logic
-                 if is_valid_box_group?(ent)
-                   menu.add_separator
-                   menu.add_item("[Skalp SectionBox] Create from Box",5) { Fiber.new { Engine.create_from_box(ent) }.resume }
-                   menu.add_separator
-                   next # Stop here
-                 end
-              end
+        begin
+          add_overlay if @@interaction_overlay.nil?
+          opts = model.rendering_options
+          keys = opts.keys
+          
+          # Backup Normal Mode
+          @@original_render_settings = {}
+          track_keys = ['InactiveFade', 'InstanceFade', 'InactiveHidden', 'InstanceHidden', 'FadeInactiveComponents', 'FadeInsideComponents', 'HideInactiveComponents', 'HideInsideComponents']
+          track_keys.each { |k| @@original_render_settings[k] = opts[k] if keys.include?(k) }
+          
+          # Initialize Inside Mode with user requested defaults
+          if @@edit_inside_render_settings.nil?
+            @@edit_inside_render_settings = {
+              'InactiveFade' => 1.0,
+              'InstanceFade' => 1.0,
+              'InactiveHidden' => false,
+              'InstanceHidden' => false,
+              'FadeInactiveComponents' => true,
+              'FadeInsideComponents' => true,
+              'HideInactiveComponents' => false,
+              'HideInsideComponents' => false
+            }
           end
           
-          # Default for any other selection (> 0): Create from BoundingBox
-          menu.add_separator
-          menu.add_item("[Skalp SectionBox] Create from BoundingBox",5) { Fiber.new { Engine.create_from_selection }.resume }
-          menu.add_separator
+          # Apply Inside Mode settings
+          @@edit_inside_render_settings.each do |k, v|
+            opts[k] = v if keys.include?(k)
+          end
+          
+          @@interaction_overlay.active_mode_text = "Edit Inside Mode" if @@interaction_overlay
+          model.active_view.invalidate
+        rescue => e
+          puts "Skalp Debug: Error enter context: #{e.message}"
         end
       end
-      @@ui_loaded = true
+      def self.on_exit_box_context(model)
+        begin
+          opts = model.rendering_options
+          keys = opts.keys
+          
+          # Capture current state as the persistent "Inside Mode" state
+          if @@edit_inside_render_settings
+            @@edit_inside_render_settings.keys.each do |k|
+              @@edit_inside_render_settings[k] = opts[k] if keys.include?(k)
+            end
+          end
+          
+          # Restore Normal Mode settings
+          @@original_render_settings.each do |k, v|
+            opts[k] = v if keys.include?(k)
+          end
+          @@original_render_settings = {}
+          
+          exit_edit_inside_mode
+          UI.start_timer(0, false) { model.active_path = nil; model.active_view.invalidate } if model.active_path && !model.active_path.empty?
+          model.active_view.invalidate
+        rescue => e
+          puts "Skalp Debug: Error exit context: #{e.message}"
+        end
+      end
+      def self.toggle_folder(fid); h = Data.get_hierarchy(Sketchup.active_model); (t_rec = lambda { |items| items.each { |i| if i["id"] == fid; i["open"] = !i["open"]; return true; end; return true if i["children"] && t_rec.call(i["children"]) }; false }).call(h); Data.save_hierarchy(Sketchup.active_model, h); @@manager.sync_data if @@manager; end
+    end
+    class SectionBoxModelObserver < Sketchup::ModelObserver
+      def onActivePathChanged(model); path = model.active_path || []; in_box = path.any? { |e| n = e.name.to_s; m = n.include?("[SkalpSectionBox-Model]"); m ||= e.definition.name.include?("[SkalpSectionBox-Model]") if !m && e.respond_to?(:definition); m }
+        if in_box && !@in_context; Engine.on_enter_box_context(model); @in_context = true; elsif !in_box && @in_context; Engine.on_exit_box_context(model); Engine.exit_edit_inside_mode; @in_context = false; end; end
+    end
+    class SectionBoxSelectionObserver < Sketchup::SelectionObserver
+      def onSelectionBulkChange(selection); return unless Engine.observers_active? && Engine.active_box_id; active = false; if selection.length == 1; ent = selection.first; active = (ent.is_a?(Sketchup::Group) && ent.get_attribute(DICTIONARY_NAME, 'box_id') == Engine.active_box_id); end
+        if active; selection.clear; Engine.enter_edit_inside_mode(ent); else; Engine.exit_edit_inside_mode; end; end
+    end
+    def self.reload; load __FILE__; load File.join(File.dirname(__FILE__), 'Skalp_box_section_tool.rb'); end
+    unless defined?(@@ui_loaded)
+      tb = UI::Toolbar.new('Skalp SectionBox'); cmd = UI::Command.new('Manager') { (Engine.manager && Engine.manager.visible?) ? Engine.stop : Engine.run }; cmd.set_validation_proc { (Engine.manager && Engine.manager.visible?) ? MF_CHECKED : MF_UNCHECKED }; cmd.small_icon = cmd.large_icon = File.join(File.dirname(__FILE__), 'icons', 'box_section', 'icon_box_section_create.svg'); tb.add_item(cmd); tb.show
+      UI.add_context_menu_handler do |menu|; s = Sketchup.active_model.selection; if s.length == 1; e = s.first; if (e.is_a?(Sketchup::Group) && e.get_attribute(DICTIONARY_NAME, 'box_id') == Engine.active_box_id); menu.add_item("Deactivate") { Fiber.new { Engine.deactivate_current }.resume }; end; end; end; @@ui_loaded = true
     end
   end
 end

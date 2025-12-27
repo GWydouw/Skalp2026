@@ -284,7 +284,7 @@ module Skalp
       
       # Use shared drawing utilities
       # Use shared drawing utilities with Magenta 3px style
-      Skalp::BoxSection::DrawHelper.draw_bounds(view, @planes_data, { color: Sketchup::Color.new(255, 0, 255), width: 3, stipple: "" })
+      Skalp::BoxSection::SkalpDrawHelper.draw_bounds(view, @planes_data, { color: Sketchup::Color.new(255, 0, 255), width: 3, stipple: "" })
       
       # Draw Drag Guide (Grey Dotted Line)
       if @dragging_index
@@ -297,7 +297,7 @@ module Skalp
         is_highlighted = (@hovered_index == i) || (@dragging_index == i)
         
         if is_highlighted
-          Skalp::BoxSection::DrawHelper.draw_face_highlight(view, data[:face_vertices], data[:name], 25)
+          Skalp::BoxSection::SkalpDrawHelper.draw_face_highlight(view, data[:face_vertices], data[:name], 25)
         end
         
         # Draw Plus (Dynamic Size)
@@ -307,7 +307,12 @@ module Skalp
         model_size = 15.0.inch if model_size == 0
         
         # Draw Plus Handles (Restored as visual anchor, interaction remains on full face)
-        Skalp::BoxSection::DrawHelper.draw_plus(view, pt, data[:normal], data[:name], is_highlighted, model_size)
+        plus_color = Skalp::BoxSection::SkalpDrawHelper.get_color(data[:name])
+        plus_color.alpha = 255 # opaque handles
+        width = is_highlighted ? 5 : 3
+        # method signature: draw_plus(view, center, normal, face_name, highlighted, arm_size, color_override)
+        # We pass: view, pt, normal, name, is_highlighted, model_size, plus_color
+        Skalp::BoxSection::SkalpDrawHelper.draw_plus(view, pt, data[:normal], data[:name], is_highlighted, model_size, plus_color)
       end
     end
     
