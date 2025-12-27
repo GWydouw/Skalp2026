@@ -1,0 +1,195 @@
+# RuboCop configuration for SketchUp Extension
+inherit_from: .rubocop_todo.yml
+
+require:
+  - rubocop-sketchup
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  Exclude:
+
+    - 'vendor/**/*'
+    - '**/vendor/**/*'
+    - 'bin/**/*'
+    - 'node_modules/**/*'
+    - 'tmp/**/*'
+    - 'BUILDS/**/*'
+    - 'Rakefile'
+    - 'tools/**/*'
+    - 'tests/**/*'
+
+SketchupRequirements/GlobalMethods:
+  Exclude:
+    - 'tools/**/*'
+    - 'tests/**/*'
+    - 'tasks/**/*'
+    - 'Rakefile'
+
+SketchupRequirements/Exit:
+  Exclude:
+    - 'tools/**/*'
+    - 'tests/**/*'
+    - 'tasks/**/*'
+
+SketchupRequirements/ExtensionNamespace:
+  Exclude:
+    - 'tests/**/*'
+    - 'tools/**/*'
+    - 'tasks/**/*'
+    - 'Rakefile'
+    - 'SOURCE/jt_hyperbolic_curves/core.rb'
+    - 'SOURCE/jt_hyperbolic_curves/preset_manager.rb'
+    - 'SOURCE/jt_hyperbolic_curves/ui_dialog.rb'
+    - 'SOURCE/jt_hyperbolic_curves/ui_menus.rb'
+
+SketchupRequirements:
+  Enabled: true
+  Exclude:
+    - '**/vendor/**/*'
+    - 'bin/**/*'
+    - 'node_modules/**/*'
+    - 'tmp/**/*'
+    - 'Rakefile'
+    - 'tools/**/*'
+    - 'tests/**/*'
+    - 'tasks/**/*'
+
+# Disabled due to rubocop-sketchup v1.5.0 internal error with newer RuboCop versions
+SketchupRequirements/GlobalConstants:
+  Enabled: false
+
+# SketchUp uses 2-space indentation, standard for Ruby
+Layout/IndentationWidth:
+  Width: 2
+
+# Max line length 120 is more practical for modern screens
+Layout/LineLength:
+  Max: 120
+  Exclude:
+    - 'tasks/**/*'
+    - 'SOURCE/jt_hyperbolic_curves/core.rb'
+    - 'SOURCE/jt_hyperbolic_curves/ui_dialog.rb'
+
+# Allow long methods for now, as refactoring existing algorithmic code is risky
+Metrics/MethodLength:
+  Max: 50
+  Exclude:
+    - 'tasks/**/*'
+    - 'SOURCE/jt_hyperbolic_curves/ui_dialog.rb'
+    - 'SOURCE/jt_hyperbolic_curves/core.rb'
+
+# Allow complex classes for now
+Metrics/ClassLength:
+  Max: 300
+  Exclude:
+    - 'SOURCE/jt_hyperbolic_curves/core/geometry_engine.rb'
+
+# Allow more complexity
+Metrics/AbcSize:
+  Max: 40
+  Exclude:
+    - 'tasks/**/*'
+    - 'SOURCE/jt_hyperbolic_curves/core.rb'
+    - 'SOURCE/jt_hyperbolic_curves/core/demo_director.rb'
+    - 'SOURCE/jt_hyperbolic_curves/core/geometry_engine.rb'
+    - 'SOURCE/jt_hyperbolic_curves/preset_manager.rb'
+    - 'SOURCE/jt_hyperbolic_curves/ui_dialog.rb'
+
+Metrics/CyclomaticComplexity:
+  Max: 15
+  Exclude:
+    - 'tasks/**/*'
+    - 'SOURCE/jt_hyperbolic_curves/ui_dialog.rb'
+    - 'SOURCE/jt_hyperbolic_curves/core.rb'
+
+Metrics/PerceivedComplexity:
+  Max: 15
+  Exclude:
+    - 'tasks/**/*'
+    - 'SOURCE/jt_hyperbolic_curves/core.rb'
+    - 'SOURCE/jt_hyperbolic_curves/core/demo_director.rb'
+    - 'SOURCE/jt_hyperbolic_curves/ui_dialog.rb'
+
+# Known encoding issue is intentional for debug logging, suppress globally
+SketchupSuggestions/FileEncoding:
+  Enabled: false
+
+# SketchUp API often uses 'foo?' style methods that return boolean
+Naming/PredicatePrefix:
+  Enabled: false
+
+# Style preferences
+Style/FrozenStringLiteralComment:
+  Enabled: true
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+# Documentation is good, but let's not force it on everything immediately
+Style/Documentation:
+  Enabled: false
+
+# Allow short variable names like 'x', 'y', 'z', 'ui' which are common in geometry/GUI code
+Naming/MethodParameterName:
+  AllowedNames: ['x', 'y', 'z', 'u', 'v', 'ui', 'id', 'ip']
+
+# TestUp/Minitest classes often use TC_Prefix and CamelCase filenames
+Naming/FileName:
+  Exclude:
+    - 'SOURCE/jt_hyperbolic_curves/tests/**/*'
+
+Naming/ClassAndModuleCamelCase:
+  Exclude:
+    - 'SOURCE/jt_hyperbolic_curves/tests/**/*'
+
+# SketchUp Observer interfaces use camelCase methods (e.g. onSelectionRemoved)
+Naming/MethodName:
+  Exclude:
+    - 'SOURCE/jt_hyperbolic_curves/ui_dialog.rb'
+    - 'SOURCE/jt_hyperbolic_curves/tests/**/*'
+
+Naming/AccessorMethodName:
+  Exclude:
+    - 'SOURCE/jt_hyperbolic_curves/ui_dialog.rb'
+
+# SketchUp extensions often use globals for menu loading state across reloads
+Style/GlobalVars:
+  Enabled: false
+
+# Double negation is common idiomatic Ruby for casting to boolean
+Style/DoubleNegation:
+  Enabled: false
+
+# UI Dialog logic is naturally complex and imperative
+Metrics/BlockLength:
+  Exclude:
+    - 'SOURCE/jt_hyperbolic_curves/ui_dialog.rb'
+    - 'Rakefile'
+    - 'tasks/**/*'
+
+# Rake tasks use different patterns than SketchUp extensions
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - 'tasks/**/*'
+
+Lint/NonAtomicFileOperation:
+  Exclude:
+    - 'tasks/**/*'
+
+Style/NumericPredicate:
+  Exclude:
+    - 'tasks/**/*'
+
+Style/ZeroLengthPredicate:
+  Exclude:
+    - 'tasks/**/*'
+
+SketchupSuggestions/Sleep:
+  Exclude:
+    - 'tasks/**/*'
+
+SketchupSuggestions/ModelEntities:
+  Exclude:
+    - 'SOURCE/jt_hyperbolic_curves/core/model_store.rb'
+    - 'SOURCE/jt_hyperbolic_curves/core.rb'

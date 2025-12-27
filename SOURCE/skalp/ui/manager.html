@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>SectionBox Manager</title>
+    <style>
+        * {
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+            -webkit-focus-ring-color: rgba(0, 0, 0, 0) !important;
+            outline: none !important;
+        }
+
+        :focus {
+            outline: none !important;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+            background-color: #ebebeb;
+            /* rgb(235, 235, 235) */
+            /* Exact Skalp Grey */
+            user-select: none;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            background-color: #ebebeb;
+            height: 38px;
+            gap: 8px;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+
+        .tool-icon {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            opacity: 0.8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tool-icon img {
+            width: 22px;
+            height: 22px;
+        }
+
+        #add-box img {
+            width: 18px;
+            height: 18px;
+        }
+
+        #add-folder img {
+            width: 23px;
+            height: 23px;
+        }
+
+        #minimize-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .tool-icon:hover {
+            opacity: 1;
+        }
+
+        #search-container {
+            flex: 1;
+            position: relative;
+            margin-left: 4px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 7px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 13px;
+            height: 13px;
+            pointer-events: none;
+            opacity: 0.5;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>');
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+
+        .filter-input {
+            width: 100%;
+            height: 22px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            padding-left: 24px;
+            padding-right: 5px;
+            outline: none;
+            background-color: white;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+
+        #content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            margin: 0 8px 4px 8px;
+            /* Slight gap before status bar */
+            border: 1px solid #b8b8b8;
+            border-radius: 2px;
+            overflow: hidden;
+            outline: none;
+            /* Remove focus outline */
+        }
+
+        .header {
+            display: flex;
+            background-color: #fff;
+            border-bottom: 1px solid #ccc;
+            /* Match Tags Dialog */
+            color: #333;
+            font-weight: normal;
+            /* Not bold as requested */
+            height: 25px;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+
+        .header-cell {
+            padding: 0 8px;
+            display: flex;
+            align-items: center;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        .col-name {
+            flex-grow: 1;
+            border-right: 1px solid #eee;
+            justify-content: space-between;
+        }
+
+        .col-scale {
+            width: 70px;
+            justify-content: flex-end;
+            padding-right: 15px;
+        }
+
+        .sort-toggle {
+            cursor: pointer;
+        }
+
+        .sort-indicator {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
+            background-repeat: no-repeat;
+            background-position: center;
+            opacity: 0.6;
+            margin-right: 4px;
+        }
+
+        .sort-indicator.asc {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23333"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>');
+        }
+
+        .sort-indicator.desc {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23333"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>');
+        }
+
+        .tree-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            background-color: white;
+            background-image: repeating-linear-gradient(to bottom,
+                    #ffffff 0px,
+                    #ffffff 22px,
+                    #f5f5f5 22px,
+                    #f5f5f5 44px);
+            background-attachment: local;
+            outline: none;
+            /* Remove focus outline */
+        }
+
+        .tree-item {
+            display: flex;
+            align-items: center;
+            height: 22px;
+            /* Match Tags Dialog and Zebra Pattern */
+            cursor: default;
+            box-sizing: border-box;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+            /* Very subtle line */
+        }
+
+        .tree-item:hover {
+            background-color: rgba(56, 117, 215, 0.1) !important;
+        }
+
+        .tree-item.selected {
+            background-color: #3875d7 !important;
+            color: #fff !important;
+        }
+
+        .tree-item.active {
+            font-weight: 600;
+            color: #3875d7;
+        }
+
+        .toggle {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 12px 12px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23555" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>');
+            flex-shrink: 0;
+        }
+
+        .tree-item.open>.toggle {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23555" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>');
+        }
+
+        .tree-item.selected .toggle {
+            filter: brightness(0) invert(1);
+        }
+
+        .icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 4px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            flex-shrink: 0;
+        }
+
+        .folder .icon {
+            background-image: url('../icons/box_section/folder.svg');
+        }
+
+        .tree-item.selected .icon {
+            filter: brightness(0) invert(1);
+        }
+
+        .tree-item:not(.folder) .icon {
+            background-image: url('../icons/box_section/dlg_style_face_wireframe.svg');
+        }
+
+        .tree-item:not(.folder) .toggle {
+            visibility: hidden;
+        }
+
+        .tree-item.active .icon {
+            filter: brightness(0) saturate(100%) invert(47%) sepia(87%) saturate(1722%) hue-rotate(201deg) brightness(96%) contrast(89%);
+        }
+
+        .name-label {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 12px;
+        }
+
+        .scale-label {
+            color: #999;
+            font-style: italic;
+            font-size: 10px;
+            width: 70px;
+            text-align: right;
+            padding-right: 15px;
+            white-space: nowrap;
+        }
+
+        .tree-item.selected .scale-label {
+            color: #ddd;
+        }
+
+        .status-bar {
+            padding: 0 10px 4px 10px;
+            background: #ebebeb;
+            border: none;
+            margin: 0 8px;
+            color: #999;
+            font-style: italic;
+            font-size: 11px;
+            font-weight: normal;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            height: 20px;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        #status-text-bottom {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #controls-min-status {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #999;
+            font-style: italic;
+            font-size: 11px;
+            font-weight: normal;
+            padding-left: 10px;
+            /* Match status-bar horizontal alignment */
+            height: 100%;
+            display: flex;
+            align-items: center;
+        }
+
+        #context-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            min-width: 140px;
+        }
+
+        .menu-item {
+            padding: 5px 15px;
+            cursor: pointer;
+        }
+
+        .menu-item:hover {
+            background-color: #3875d7;
+            color: white;
+        }
+
+        .menu-sep {
+            height: 1px;
+            background: #eee;
+            margin: 3px 0;
+        }
+
+        .drag-over {
+            background-color: rgba(56, 117, 215, 0.1) !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="toolbar">
+        <div id="controls-max" style="display: flex; flex-grow: 1; align-items: center;">
+            <div class="tool-icon" id="add-box" title="Add SectionBox from selection">
+                <img src="../icons/box_section/plus_circled.svg">
+            </div>
+            <div class="tool-icon" id="add-folder" title="New Folder">
+                <img src="../icons/box_section/folderplus.svg">
+            </div>
+            <div id="search-container">
+                <div class="search-icon"></div>
+                <input type="text" class="filter-input" placeholder="Search" id="filter">
+            </div>
+        </div>
+        <div id="controls-min-status" style="display: none;">SectionBox: None</div>
+        <div class="tool-icon" id="minimize-btn" title="Minimize to Status Bar">
+            <img src="../icons/box_section/dlg_hide_secondary_view.svg" id="minimize-icon">
+        </div>
+    </div>
+
+    <div id="content-area">
+        <div class="header">
+            <div class="header-cell col-name sort-toggle" data-col="name" style="cursor: pointer; flex-grow: 1;">
+                Name <span id="sort-indicator-name" class="sort-indicator asc"></span>
+            </div>
+            <div class="header-cell col-scale sort-toggle" data-col="scale"
+                style="cursor: pointer; width: 70px; text-align: right; padding-right: 15px;">
+                Scale <span id="sort-indicator-scale" class="sort-indicator"></span>
+            </div>
+        </div>
+        <div class="tree-container" id="tree">
+            <!-- Items populated by JS -->
+        </div>
+    </div>
+
+    <!-- Status bar below the grey line (content-area border) -->
+    <div class="status-bar" id="status-line">
+        <div id="status-text-bottom">SectionBox: None</div>
+    </div>
+
+    <div id="context-menu"></div>
+
+    <script src="../html/js/jquery.js"></script>
+    <script>
+        let currentState = { boxes: {}, hierarchy: [], active_id: null };
+        let draggedDetails = null;
+        let selectedFolderId = null;
+        let activeSort = { col: 'name', asc: true };
+        let isMinimized = false;
+        const DEFAULT_HEIGHT = 500;
+        const MIN_HEIGHT = 68; // Height on Mac to show Title Bar + Toolbar
+
+        function toggleMinimize() {
+            isMinimized = !isMinimized;
+            const $icon = $('#minimize-icon');
+            const currentWidth = window.innerWidth;
+            if (isMinimized) {
+                $('#controls-max, #content-area').hide();
+                $('#controls-min-status').show();
+                $icon.attr('src', '../icons/box_section/dlg_show_secondary_view.svg');
+                $('#minimize-btn').attr('title', 'Restore Manager');
+                resizeWindow(currentWidth, MIN_HEIGHT);
+            } else {
+                $('#controls-max, #content-area').show();
+                $('#controls-min-status').hide();
+                $icon.attr('src', '../icons/box_section/dlg_hide_secondary_view.svg');
+                $('#minimize-btn').attr('title', 'Minimize to Status Bar');
+                resizeWindow(currentWidth, DEFAULT_HEIGHT);
+            }
+        }
+
+        function resizeWindow(width, height) {
+            if (window.sketchup) {
+                window.sketchup.resize_window(JSON.stringify({ width: width, height: height }));
+            } else {
+                window.location.href = `skp:resize_window@${JSON.stringify({ width: width, height: height })}`;
+            }
+        }
+
+        // Lock minimized height while allowing width adjustments
+        window.onresize = function () {
+            if (isMinimized) {
+                const currentWidth = window.innerWidth;
+                const currentHeight = window.innerHeight;
+                // If the height has changed due to user resize, force it back
+                if (currentHeight !== MIN_HEIGHT) {
+                    resizeWindow(currentWidth, MIN_HEIGHT);
+                }
+            }
+        };
+
+        function parseScaleValue(scaleStr) {
+            if (!scaleStr) return 50;
+            const ratioMatch = scaleStr.match(/\(1:([\d\.]+)\)$/) || scaleStr.match(/^1:([\d\.]+)$/);
+            if (ratioMatch) return parseFloat(ratioMatch[1]);
+            if (scaleStr.includes(':')) {
+                const parts = scaleStr.split(':');
+                if (parts.length === 2 && parseFloat(parts[0]) !== 0) return parseFloat(parts[1]) / parseFloat(parts[0]);
+            }
+            return 50;
+        }
+
+        function sortHierarchy(items) {
+            items.sort((a, b) => {
+                let valA, valB;
+                if (activeSort.col === 'name') {
+                    valA = a.type === 'folder' ? (a.name || '') : (currentState.boxes[a.id]?.name || '');
+                    valB = b.type === 'folder' ? (b.name || '') : (currentState.boxes[b.id]?.name || '');
+                    return activeSort.asc ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' }) : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+                } else if (activeSort.col === 'scale') {
+                    const getGroup = (item) => {
+                        if (item.type === 'folder') return 0;
+                        const box = currentState.boxes[item.id];
+                        if (!box) return 2;
+                        const s = (box.scale || '').toLowerCase();
+                        const isImp = s.includes('"') || s.includes("'") || s.includes('in') || s.includes('ft');
+                        return isImp ? 2 : 1;
+                    };
+                    const ratioA = a.type === 'folder' ? 0 : parseScaleValue(currentState.boxes[a.id]?.scale);
+                    const ratioB = b.type === 'folder' ? 0 : parseScaleValue(currentState.boxes[b.id]?.scale);
+                    const grpA = getGroup(a);
+                    const grpB = getGroup(b);
+
+                    if (grpA !== grpB) return grpA - grpB;
+                    return activeSort.asc ? ratioA - ratioB : ratioB - ratioA;
+                }
+                return 0;
+            });
+            items.forEach(i => {
+                if (i.children) sortHierarchy(i.children);
+            });
+        }
+
+        function updateData(data) {
+            currentState = data;
+            renderTree();
+            updateStatus();
+        }
+
+        function renderTree() {
+            sortHierarchy(currentState.hierarchy);
+            const $tree = $('#tree').empty();
+            $tree.off('dragover dragleave drop');
+            $tree.on('dragover', e => { e.preventDefault(); $tree.addClass('drag-over'); });
+            $tree.on('dragleave', e => { if (e.target === $tree[0]) $tree.removeClass('drag-over'); });
+            $tree.on('drop', e => {
+                e.preventDefault(); e.stopPropagation();
+                $tree.removeClass('drag-over');
+                if (draggedDetails) safeCallback("move_item", JSON.stringify({ source: draggedDetails.id, target: "" }));
+                draggedDetails = null;
+            });
+
+            const filterVal = $('#filter').val().toLowerCase();
+
+            function renderItem(item, depth = 0) {
+                if (item.type === 'folder') {
+                    const $folder = $(`<div class="tree-item folder ${item.id === selectedFolderId ? 'selected' : ''} ${item.open ? 'open' : ''}" draggable="true"></div>`);
+                    $folder.css('padding-left', `${depth * 16}px`);
+                    $folder.append('<div class="toggle"></div>');
+                    $folder.append('<div class="icon"></div>');
+                    $folder.append(`<div class="name-label">${item.name}</div>`);
+
+                    $folder.on('click', (e) => {
+                        if ($(e.target).hasClass('toggle')) {
+                            e.stopPropagation(); safeCallback("toggle_folder", item.id);
+                        } else {
+                            $('.tree-item').removeClass('selected'); $folder.addClass('selected'); selectedFolderId = item.id;
+                        }
+                    });
+                    $folder.on('contextmenu', (e) => {
+                        selectedFolderId = item.id; $('.tree-item').removeClass('selected'); $folder.addClass('selected');
+                        showContextMenu(e, 'folder', item.id);
+                    });
+                    $folder.on('dragstart', e => { e.stopPropagation(); draggedDetails = { id: item.id, type: 'folder' }; });
+                    $folder.on('dragover', e => { e.preventDefault(); e.stopPropagation(); if (draggedDetails && draggedDetails.id !== item.id) $folder.addClass('drag-over'); });
+                    $folder.on('dragleave', e => $folder.removeClass('drag-over'));
+                    $folder.on('drop', e => {
+                        e.preventDefault(); e.stopPropagation();
+                        $('.drag-over').removeClass('drag-over'); // Robust cleanup
+                        if (draggedDetails && draggedDetails.id !== item.id) safeCallback("move_item", JSON.stringify({ source: draggedDetails.id, target: item.id }));
+                        draggedDetails = null;
+                    });
+                    $tree.append($folder);
+                    if (item.open && item.children) item.children.forEach(child => renderItem(child, depth + 1));
+                } else {
+                    const box = currentState.boxes[item.id];
+                    if (!box || (filterVal && !box.name.toLowerCase().includes(filterVal))) return;
+
+                    const $item = $(`<div class="tree-item ${item.id === currentState.active_id ? 'active' : ''}" draggable="true" data-id="${item.id}"></div>`);
+                    $item.css('padding-left', `${depth * 16}px`);
+                    $item.append('<div class="toggle"></div>');
+                    $item.append('<div class="icon"></div>');
+                    $item.append(`<div class="name-label">${box.name}</div>`);
+                    $item.append(`<div class="scale-label">${box.scale || ''}</div>`);
+
+                    $item.on('dblclick', (e) => {
+                        e.stopPropagation();
+                        const action = (item.id === currentState.active_id) ? "deactivate" : "activate";
+                        safeCallback(action, item.id);
+                    });
+
+                    // Preview Overlay Events
+                    $item.on('mouseenter', (e) => {
+                        if (!currentState.active_id) {
+                            safeCallback('preview', item.id);
+                        }
+                    });
+                    $item.on('mouseleave', (e) => {
+                        if (!isContextMenuOpen) safeCallback('clear_preview');
+                    });
+
+                    $item.on('click', (e) => { e.stopPropagation(); $('.tree-item').removeClass('selected'); $item.addClass('selected'); selectedFolderId = null; });
+                    $item.on('contextmenu', (e) => { showContextMenu(e, 'item', item.id); });
+                    $item.on('dragstart', e => { e.stopPropagation(); draggedDetails = { id: item.id, type: 'item' }; });
+                    $tree.append($item);
+                }
+            }
+            currentState.hierarchy.forEach(item => renderItem(item));
+        }
+
+        let isContextMenuOpen = false;
+
+        function showContextMenu(e, type, id) {
+            e.preventDefault(); e.stopPropagation();
+            isContextMenuOpen = true;
+            const $menu = $('#context-menu').empty();
+            if (type === 'item') {
+                const isActive = (id === currentState.active_id);
+                if (isActive) {
+                    $menu.append(`<div class="menu-item" onclick="safeCallback('deactivate', '${id}')">Deactivate</div>`);
+                } else {
+                    $menu.append(`<div class="menu-item" onclick="safeCallback('activate', '${id}')">Activate</div>`);
+                }
+                $menu.append(`<div class="menu-item" onclick="safeCallback('modify', '${id}')">Modify</div>`);
+                $menu.append('<div class="menu-sep"></div>');
+                $menu.append(`<div class="menu-item" onclick="safeCallback('edit', '${id}')">Edit Settings</div>`);
+                $menu.append(`<div class="menu-item" onclick="safeCallback('rename', '${id}')">Rename</div>`);
+                $menu.append(`<div class="menu-item" onclick="safeCallback('delete', '${id}')">Delete</div>`);
+            } else {
+                $menu.append(`<div class="menu-item" onclick="safeCallback('rename_folder', '${id}')">Rename folder</div>`);
+                $menu.append(`<div class="menu-item" onclick="safeCallback('explode_folder', '${id}')">Explode folder</div>`);
+            }
+            $menu.append('<div class="menu-sep"></div>');
+            $menu.append('<div class="menu-item" onclick="safeCallback(\'expand_all\')">Expand all</div>');
+            $menu.append('<div class="menu-item" onclick="safeCallback(\'collaps_all\')">Collapse all</div>');
+            $menu.css({ top: e.pageY + 'px', left: e.pageX + 'px', display: 'block' });
+
+            $(document).one('click', () => {
+                $menu.hide();
+                isContextMenuOpen = false;
+                safeCallback('clear_preview');
+            });
+        }
+
+        function updateStatus() {
+            const activeId = currentState.active_id;
+            let text = "SectionBox: None";
+            if (activeId && currentState.boxes[activeId]) {
+                const box = currentState.boxes[activeId];
+                text = `SectionBox: ${box.name} (${box.scale || '1:1'})`;
+            }
+            $('#status-text-bottom').text(text);
+            $('#controls-min-status').text(text);
+        }
+
+        function safeCallback(action, data = "") {
+            if (window.sketchup && window.sketchup[action]) window.sketchup[action](data);
+            else window.location.href = `skp:${action}@${data}`;
+        }
+
+        $(document).ready(() => {
+            safeCallback("ready");
+            $('#add-box').on('click', () => safeCallback("add_box"));
+            $('#add-folder').on('click', () => safeCallback("add_folder", selectedFolderId || ""));
+            $('#filter').on('input', renderTree);
+            $('#minimize-btn').on('click', toggleMinimize);
+            $('#status-line').on('dblclick', toggleMinimize);
+
+            // Sort Handler
+            $('.sort-toggle').on('click', function () {
+                const col = $(this).data('col');
+                if (activeSort.col === col) {
+                    activeSort.asc = !activeSort.asc;
+                } else {
+                    activeSort.col = col;
+                    activeSort.asc = true;
+                }
+                $('#sort-indicator-name, #sort-indicator-scale').removeClass('asc desc');
+                const indicatorClass = activeSort.asc ? 'asc' : 'desc';
+                if (activeSort.col === 'name') $('#sort-indicator-name').addClass(indicatorClass);
+                else $('#sort-indicator-scale').addClass(indicatorClass);
+                renderTree();
+            });
+
+            $(document).on('contextmenu', e => { if (e.target === document.body || e.target === $('#tree')[0]) e.preventDefault(); });
+            $(document).on('click', e => { if (!$(e.target).closest('.tree-item').length) { $('.tree-item').removeClass('selected'); selectedFolderId = null; } });
+
+            // Global Drag Cleanup
+            $(document).on('dragend drop', () => {
+                $('.drag-over').removeClass('drag-over');
+                draggedDetails = null;
+            });
+        });
+    </script>
+</body>
+
+</html>

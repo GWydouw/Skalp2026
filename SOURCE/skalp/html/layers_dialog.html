@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta charset="utf-8">
+    <script src='js/jquery.js'></script>
+    <script type="text/javascript" src="js/jquery-ui.min.js"></script>
+    <link href="css/jquery-ui-1.10.4.custom.min.css" rel="stylesheet" />
+
+    <style>
+        * {
+            -webkit-user-select: none;
+            user-select: none;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #dcdcdc;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #app-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            position: relative;
+        }
+
+        /* TOOLBAR */
+        #toolbar {
+            height: 38px;
+            background-color: #dcdcdc;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            flex-shrink: 0;
+        }
+
+        /* CONTENT AREA - White box with gray border, inset from edges */
+        #content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            margin: 0 8px 8px 8px;
+            border: 1px solid #b8b8b8;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #search-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #filter {
+            width: 100%;
+            height: 24px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            padding-left: 24px;
+            padding-right: 5px;
+            outline: none;
+            background-color: white;
+            font-size: 12px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 7px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 13px;
+            height: 13px;
+            pointer-events: none;
+            opacity: 0.5;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>');
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+
+        #header {
+            height: 25px;
+            background-color: white;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            padding: 0;
+            flex-shrink: 0;
+            box-sizing: border-box;
+            overflow-y: scroll;
+            /* Match list-container scrollbar */
+        }
+
+        .col-header {
+            display: flex;
+            align-items: center;
+            height: 24px;
+            background-color: #fff;
+            color: #333;
+            cursor: default;
+            font-weight: normal;
+            /* Not bold */
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+
+        .col-header:hover {
+            background-color: #f8f8f8;
+        }
+
+        .col-name-header {
+            width: 55%;
+            padding: 2px 4px 2px 8px;
+            border-right: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+
+        .col-pattern-header {
+            width: 45%;
+            padding: 2px 4px 2px 7px;
+            display: flex;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .sort-indicator {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
+            background-repeat: no-repeat;
+            background-position: center;
+            opacity: 0.6;
+            margin-right: 4px;
+        }
+
+        .sort-indicator.asc {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23333"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>');
+        }
+
+        .sort-indicator.desc {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23333"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>');
+        }
+
+        /* LIST CONTAINER */
+        #list-container {
+            flex: 1;
+            overflow-y: scroll;
+            /* Always show scrollbar for consistent width */
+            background-color: white;
+        }
+
+        /* TREE ITEMS */
+        .tree-item {
+            display: flex;
+            align-items: center;
+            height: 22px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .tree-item.zebra {
+            background-color: #f5f5f5;
+        }
+
+        .tree-item:hover {
+            background-color: #e8f2ff;
+        }
+
+        .tree-item.selected {
+            background-color: #3875d7 !important;
+        }
+
+        .tree-item.selected .item-label,
+        .tree-item.selected .material-name {
+            color: #fff !important;
+        }
+
+        .tree-item.selected .folder-icon {
+            filter: brightness(0) invert(1);
+        }
+
+        .tree-item.selected .toggle-icon {
+            filter: brightness(0) invert(1);
+        }
+
+        .item-row {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .col-name {
+            width: 55%;
+            padding: 2px 4px 2px 0;
+            /* No left padding */
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            border-right: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        .col-pattern {
+            width: 45%;
+            padding: 2px 4px 2px 4px;
+            display: flex;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .toggle-icon {
+            width: 18px;
+            height: 18px;
+            margin-left: 0;
+            /* Remove left margin */
+            cursor: pointer;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 12px 12px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23555" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>');
+            flex-shrink: 0;
+        }
+
+        .toggle-icon.expanded {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23555" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>');
+        }
+
+        .folder-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 4px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23888"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>');
+            background-size: contain;
+            background-repeat: no-repeat;
+            flex-shrink: 0;
+        }
+
+        .item-label {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #111;
+            font-size: 12px;
+            flex: 1;
+        }
+
+        /* MATERIAL PREVIEW */
+        .material-selector {
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .material-preview-box {
+            width: 54px;
+            height: 100%;
+            margin-right: 8px;
+            flex-shrink: 0;
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            background-position: center;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .material-thumb {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .material-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #333;
+            font-size: 11px;
+        }
+
+        .no-pattern {
+            font-style: italic;
+            color: #999;
+            font-size: 11px;
+        }
+
+        /* RESIZE HANDLE */
+        #resize-handle {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 14px;
+            height: 14px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23aaa"><path d="M22 22v-2h-2v2h2zm0-4v-2h-2v2h2zm-4 4v-2h-2v2h2zm0-4v-2h-2v2h2zm-4 4v-2h-2v2h2zm8-8v-2h-2v2h2z"/></svg>');
+            background-size: contain;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f0f0f0;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #bbb;
+            border-radius: 5px;
+            border: 2px solid #f0f0f0;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+
+        /* Context Menu */
+        #context-menu {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            background-color: #fff;
+            border: 1px solid #aaa;
+            box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.15);
+            padding: 0;
+            font-size: 11px;
+        }
+
+        .context-menu-item {
+            padding: 3px 10px;
+            cursor: default;
+            color: #333;
+            text-align: center;
+        }
+
+        .context-menu-item:hover {
+            background-color: #3875d7;
+            color: #fff;
+        }
+    </style>
+    <script>
+        var fullData = [];
+        var zebraCount = 0;
+        var sortAsc = true;
+        var collapsedFolders = loadCollapsedFolders(); // Track collapsed folder state by name
+        var selectedIds = new Set();
+        var lastSelectedId = null;
+        var flattenedItems = []; // For shift-selection range mapping
+
+        function loadCollapsedFolders() {
+            try {
+                var stored = localStorage.getItem('skalp_layers_collapsed');
+                return stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveCollapsedFolders() {
+            try {
+                localStorage.setItem('skalp_layers_collapsed', JSON.stringify(collapsedFolders));
+            } catch (e) { }
+        }
+
+        function sortTree(items, ascending) {
+            if (!items || !Array.isArray(items)) return items;
+            var sorted = items.slice().sort(function (a, b) {
+                var nameA = a.name.toLowerCase();
+                var nameB = b.name.toLowerCase();
+                if (nameA < nameB) return ascending ? -1 : 1;
+                if (nameA > nameB) return ascending ? 1 : -1;
+                return 0;
+            });
+            // Recursively sort children
+            sorted.forEach(function (item) {
+                if (item.type === 'folder' && item.children) {
+                    item.children = sortTree(item.children, ascending);
+                }
+            });
+            return sorted;
+        }
+
+        function toggleSort() {
+            sortAsc = !sortAsc;
+            updateSortIndicator();
+            render();
+        }
+
+        function updateSortIndicator() {
+            var indicator = $('#sort-indicator');
+            indicator.removeClass('asc desc');
+            indicator.addClass(sortAsc ? 'asc' : 'desc');
+        }
+
+        function update_layers(json) {
+            if (!json) return;
+            try {
+                fullData = (typeof json === 'string') ? JSON.parse(json) : json;
+                // DIAGNOSTIC
+                if (window.location.host === "") { // Only in local/Sketchup context
+                    // console.log("Skalp: fullData size=" + (fullData ? fullData.length : "null"));
+                }
+                if (!fullData || fullData.length === 0) {
+                    $('#list-container').html('<div style="padding:10px; color:#666;">No tags found.</div>');
+                    return;
+                }
+            } catch (e) {
+                console.error("Invalid JSON:", e);
+                $('#list-container').html('<div style="padding:10px; color:red;">Error loading tags.</div>');
+                return;
+            }
+
+            var container = $('#list-container');
+            if (container.length === 0) return;
+
+            var scrollTop = container.scrollTop();
+            zebraCount = 0;
+            var filterString = $('#filter').val() || "";
+            var filter = filterString.toLowerCase();
+            var sortedData = sortTree(fullData, sortAsc);
+
+            // Re-use strategy: keep track of what we processed
+            var processedIds = new Set();
+            var existingElements = {};
+            container.find('.tree-item').each(function () {
+                var id = $(this).attr('data-id');
+                if (id) existingElements[id] = $(this);
+            });
+
+            // Recursive render
+            flattenedItems = [];
+            render_tree_recursive(sortedData, container, 0, filter, existingElements, processedIds);
+
+            // Cleanup stale elements
+            for (var id in existingElements) {
+                if (!processedIds.has(id)) {
+                    existingElements[id].remove();
+                }
+            }
+
+            container.scrollTop(scrollTop);
+            updateSortIndicator();
+        }
+
+        function render_tree_recursive(items, container, level, filter, existingElements, processedIds) {
+            if (!items || !Array.isArray(items)) return;
+
+            items.forEach(function (item) {
+                // Visibility check
+                var isVisible = true;
+                if (filter) {
+                    isVisible = item.name.toLowerCase().indexOf(filter) !== -1;
+                    if (!isVisible && item.type === 'folder' && item.children) {
+                        isVisible = check_visible_recursive(item.children, filter);
+                    }
+                }
+                if (!isVisible) return;
+
+                var itemId = item.id;
+                processedIds.add(itemId);
+                flattenedItems.push(item);
+
+                var row = existingElements[itemId];
+                var isNew = false;
+                if (!row) {
+                    row = $('<div class="tree-item"></div>').attr('data-id', itemId);
+                    isNew = true;
+                }
+
+                // Update selection & striping
+                row.removeClass('zebra selected');
+                if (selectedIds.has(itemId)) row.addClass('selected');
+                else if (zebraCount % 2 === 1) row.addClass('zebra');
+                zebraCount++;
+
+                row.off('click').on('click', function (e) {
+                    handleRowClick(item, e);
+                });
+
+                // Build Columns if needed
+                var nameCol = row.find('.col-name');
+                if (nameCol.length === 0) {
+                    nameCol = $('<div class="col-name item-row"></div>');
+                    row.append(nameCol);
+                }
+                var pad = (level * 18) + 4; // Increased padding for better hierarchy
+                nameCol.css('padding-left', pad + 'px');
+
+                // Content update
+                var nameContent = '';
+                if (item.type === 'folder') {
+                    var expanded = !collapsedFolders[item.name];
+                    var arrowClass = expanded ? 'toggle-icon expanded' : 'toggle-icon';
+                    nameContent += '<div class="' + arrowClass + '" onclick="toggleFolder(\'' + item.name + '\', event)"></div>';
+                    nameContent += '<div class="folder-icon"></div>';
+                    nameContent += '<div class="item-label" title="' + item.name + '">' + item.name + '</div>';
+                } else {
+                    nameContent += '<div class="toggle-spacer" style="width:18px; flex-shrink:0;"></div>';
+                    nameContent += '<div class="item-label" title="' + item.name + '">' + item.name + '</div>';
+                }
+                if (nameCol.html() !== nameContent) nameCol.html(nameContent);
+
+                var patCol = row.find('.col-pattern');
+                if (patCol.length === 0) {
+                    patCol = $('<div class="col-pattern item-row"></div>');
+                    row.append(patCol);
+                }
+
+                if (item.type === 'layer') {
+                    var matName = item.material || "";
+                    var thumb = item.thumb;
+                    var thickness = item.thickness || 1;
+
+                    // Use the helper function to render material/pattern preview
+                    var patContainer = patCol.find('.material-selector');
+                    if (patContainer.length === 0) {
+                        patContainer = $('<div class="material-selector"></div>');
+                        patCol.append(patContainer);
+                    }
+
+                    update_material_selector_visual(patContainer, matName, thumb, thickness);
+
+                    patContainer.off('click').on('click', function (e) {
+                        e.stopPropagation(); // Avoid triggering row selection
+                        if (!selectedIds.has(item.id)) {
+                            selectedIds.clear();
+                            selectedIds.add(item.id);
+                            lastSelectedId = item.id;
+                            render();
+                        }
+                        materialSelector(Array.from(selectedIds).join(';'));
+                    });
+                } else {
+                    patCol.empty();
+                }
+
+                // Placement logic
+                if (isNew) {
+                    container.append(row);
+                } else {
+                    // Always append to ensure correct order in the flat list
+                    container.append(row);
+                }
+
+                // Recursion for folders
+                if (item.type === 'folder' && !collapsedFolders[item.name]) {
+                    render_tree_recursive(item.children, container, level + 1, filter, existingElements, processedIds);
+                }
+            });
+        }
+
+        function toggleFolder(name, event) {
+            event.stopPropagation();
+            if (collapsedFolders[name]) {
+                delete collapsedFolders[name];
+            } else {
+                collapsedFolders[name] = true;
+            }
+            saveCollapsedFolders();
+            render();
+        }
+
+        function handleRowClick(item, event) {
+            var id = item.id;
+
+            if (event.ctrlKey || event.metaKey) {
+                // Toggle
+                if (selectedIds.has(id)) selectedIds.delete(id);
+                else selectedIds.add(id);
+                lastSelectedId = id;
+            } else if (event.shiftKey && lastSelectedId !== null) {
+                // Range
+                var idx1 = -1, idx2 = -1;
+                for (var i = 0; i < flattenedItems.length; i++) {
+                    if (flattenedItems[i].id === lastSelectedId) idx1 = i;
+                    if (flattenedItems[i].id === id) idx2 = i;
+                }
+                if (idx1 !== -1 && idx2 !== -1) {
+                    selectedIds.clear();
+                    var start = Math.min(idx1, idx2);
+                    var end = Math.max(idx1, idx2);
+                    for (var i = start; i <= end; i++) {
+                        selectedIds.add(flattenedItems[i].id);
+                    }
+                }
+            } else {
+                // Single select
+                selectedIds.clear();
+                selectedIds.add(id);
+                lastSelectedId = id;
+            }
+            render();
+        }
+
+        function editPattern(id) {
+            // Restore proper callback format with coordinates
+            var x = window.screenX.toString();
+            var y = window.screenY.toString();
+            var params = x.concat(";", y, ";", id.toString());
+            window.location = 'skp:materialSelector@' + params;
+        }
+
+        function render() {
+            update_layers(fullData);
+        }
+
+        function check_visible_recursive(items, filter) {
+            if (!filter) return true;
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type === 'layer' && items[i].name.toLowerCase().indexOf(filter) !== -1) return true;
+                if (items[i].type === 'folder' && check_visible_recursive(items[i].children, filter)) return true;
+                if (items[i].name.toLowerCase().indexOf(filter) !== -1) return true;
+            }
+            return false;
+        }
+
+        function update_material_selector_visual(el, name, thumb, thickness) {
+            el.empty();
+            if (name && name !== '' && name !== '- no pattern selected -') {
+                var previewBox = $('<div class="material-preview-box"></div>');
+
+                // The PNG thumbnail already has the section cut border drawn into it by ChunkyPNG
+                // No need to add CSS border - just display the image
+
+                // Context menu handling
+                previewBox.on('contextmenu', function (e) {
+                    e.preventDefault();
+                    showContextMenu(e.pageX, e.pageY, name);
+                });
+
+                if (thumb && thumb !== '') {
+                    previewBox.css('background-image', 'url(data:image/png;base64,' + thumb + ')');
+                } else {
+                    previewBox.css('background-color', 'transparent');
+                }
+
+                el.append(previewBox);
+                el.append('<span class="material-name">' + name + '</span>');
+            } else {
+                el.append('<span class="material-name no-pattern">Assign pattern...</span>');
+            }
+        }
+
+        function materialSelector(id) {
+            var x = window.screenX.toString();
+            var y = window.screenY.toString();
+            var params = x.concat(";", y, ";", id.toString());
+            window.location = 'skp:materialSelector@' + params;
+        }
+
+        // Context menu functions
+        function showContextMenu(x, y, patternName) {
+            var contextMenu = $('#context-menu');
+            contextMenu.css({
+                left: x + 'px',
+                top: y + 'px'
+            }).show();
+
+            $('#edit-pattern-item').off('click').on('click', function () {
+                window.location = 'skp:editPattern@' + patternName;
+                contextMenu.hide();
+            });
+
+            // Hide context menu when clicking anywhere else
+            $(document).one('click', function () {
+                contextMenu.hide();
+            });
+        }
+
+        $(function () {
+            $('#filter').on('input', function () {
+                render();
+            });
+            $('#header-name').click(function () {
+                toggleSort();
+            });
+        });
+
+        function dialog_position() {
+            var x = window.screenX.toString();
+            var y = window.screenY.toString();
+            var w = window.innerWidth.toString();
+            var h = window.innerHeight.toString();
+            var params = w.concat(";", h, ";", x, ";", y);
+            window.location = 'skp:dialog_position@' + params;
+        }
+
+        function loaded() {
+            window.location = 'skp:loaded@';
+        }
+
+    </script>
+</head>
+
+<body onresize="dialog_position()" onload="loaded()">
+    <div id="context-menu">
+        <div class="context-menu-item" id="edit-pattern-item">Edit</div>
+    </div>
+    <div id="app-wrapper">
+        <div id="toolbar">
+            <div id="search-container">
+                <div class="search-icon"></div>
+                <input type="text" id="filter" placeholder="Filter">
+            </div>
+        </div>
+
+        <div id="content-area">
+            <div id="header">
+                <div class="col-header col-name-header" id="header-name">
+                    Tag Name <span id="sort-indicator" class="sort-indicator asc"></span>
+                </div>
+                <div class="col-header col-pattern-header">Skalp Pattern</div>
+            </div>
+
+            <div id="list-container">
+                <!-- Tree content injected here -->
+            </div>
+        </div>
+
+        <div id="resize-handle"></div>
+    </div>
+</body>
+
+</html>

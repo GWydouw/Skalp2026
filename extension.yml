@@ -1,0 +1,26 @@
+extension:
+  # Display name shown in SketchUp Extension Manager
+  name: "Skalp 2026"
+
+  # Technical identifier (case sensitive, used for filenames and directory names)
+  id: "skalp"
+
+  # Ruby module name (CamelCase version of id)
+  module_name: "Skalp"
+
+  # Build artifact prefix (used in BUILDS/ filenames)
+  artifact_prefix: "Skalp_2026"
+
+  # Author information
+  author: "Skalp"
+  copyright: "© 2014-2026 Skalp"
+
+  # Extension description (for Extension Manager)
+  description: "Professional Cross Sections and Hatch Patterns inside SketchUp"
+
+  # License for this extension
+  license: "Proprietary"
+
+toolkit:
+  # Scaffold/toolkit version
+  version: "1.0.0"

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background: transparent;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .menu-container {
+            display: flex;
+            gap: 8px;
+            padding: 8px;
+            background: rgba(30, 30, 30, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            gap: 4px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn.deactivate:hover {
+            color: #ff3b30;
+        }
+
+        .btn.modify:hover {
+            color: #007aff;
+        }
+
+        .btn.edit:hover {
+            color: #34c759;
+        }
+
+        .btn.outliner:hover {
+            color: #ff9500;
+        }
+
+        .icon {
+            font-size: 20px;
+            margin-bottom: 2px;
+        }
+
+        .label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        /* Tooltip style icons using emojis as placeholders, can be replaced with SVGs */
+    </style>
+</head>
+
+<body>
+    <div class="menu-container">
+        <button class="btn deactivate" onclick="callRuby('deactivate')">
+            <span class="icon">✕</span>
+            <span class="label">Off</span>
+        </button>
+        <button class="btn modify" onclick="callRuby('modify')">
+            <span class="icon">⚙</span>
+            <span class="label">Modify</span>
+        </button>
+        <button class="btn edit" onclick="callRuby('edit_inside')">
+            <span class="icon">⇲</span>
+            <span class="label">Inside</span>
+        </button>
+        <button class="btn outliner" onclick="callRuby('toggle_outliner')">
+            <span class="icon">👁</span>
+            <span class="label">Outliner</span>
+        </button>
+    </div>
+
+    <script>
+        function callRuby(action) {
+            sketchup.callAction(action);
+        }
+
+        // Close when clicking outside (on the body)
+        document.body.onclick = (e) => {
+            if (e.target === document.body) {
+                sketchup.close();
+            }
+        };
+    </script>
+</body>
+
+</html>

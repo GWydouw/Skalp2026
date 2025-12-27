@@ -1,0 +1,6 @@
+--title "JT Hyperbolic Curves Documentation"
+--readme README.md
+--output-dir doc
+SOURCE/**/*.rb
+-
+SOURCE/jt_hyperbolic_curves/debug.rb
