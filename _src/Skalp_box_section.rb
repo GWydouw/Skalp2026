@@ -66,7 +66,7 @@ module Skalp
           "style_rule" => "combined",
           "sides" => { "all" => { "cut_width" => true, "style_rule" => "combined", "rear_view" => "off" } }
         }
-        saved = safe_read_default("SectionBoxDefaults_v6")
+        saved = safe_read_default("SectionBoxDefaults_v8")
         defaults.merge!(saved) if saved.is_a?(Hash)
         defaults
       end
@@ -78,7 +78,7 @@ module Skalp
           "rear_view_global" => settings["rear_view_global"],
           "sides" => settings["sides"]
         }
-        Sketchup.write_default("Skalp", "SectionBoxDefaults_v6", data)
+        Sketchup.write_default("Skalp", "SectionBoxDefaults_v8", "SB_JSON:" + data.to_json)
       end
 
       def self.get_scales
@@ -87,13 +87,13 @@ module Skalp
           "1\" = 1' (1:12)", "1/8\" = 1' (1:96)", "1/4\" = 1' (1:48)", "1/2\" = 1' (1:24)",
           "3/4\" = 1' (1:16)", "3\" = 1' (1:4)"
         ]
-        saved = safe_read_default("SectionBoxScales_v6")
+        saved = safe_read_default("SectionBoxScales_v8")
         return saved if saved.is_a?(Array)
         default_scales
       end
 
       def self.save_scales(scales_array)
-        Sketchup.write_default("Skalp", "SectionBoxScales_v6", scales_array)
+        Sketchup.write_default("Skalp", "SectionBoxScales_v8", "SB_JSON:" + scales_array.to_json)
       end
       
       def self.get_active_id(model)
