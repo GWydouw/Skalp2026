@@ -282,6 +282,7 @@ module Skalp
 
     def place_rear_view_lines_in_model(target_group = nil)
       target_group ||= @sectiongroup
+      puts "[DEBUG] place_rear_view_lines_in_model for: #{target_group}"
       return unless target_group && target_group.valid?
       return unless Skalp.models[@skpModel]
 
@@ -289,16 +290,21 @@ module Skalp
       Skalp.models[@skpModel].observer_active = false
 
       type = @page || @skpModel
+      puts "[DEBUG] type: #{type.is_a?(Sketchup::Page) ? type.name : 'Model'}"
 
       return unless @sectionplane && @sectionplane.respond_to?(:skalpID)
 
       id = @sectionplane.skalpID
+      puts "[DEBUG] sectionplane id: #{id}"
 
       active_page = type
+      puts "[DEBUG] active_page calculated[#{active_page}]: #{@model.hiddenlines.calculated[active_page]}"
       if id == @model.hiddenlines.calculated[active_page]
+        puts "[DEBUG] Exact match found for active_page"
         place_lines_or_definition_in_model(active_page, target_group)
       elsif id == @model.hiddenlines.calculated[@skpModel]
         # Fallback: check if calculated for model (live section)
+        puts "[DEBUG] Match found for Model fallback"
         place_lines_or_definition_in_model(@skpModel, target_group)
       else
         found = false
@@ -310,7 +316,45 @@ module Skalp
             found = true
           end
         end
-        place_lines_or_definition_in_model(type, target_group, true) if found
+        if found
+          puts "[DEBUG] Match found for other page: #{type.name}"
+          place_lines_or_definition_in_model(type, target_group, true)
+        else
+          puts "[DEBUG] NO match found in calculated hash"
+          # Fallback: use saved rear_view_definitions if available (for freshly loaded models)
+          # Check multiple possible keys since definitions may be keyed by Page, Model, or selected_page
+          selected_page = @skpModel.pages.selected_page
+          puts "[DEBUG] Checking rear_view_definitions keys: active_page=#{active_page.class}, selected_page=#{selected_page&.name}, Model"
+          puts "[DEBUG] rear_view_definitions keys: #{@model.hiddenlines.rear_view_definitions.keys.map do |k|
+            k.is_a?(Sketchup::Page) ? k.name : k.class.to_s
+          end}"
+
+          if @model.hiddenlines.rear_view_definitions[active_page] &&
+             @model.hiddenlines.rear_view_definitions[active_page].valid? &&
+             @model.hiddenlines.rear_view_definitions[active_page].entities.size > 0
+            puts "[DEBUG] Using saved rear_view_definition for active_page"
+            place_lines_or_definition_in_model(active_page, target_group)
+          elsif selected_page && @model.hiddenlines.rear_view_definitions[selected_page] &&
+                @model.hiddenlines.rear_view_definitions[selected_page].valid? &&
+                @model.hiddenlines.rear_view_definitions[selected_page].entities.size > 0
+            puts "[DEBUG] Using saved rear_view_definition for selected_page: #{selected_page.name}"
+            place_lines_or_definition_in_model(selected_page, target_group)
+          elsif @model.hiddenlines.rear_view_definitions[@skpModel] &&
+                @model.hiddenlines.rear_view_definitions[@skpModel].valid? &&
+                @model.hiddenlines.rear_view_definitions[@skpModel].entities.size > 0
+            puts "[DEBUG] Using saved rear_view_definition for Model fallback"
+            place_lines_or_definition_in_model(@skpModel, target_group)
+          else
+            # No valid definition found for this page - don't use definitions from other pages!
+            # The lines will need to be recalculated for this page
+            puts "[DEBUG] No rear_view_definition found for current page (#{selected_page&.name || 'Model'})"
+            puts "[DEBUG] Available definitions are for: #{@model.hiddenlines.rear_view_definitions.keys.select do |k|
+              k.is_a?(Sketchup::Page)
+            end.map(&:name).join(', ')}"
+            puts "[DEBUG] Rearview lines will need to be recalculated for this page"
+          end
+
+        end
       end
       Skalp.models[@skpModel].observer_active = observer_status
     end

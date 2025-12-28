@@ -73,17 +73,28 @@ module Skalp
     end
 
     def update_dialog
+      # Determine the correct context to read settings from
+      selected_page = Sketchup.active_model&.pages&.selected_page
+      context = save_settings_status && selected_page ? selected_page : Sketchup.active_model
+
+      if defined?(DEBUG) && DEBUG
+        puts "[DEBUG] update_dialog START"
+        puts "        context: #{context.is_a?(Sketchup::Page) ? context.name : 'Model'}"
+        puts "        save_settings_status: #{save_settings_status}"
+        puts "        rearview_status: #{rearview_status(context)}"
+        puts "        drawing_scale: #{drawing_scale(context)}"
+      end
       save_settings_status ? save_settings_checkbox_on : save_settings_checkbox_off
-      rearview_status ? rearview_status_switch_on : rearview_status_switch_off
-      rearview_update ? rearview_update_checkbox_on : rearview_update_checkbox_off
-      set_rearview_linestyle
+      rearview_status(context) ? rearview_status_switch_on : rearview_status_switch_off
+      rearview_update(context) ? rearview_update_checkbox_on : rearview_update_checkbox_off
+      set_rearview_linestyle(context)
 
-      lineweights_status ? lineweights_status_switch_on : lineweights_status_switch_off
+      lineweights_status(context) ? lineweights_status_switch_on : lineweights_status_switch_off
 
-      set_drawing_scale_in_dialog(drawing_scale)
+      set_drawing_scale_in_dialog(drawing_scale(context))
 
-      if fog_status
-        set_fog_distance_in_dialog(fog_distance)
+      if fog_status(context)
+        set_fog_distance_in_dialog(fog_distance(context))
         fog_status_switch_on
       else
         fog_status_switch_off
@@ -92,7 +103,7 @@ module Skalp
 
       check_SU_style
       check_rearview_uptodate
-      style_rules.to_dialog
+      style_rules(context).to_dialog
     end
 
     def blur_dialog_settings
@@ -150,6 +161,9 @@ module Skalp
       page_settings = Skalp.active_model.get_memory_attribute(page, "Skalp", "style_settings")
       model_settings = style_settings
       STYLE_SETTINGS.each { |setting| page_settings[setting] = model_settings[setting] }
+
+      # FIX: Must save the hash back to native attributes after modification
+      Skalp.active_model.set_memory_attribute(page, "Skalp", "style_settings", page_settings)
     end
 
     def settings_from_page(page)
@@ -160,6 +174,8 @@ module Skalp
       if page_settings
         model_settings = style_settings
         STYLE_SETTINGS.each { |setting| model_settings[setting] = page_settings[setting] }
+        # FIX: Must save the model settings hash back after modification
+        Skalp.active_model.set_memory_attribute(Sketchup.active_model, "Skalp", "style_settings", model_settings)
         Skalp.active_model.save_settings = true
       else
         Skalp.active_model.save_settings = false
@@ -195,7 +211,8 @@ module Skalp
     def rearview_update(object = Sketchup.active_model)
       return unless Skalp.active_model
 
-      Skalp.active_model.get_memory_attribute(object, "Skalp", "rearview_update") == "true"
+      # Use Skalp.to_boolean to handle both legacy strings and new actual Booleans
+      Skalp.to_boolean(Skalp.active_model.get_memory_attribute(object, "Skalp", "rearview_update"))
     end
 
     def save_rearview_status(status, object = Sketchup.active_model)
@@ -237,7 +254,8 @@ module Skalp
     def lineweights_update(object = Sketchup.active_model)
       return false unless Skalp.active_model
 
-      Skalp.active_model.get_memory_attribute(object, "Skalp", "lineweights") == "true"
+      # Use Skalp.to_boolean to handle both legacy strings and new actual Booleans
+      Skalp.to_boolean(Skalp.active_model.get_memory_attribute(object, "Skalp", "lineweights"))
     end
 
     def save_lineweights_status(status, object = Sketchup.active_model)
@@ -410,8 +428,8 @@ module Skalp
       set_select_linestyle_inactive
     end
 
-    def set_rearview_linestyle
-      script("$('#linestyles').val('#{rearview_linestyle}')")
+    def set_rearview_linestyle(object = Sketchup.active_model)
+      script("$('#linestyles').val('#{rearview_linestyle(object)}')")
     end
 
     def lineweights_status_switch_on
