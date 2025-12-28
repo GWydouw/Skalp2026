@@ -12,6 +12,11 @@ namespace :install do
     FileUtils.rm_rf(File.join(Config::PLUGINS_DIR, Config::EXTENSION_ID))
     # Skalp specific dir
     FileUtils.rm_rf(File.join(Config::PLUGINS_DIR, "Skalp_Skalp2026"))
+    FileUtils.rm_f(File.join(Config::PLUGINS_DIR, "Skalp_Skalp")) # Remove legacy symlink if exists
+
+    # Remove installer artifacts if present
+    FileUtils.rm_f(File.join(Config::PLUGINS_DIR, "Skalp_Skalp2026_installer.rb"))
+    FileUtils.rm_rf(File.join(Config::PLUGINS_DIR, "Skalp_Skalp2026_installer"))
 
     # 2. Dev/Debug Artifacts
     artifacts = [
@@ -38,20 +43,20 @@ namespace :install do
     FileUtils.mkdir_p(Config::PLUGINS_DIR)
 
     # Copy new source
-    # We use -L to follow symlinks so Skalp_Skalp2026 is copied as a directory
-    sh "cp -R -L '#{Config::SOURCE_DIR}/'* '#{Config::PLUGINS_DIR}/'"
-    
+    # We use rsync to exclude the installer files which are only for release builds
+    sh "rsync -aL --exclude='Skalp_Skalp2026_installer*' '#{Config::SOURCE_DIR}/' '#{Config::PLUGINS_DIR}/'"
+
     # Copy embed.yml for development mode
-    embed_yml_src = File.join(Config::PROJECT_ROOT, 'embed.yml')
-    embed_yml_dest = File.join(Config::PLUGINS_DIR, 'Skalp_Skalp2026', 'embed.yml')
+    embed_yml_src = File.join(Config::PROJECT_ROOT, "embed.yml")
+    embed_yml_dest = File.join(Config::PLUGINS_DIR, "Skalp_Skalp2026", "embed.yml")
     if File.exist?(embed_yml_src)
       FileUtils.cp(embed_yml_src, embed_yml_dest)
       puts "   📋 Copied embed.yml for DevMode"
     end
-    
+
     # Extract SkalpC from .bundle directory to .so file (Ruby can't load .bundle directories)
-    skalpc_bundle_binary = File.join(Config::PLUGINS_DIR, 'Skalp_Skalp2026', 'SkalpC.bundle', 'Contents', 'MacOS', 'SkalpC')
-    skalpc_so = File.join(Config::PLUGINS_DIR, 'Skalp_Skalp2026', 'SkalpC.so')
+    skalpc_bundle_binary = File.join(Config::PLUGINS_DIR, "Skalp_Skalp2026", "SkalpC.bundle", "Contents", "MacOS", "SkalpC")
+    skalpc_so = File.join(Config::PLUGINS_DIR, "Skalp_Skalp2026", "SkalpC.so")
     if File.exist?(skalpc_bundle_binary)
       FileUtils.cp(skalpc_bundle_binary, skalpc_so)
       puts "   💎 Extracted SkalpC.so from bundle"
@@ -62,14 +67,14 @@ namespace :install do
     # And we also update the root loader for consistency
     skalp_rb = File.join(Config::PLUGINS_DIR, "Skalp_Skalp2026", "Skalp.rb")
     root_loader = File.join(Config::PLUGINS_DIR, "Skalp_Skalp2026.rb")
-    
+
     # Get version logic
     # FastBuild always uses .9999 version (not registered in database)
     version = "2026.0.9999"
     build_date = Time.now.strftime("%d %B %Y").downcase
-    
+
     # Update version.rb in installed Plugins to show fastbuild version
-    installed_version_rb = File.join(Config::PLUGINS_DIR, 'Skalp_Skalp2026', 'version.rb')
+    installed_version_rb = File.join(Config::PLUGINS_DIR, "Skalp_Skalp2026", "version.rb")
     if File.exist?(installed_version_rb)
       version_content = File.read(installed_version_rb)
       version_content.gsub!(/VERSION\s*=\s*["'][^"']+["']/, "VERSION = \"#{version}\"")
@@ -80,18 +85,19 @@ namespace :install do
 
     [skalp_rb, root_loader].each do |file|
       next unless File.exist?(file)
+
       puts "💉 Injecting Skalp Metadata into #{File.basename(file)}..."
-      
+
       content = File.read(file)
-      
+
       # 1. Placeholders
       content.gsub!("#SKALPVERSION#", version)
       content.gsub!("#SKALPBUILDDATE#", build_date)
-      
+
       # 2. Hardcoded Patterns (mostly for root loader which might not use placeholders)
       content.gsub!(/(# Version\s*:\s*)\d+\.\d+\.\d+/, "\\1#{version}")
       content.gsub!(/(# Date\s*:\s*)\d+ \w+ \d+/, "\\1#{build_date}")
-      
+
       # 3. SketchUp Version Lock (e.g. 26 for 2026)
       short_year = Config::SKETCHUP_YEAR.to_s[-2..-1]
       content.gsub!(/(@version_required\s*=\s*)\d+/, "\\1#{short_year}")
@@ -105,16 +111,16 @@ namespace :install do
         content.gsub!("#SKETCHUPDEBUG#", "SKETCHUPDEBUG = false")
         content.gsub!("#SKALPDEBUGGER#", "SKALPDEBUGGER = false")
       end
-      
+
       File.write(file, content)
     end
     puts "   ✅ Metadata injected (Version: #{version})"
     # ---------------------------------------
 
     dest_lic = File.join(Config::PLUGINS_DIR, "Skalp_Skalp2026", "Skalp.lic")
-    
+
     # Handle License selection
-    lic_choice = ENV['LIC']
+    lic_choice = ENV.fetch("LIC", nil)
     if lic_choice
       lic_src = File.join(Config::PROJECT_ROOT, "dev_licenses", lic_choice)
       if File.exist?(lic_src)
@@ -134,10 +140,13 @@ namespace :install do
     end
 
     puts "✅ Extension installed."
+
+    puts "🚀 Launching SketchUp 2026..."
+    sh "open -a '/Applications/SketchUp 2026/SketchUp.app'"
   end
 
   # ... [rest of the file stays same, but I'll write the whole file to be safe]
-  
+
   desc "Inject Debug Loaders (Development Only)"
   task :debug_loaders do
     puts "💉 Injecting Debug Resources..."
@@ -146,6 +155,10 @@ namespace :install do
     Config::DEV_LOADERS.each do |src, dest|
       src_path = File.join(Dir.pwd, src)
       dest_path = File.join(Config::PLUGINS_DIR, dest)
+
+      # Ensure subdirectories exist if dest contains slashes
+      FileUtils.mkdir_p(File.dirname(dest_path)) if dest.include?("/")
+
       if File.exist?(src_path)
         FileUtils.cp(src_path, dest_path)
         puts "   + #{dest}"

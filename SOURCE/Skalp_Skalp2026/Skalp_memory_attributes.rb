@@ -1,14 +1,12 @@
 module Skalp
   class Memory_attributes
-    def initialize()
+    def initialize
       @model = Skalp.active_model
       @skpModel = @model.skpModel
       setup
     end
 
-    def model
-      @model
-    end
+    attr_reader :model
 
     def [](object)
       @mem_attributes[object]
@@ -19,7 +17,7 @@ module Skalp
     end
 
     def []=(object, value)
-      @mem_attributes[object]= value
+      @mem_attributes[object] = value
     end
 
     def include?(object)
@@ -36,8 +34,8 @@ module Skalp
       attrib_new = @mem_attributes[page]
       attrib_old = mem_old[page]
 
-      return false if ((attrib_new == nil || attrib_new == {}) && (attrib_old == nil || attrib_old == {}))
-      return true if ((attrib_new == nil || attrib_new == {}) || (attrib_old == nil || attrib_old == {}))
+      return false if [nil, {}].include?(attrib_new) && [nil, {}].include?(attrib_old)
+      return true if [nil, {}].include?(attrib_new) || [nil, {}].include?(attrib_old)
 
       attrib_new["sectionplaneID"] != attrib_old["sectionplaneID"]
     end
@@ -45,22 +43,22 @@ module Skalp
     def to_s
       if @mem_attributes[@skpModel]["selected_page"]
         "---- \n" +
-            "scene:  #{@mem_attributes[@skpModel]["selected_page"].name}\n" +
-            "timestamp: #{@mem_attributes[@skpModel]["page_undo"]}\n" +
-            "sectionplaneID: #{@mem_attributes[@skpModel]["active_sectionplane_ID"]}\n" +
-            "scale: #{@mem_attributes[@skpModel]["active_drawing_scale"]}\n" +
-            "style: #{@mem_attributes[@skpModel]["style"]}\n" +
-            "page changed: #{@mem_attributes[:page_changed]}\n" +
-            "----"
+          "scene:  #{@mem_attributes[@skpModel]['selected_page'].name}\n" +
+          "timestamp: #{@mem_attributes[@skpModel]['page_undo']}\n" +
+          "sectionplaneID: #{@mem_attributes[@skpModel]['active_sectionplane_ID']}\n" +
+          "scale: #{@mem_attributes[@skpModel]['active_drawing_scale']}\n" +
+          "style: #{@mem_attributes[@skpModel]['style']}\n" +
+          "page changed: #{@mem_attributes[:page_changed]}\n" +
+          "----"
       else
         "---- \n" +
-            "scene: \n" +
-            "timestamp: #{@mem_attributes[@skpModel]["page_undo"]}\n" +
-            "sectionplaneID: #{@mem_attributes[@skpModel]["active_sectionplane_ID"]}\n" +
-            "scale: #{@mem_attributes[@skpModel]["active_drawing_scale"]}\n" +
-            "style: #{@mem_attributes[@skpModel]["style"]}\n" +
-            "page changed: #{@mem_attributes[:page_changed]}\n" +
-            "----"
+          "scene: \n" +
+          "timestamp: #{@mem_attributes[@skpModel]['page_undo']}\n" +
+          "sectionplaneID: #{@mem_attributes[@skpModel]['active_sectionplane_ID']}\n" +
+          "scale: #{@mem_attributes[@skpModel]['active_drawing_scale']}\n" +
+          "style: #{@mem_attributes[@skpModel]['style']}\n" +
+          "page changed: #{@mem_attributes[:page_changed]}\n" +
+          "----"
       end
     end
 
@@ -72,6 +70,7 @@ module Skalp
     def clear_save_memory_attributes_from_model
       attrdicts = @skpModel.attribute_dictionaries
       return unless attrdicts
+
       attrdict = attrdicts["Skalp_memory_attributes"]
       attrdict.each_key { |key| attrdict.delete_key(key) } if attrdict
     end
@@ -81,21 +80,24 @@ module Skalp
 
       @model.start("Skalp - #{Skalp.translate('save scene and model attributes from memory')}", false)
       clear_save_memory_attributes_from_model
-      @model.set_memory_attribute(@skpModel, 'Skalp', 'skalp_version', Skalp::SKALP_VERSION) if !Skalp.active_model.skalp_version || (Skalp::SKALP_VERSION > Skalp.active_model.skalp_version)
+      if !Skalp.active_model.skalp_version || (Skalp::SKALP_VERSION > Skalp.active_model.skalp_version)
+        @model.set_memory_attribute(@skpModel, "Skalp", "skalp_version",
+                                    Skalp::SKALP_VERSION)
+      end
 
       @mem_attributes.each_pair do |object, hash_value|
         next unless object.valid?
 
         case object
-          when Sketchup::Model
-            hash_value.each_pair do |key, value|
-              process_attributes_for_write("skpModel|", key, value)
-            end
-          when Sketchup::Page
-            object.set_attribute('Skalp', 'ID', hash_value['ID'].to_s)
-            hash_value.each_pair do |key, value|
-              process_attributes_for_write("#{hash_value['ID']}|", key, value)
-            end
+        when Sketchup::Model
+          hash_value.each_pair do |key, value|
+            process_attributes_for_write("skpModel|", key, value)
+          end
+        when Sketchup::Page
+          object.set_attribute("Skalp", "ID", hash_value["ID"].to_s)
+          hash_value.each_pair do |key, value|
+            process_attributes_for_write("#{hash_value['ID']}|", key, value)
+          end
         end
       end
       Skalp.insert_version_check_code
@@ -103,17 +105,21 @@ module Skalp
     end
 
     def process_attributes_for_write(index_name, key_name, value)
-
-      if key_name == 'style_settings' && value.class == Hash
-        @skpModel.set_attribute('Skalp_memory_attributes', index_name + 'drawing_scale', value[:drawing_scale].to_s)
-        @skpModel.set_attribute('Skalp_memory_attributes', index_name + 'rearview_status', value[:rearview_status].to_s)
-        @skpModel.set_attribute('Skalp_memory_attributes', index_name + 'rearview_linestyle', value[:rearview_linestyle].to_s)
-        @skpModel.set_attribute('Skalp_memory_attributes', index_name + 'lineweights_status', value[:section_cut_width_status].to_s)
-        @skpModel.set_attribute('Skalp_memory_attributes', index_name + 'fog_status', value[:depth_clipping_status].to_s)
-        @skpModel.set_attribute('Skalp_memory_attributes', index_name + 'fog_distance', value[:depth_clipping_distance].to_s)
-        @skpModel.set_attribute('Skalp_memory_attributes', index_name + 'style_rules', value[:style_rules].rules.inspect)
+      if key_name == "style_settings" && value.class == Hash
+        @skpModel.set_attribute("Skalp_memory_attributes", index_name + "drawing_scale", value[:drawing_scale].to_s)
+        @skpModel.set_attribute("Skalp_memory_attributes", index_name + "rearview_status", value[:rearview_status].to_s)
+        @skpModel.set_attribute("Skalp_memory_attributes", index_name + "rearview_linestyle",
+                                value[:rearview_linestyle].to_s)
+        @skpModel.set_attribute("Skalp_memory_attributes", index_name + "lineweights_status",
+                                value[:section_cut_width_status].to_s)
+        @skpModel.set_attribute("Skalp_memory_attributes", index_name + "fog_status",
+                                value[:depth_clipping_status].to_s)
+        @skpModel.set_attribute("Skalp_memory_attributes", index_name + "fog_distance",
+                                value[:depth_clipping_distance].to_s)
+        @skpModel.set_attribute("Skalp_memory_attributes", index_name + "style_rules",
+                                value[:style_rules].rules.inspect)
       else
-        @skpModel.set_attribute('Skalp_memory_attributes', index_name + key_name.to_s, value.to_s)
+        @skpModel.set_attribute("Skalp_memory_attributes", index_name + key_name.to_s, value.to_s)
       end
     end
 
@@ -121,63 +127,63 @@ module Skalp
       style_rules = StyleRules.new
       style_rules.setup_default
 
-      distance = Distance.new('300cm')
+      distance = Distance.new("300cm")
 
       {
-          drawing_scale: Skalp.default_drawing_scale,
-          rearview_status: false,
-          section_cut_width_status: false,
-          depth_clipping_status: false,
-          depth_clipping_distance: distance,
-          style_rules: style_rules
+        drawing_scale: Skalp.default_drawing_scale,
+        rearview_status: false,
+        section_cut_width_status: false,
+        depth_clipping_status: false,
+        depth_clipping_distance: distance,
+        style_rules: style_rules
       }
     end
 
     def read_from_model
       puts "\n=== SKALP: Start Reading Memory Attributes (MIGRATION CHECK) ==="
-      saved_memory_attributes = @skpModel.attribute_dictionary('Skalp_memory_attributes')
+      saved_memory_attributes = @skpModel.attribute_dictionary("Skalp_memory_attributes")
 
       to_check = []
       if saved_memory_attributes
         puts "[LOG] Found 'Skalp_memory_attributes' dictionary with #{saved_memory_attributes.count} entries."
         saved_memory_attributes.each_pair do |key, value|
-          key_array = key.split('|')
+          key_array = key.split("|")
           object = key_array[0]
           key_name = key_array[1]
 
           case object
-            when 'skpModel'
-              puts "[LOG] Validating Model attribute: #{key_name} = #{value}"
-              to_check << @skpModel
-              process_attributes_for_read(@mem_attributes[@skpModel], key_name, value)
-            else
-              skpPage = find_page(object)
+          when "skpModel"
+            puts "[LOG] Validating Model attribute: #{key_name} = #{value}"
+            to_check << @skpModel
+            process_attributes_for_read(@mem_attributes[@skpModel], key_name, value)
+          else
+            skpPage = find_page(object)
 
-              if skpPage &&  @mem_attributes[skpPage]
-                puts "[LOG] Validating Page attribute for '#{skpPage.name}': #{key_name} = #{value}"
-                to_check << skpPage
-                process_attributes_for_read(@mem_attributes[skpPage], key_name, value)
-              else
-                puts "[LOG] WARNING: Could not find page for ID '#{object}' (Key: #{key}). Skipping."
-              end
+            if skpPage && @mem_attributes[skpPage]
+              puts "[LOG] Validating Page attribute for '#{skpPage.name}': #{key_name} = #{value}"
+              to_check << skpPage
+              process_attributes_for_read(@mem_attributes[skpPage], key_name, value)
+            else
+              puts "[LOG] WARNING: Could not find page for ID '#{object}' (Key: #{key}). Skipping."
+            end
           end
         end
 
         check_attributes(to_check)
       else
         puts "[LOG] No 'Skalp_memory_attributes' dictionary found. initializing defaults."
-        @mem_attributes[Sketchup.active_model]={}
-        @mem_attributes[Sketchup.active_model]['style_settings'] = default_settings
+        @mem_attributes[Sketchup.active_model] = {}
+        @mem_attributes[Sketchup.active_model]["style_settings"] = default_settings
         save_to_model
       end
-      
+
       # MIGRATION SU2026: Sync migrated data to native page attributes
       puts "\n=== SKALP: Syncing to Native Attributes ==="
       sync_to_native_attributes
-      
+
       puts "\n=== SKALP: Final Active Memory Attributes State ==="
       log_current_state
-      
+
       puts "\n=== SKALP: VERIFICATION - Native Attributes State ==="
       log_native_attributes_state
     end
@@ -186,20 +192,62 @@ module Skalp
     # This ensures old format data is migrated to new native format
     def sync_to_native_attributes
       @mem_attributes.each_pair do |object, attrs|
-        next unless object && object.valid? rescue next
+        begin
+          next unless object && object.valid?
+        rescue StandardError
+          next
+        end
         next unless attrs.is_a?(Hash)
-        
+
         object_name = object.is_a?(Sketchup::Model) ? "Model" : "Page '#{object.name}'"
-        
+
         attrs.each_pair do |key, value|
-          next if key == 'commit'
-          next if value.is_a?(Hash) && key == 'style_settings'  # Skip complex hashes for now
+          next if key == "commit"
+
+          if key == "style_settings" && value.is_a?(Hash)
+            # Flatten style settings to native attributes (ss_*)
+            # Must match keys in Skalp_model.rb
+            style_keys = %i[drawing_scale rearview_status rearview_linestyle section_cut_width_status
+                            depth_clipping_status depth_clipping_distance style_rules]
+
+            value.each do |style_key, style_value|
+              # Only migrate known valid style keys
+              next unless style_keys.include?(style_key) || style_keys.include?(style_key.to_sym)
+
+              begin
+                puts "[LOG] Transferring #{object_name}: style_settings['#{style_key}'] -> 'ss_#{style_key}'"
+
+                if [:style_rules, "style_rules"].include?(style_key) && style_value.respond_to?(:rules)
+                  object.set_attribute("Skalp", "ss_#{style_key}", style_value.rules.inspect)
+                elsif !style_value.is_a?(Hash)
+                  # HEURISTIC FIX: If page has rearview_status false but model has it true, force it to true
+                  # This fixes models where rearview was globally enabled but stagnant page values stayed false.
+                  if style_key == :rearview_status && ["false", false].include?(style_value)
+                    model_rv = Skalp.active_model.get_memory_attribute(Sketchup.active_model, "Skalp",
+                                                                       "rearview_status")
+                    if ["true", true].include?(model_rv)
+                      style_value = true
+                      puts "[LOG] Healing #{object_name}: rearview_status forced to TRUE to match Model"
+                    end
+                  end
+
+                  object.set_attribute("Skalp", "ss_#{style_key}", style_value.to_s)
+                end
+              rescue StandardError => e
+                puts "[ERROR] Failed to transfer #{object_name} style setting '#{style_key}': #{e.message}"
+              end
+            end
+            next
+          end
+
+          next if value.is_a?(Hash) # Skip other complex hashes
+
           begin
             if value
               puts "[LOG] Transferring #{object_name}: '#{key}' -> '#{value}'"
-              object.set_attribute('Skalp', key, value) 
+              object.set_attribute("Skalp", key, value)
             end
-          rescue => e
+          rescue StandardError => e
             puts "[ERROR] Failed to transfer #{object_name}: '#{key}' -> '#{value}': #{e.message}"
           end
         end
@@ -208,17 +256,21 @@ module Skalp
 
     def log_current_state
       @mem_attributes.each_pair do |object, attrs|
-        next unless object && object.valid? rescue next
+        begin
+          next unless object && object.valid?
+        rescue StandardError
+          next
+        end
         object_name = object.is_a?(Sketchup::Model) ? "Model" : "Page '#{object.name}'"
         puts "--- #{object_name} ---"
         if attrs.is_a?(Hash)
           attrs.each do |k, v|
-             if k == 'style_settings' && v.is_a?(Hash)
-               puts "  #{k}:"
-               v.each { |sk, sv| puts "    #{sk}: #{sv}" }
-             else
-               puts "  #{k}: #{v}"
-             end
+            if k == "style_settings" && v.is_a?(Hash)
+              puts "  #{k}:"
+              v.each { |sk, sv| puts "    #{sk}: #{sv}" }
+            else
+              puts "  #{k}: #{v}"
+            end
           end
         else
           puts "  #{attrs.inspect}"
@@ -226,7 +278,7 @@ module Skalp
       end
       puts "=================================================\n"
     end
-    
+
     def log_native_attributes_state
       objects = []
       objects << @skpModel if @skpModel
@@ -234,77 +286,75 @@ module Skalp
 
       objects.each do |obj|
         next unless obj && obj.valid?
-        dict = obj.attribute_dictionary('Skalp')
-        if dict
-          object_name = obj.is_a?(Sketchup::Model) ? "Model" : "Page '#{obj.name}'"
-          puts "--- Native Attributes: #{object_name} ---"
-          dict.each_pair do |k, v|
-            puts "  #{k}: #{v}"
-          end
+
+        dict = obj.attribute_dictionary("Skalp")
+        next unless dict
+
+        object_name = obj.is_a?(Sketchup::Model) ? "Model" : "Page '#{obj.name}'"
+        puts "--- Native Attributes: #{object_name} ---"
+        dict.each_pair do |k, v|
+          puts "  #{k}: #{v}"
         end
       end
       puts "=================================================\n"
     end
-    
+
     def check_attributes(objects)
       objects.each do |object|
         object_attributes = @mem_attributes[object]
-        style_settings = object_attributes['style_settings']
+        style_settings = object_attributes["style_settings"]
         next unless style_settings.class == Hash
 
-        if object.class == Sketchup::Model || style_settings[:style_rules]
-          object_attributes['style_settings'] = default_settings.merge(style_settings)
-        else
-          object_attributes['style_settings'] = nil
-        end
+        object_attributes["style_settings"] = if object.class == Sketchup::Model || style_settings[:style_rules]
+                                                default_settings.merge(style_settings)
+                                              else
+                                                nil
+                                              end
       end
     end
 
     def process_attributes_for_read(object_attributes, key_name, value)
-      object_attributes['style_settings'] = {} unless object_attributes['style_settings']
-      style_settings = object_attributes['style_settings']
+      object_attributes["style_settings"] = {} unless object_attributes["style_settings"]
+      style_settings = object_attributes["style_settings"]
 
       case key_name
-        when 'save_settings_status'
-          #do nothing
-        when 'active_drawing_scale', 'drawing_scale'
-          style_settings[:drawing_scale] = value.to_f if value.to_f != 0.0
-        when 'rearview_status'
-          style_settings[:rearview_status] = Skalp.to_boolean(value)
-        when 'lineweights_status'
-          style_settings[:section_cut_width_status] = Skalp.to_boolean(value)
-        when 'rearview_linestyle'
-          if value == nil || value == ''
-            value = 'Dash'
-          end
-          style_settings[:rearview_linestyle] = value
-        when 'fog_status'
-          style_settings[:depth_clipping_status] = Skalp.to_boolean(value)
-        when 'fog_distance'
-          style_settings[:depth_clipping_distance] = Distance.new(value)
-        when 'style_rules'
-          begin
-            value ? style_settings[:style_rules] = StyleRules.new(eval(value)) : style_settings[:style_rules] = StyleRules.new
-          rescue => e
-            puts "Skalp Debug: Error evaluating style_rules in memory_attributes: #{e.message}"
-            puts e.backtrace.first(3).join("\n")
-            style_settings[:style_rules] = StyleRules.new
-          end
-        when 'style'
-          style_rules = StyleRules.new
-          (value.class == Array) ? style_rules.load_from_attribute_style(value) : style_rules.setup_default
-          style_settings[:style_rules] = style_rules
-        when 'style_hatch', 'style_layer'
-          #do nothing
-        else
-          object_attributes[key_name] = value
+      when "save_settings_status"
+      # do nothing
+      when "active_drawing_scale", "drawing_scale"
+        style_settings[:drawing_scale] = value.to_f if value.to_f != 0.0
+      when "rearview_status"
+        style_settings[:rearview_status] = Skalp.to_boolean(value)
+      when "lineweights_status"
+        style_settings[:section_cut_width_status] = Skalp.to_boolean(value)
+      when "rearview_linestyle"
+        value = "Dash" if [nil, ""].include?(value)
+        style_settings[:rearview_linestyle] = value
+      when "fog_status"
+        style_settings[:depth_clipping_status] = Skalp.to_boolean(value)
+      when "fog_distance"
+        style_settings[:depth_clipping_distance] = Distance.new(value)
+      when "style_rules"
+        begin
+          style_settings[:style_rules] = value ? StyleRules.new(eval(value)) : StyleRules.new
+        rescue StandardError => e
+          puts "Skalp Debug: Error evaluating style_rules in memory_attributes: #{e.message}"
+          puts e.backtrace.first(3).join("\n")
+          style_settings[:style_rules] = StyleRules.new
+        end
+      when "style"
+        style_rules = StyleRules.new
+        value.class == Array ? style_rules.load_from_attribute_style(value) : style_rules.setup_default
+        style_settings[:style_rules] = style_rules
+      when "style_hatch", "style_layer"
+      # do nothing
+      else
+        object_attributes[key_name] = value
       end
     end
 
-
     def find_page(id)
       @skpModel.pages.each do |page|
-        return page if page.get_attribute('Skalp', 'ID') == id
+        return page if page.get_attribute("Skalp", "ID") == id
       end
 
       rescue_find_page(id)
@@ -325,7 +375,9 @@ module Skalp
         active_layers = layers - page.layers.to_a
         other_scene_layers = scene_layers - [scene_layer]
 
-        found_pages << page if (((active_layers - other_scene_layers).size == active_layers.size) && active_layers.include?(scene_layer))
+        if ((active_layers - other_scene_layers).size == active_layers.size) && active_layers.include?(scene_layer)
+          found_pages << page
+        end
       end
 
       if found_pages.size == 1
@@ -335,13 +387,14 @@ module Skalp
           return page if page.name == scene_layer.name[8..-1]
         end
       end
-      return nil
+
+      nil
     end
 
     def find_all_scene_layers
       scene_layers = []
       @skpModel.layers.each do |layer|
-        scene_layers << layer if layer.get_attribute('Skalp', 'ID') && layer.name.include?('Scene:')
+        scene_layers << layer if layer.get_attribute("Skalp", "ID") && layer.name.include?("Scene:")
       end
       scene_layers
     end
@@ -358,21 +411,21 @@ module Skalp
 
     def setup(status = nil)
       @mem_attributes = {}
-      @mem_attributes[@model.skpModel]={}
+      @mem_attributes[@model.skpModel] = {}
       return unless @model.skpModel.pages
-      @model.skpModel.pages.each do |page|
-        @mem_attributes[page]={}
-      end
 
+      @model.skpModel.pages.each do |page|
+        @mem_attributes[page] = {}
+      end
     end
 
     def read_attributes(object)
       return unless object.attribute_dictionaries
-      return unless object.attribute_dictionaries['Skalp']
+      return unless object.attribute_dictionaries["Skalp"]
 
       page_attributes = @mem_attributes[object]
-      object.attribute_dictionaries['Skalp'].each_pair do |key, value|
-        page_attributes[key] = value unless key == 'commit'
+      object.attribute_dictionaries["Skalp"].each_pair do |key, value|
+        page_attributes[key] = value unless key == "commit"
       end
     end
 
@@ -380,31 +433,35 @@ module Skalp
       page_attributes = @mem_attributes[object]
 
       page_attributes.each_pair do |key, value|
-        object.set_attribute('Skalp', key, value)
+        object.set_attribute("Skalp", key, value)
       end
     end
 
     def dup_attributes(value)
       dup_value = {}
 
-      value.each_pair { |key, value|
-        if value.class == Hash || value.class == Array
-          dup_value[key] = Marshal.load(Marshal.dump(value))
-        else
-          dup_value[key] = value
-        end
-      }
+      value.each_pair do |key, value|
+        dup_value[key] = if [Hash, Array].include?(value.class)
+                           Marshal.load(Marshal.dump(value))
+                         else
+                           value
+                         end
+      end
 
-      return dup_value
+      dup_value
     end
 
     def remove_unvalid_keys
       objects = []
       objects << @model.skpModel if @model && @model.skpModel
 
-      @model.skpModel.pages.each { |page| objects << page if page.class == Sketchup::Page } if @model && @model.skpModel && @model.skpModel.pages
+      if @model && @model.skpModel && @model.skpModel.pages
+        @model.skpModel.pages.each do |page|
+          objects << page if page.class == Sketchup::Page
+        end
+      end
 
-      to_delete=[]
+      to_delete = []
       @mem_attributes.each_key { |key| to_delete << key unless objects.include?(key) }
       to_delete.each do |key|
         @mem_attributes.delete(key)

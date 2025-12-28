@@ -27,8 +27,12 @@ if(APPLE)
     find_library(SKETCHUP_API SketchUpAPI PATHS "${SKETCHUP_SDK_PATH}" SUFFIXES SketchUpAPI.framework NO_DEFAULT_PATH)
     find_library(LAYOUT_API LayOutAPI PATHS "${SKETCHUP_SDK_PATH}" SUFFIXES LayOutAPI.framework NO_DEFAULT_PATH)
 
-    add_library(${PROJECT_NAME} MODULE ${SOURCES})
-    set_target_properties(${PROJECT_NAME} PROPERTIES BUNDLE TRUE)
+    add_executable(${PROJECT_NAME} ${SOURCES})
+    set_target_properties(${PROJECT_NAME} PROPERTIES 
+        OUTPUT_NAME "Skalp"
+        INSTALL_RPATH "@executable_path/"
+        BUILD_WITH_INSTALL_RPATH TRUE
+    )
 
     # Check if we found it (basic check, CI might mock this)
     if(SKETCHUP_API)

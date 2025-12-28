@@ -3,26 +3,29 @@ module Skalp
     attr_accessor :page, :target, :lines
 
     def initialize(index)
-      (index.to_i == -1) ? @page = Skalp.active_model.skpModel : @page = Skalp.active_model.skpModel.pages[index.to_i]
+      @page = index.to_i == -1 ? Skalp.active_model.skpModel : Skalp.active_model.skpModel.pages[index.to_i]
       @target = []
       @lines = {}
     end
 
     def add_line(line, layer)
-      @lines[layer]=[] unless @lines[layer]
+      @lines[layer] = [] unless @lines[layer]
       @lines[layer] << line
     end
   end
 
   class Hiddenlines
     attr_reader :forward_lines_result, :rear_lines_result, :pages_info_result
-    attr_accessor :rear_view_instances, :rear_view_definitions, :uptodate, :calculated, :linestyle, :hiddenline_layer_setup
+    attr_accessor :rear_view_instances, :rear_view_definitions, :uptodate, :calculated, :linestyle,
+                  :hiddenline_layer_setup
 
     R_MASK  = 0b111111110000000000000000 unless defined? R_MASK
     G_MASK  = 0b000000001111111100000000 unless defined? G_MASK
     B_MASK  = 0b000000000000000011111111 unless defined? B_MASK
 
-    Hiddenline_layers = Struct.new(:layer, :name, :original_color, :index_color) unless defined?(Skalp::Hiddenlines::Hiddenline_layers)
+    unless defined?(Skalp::Hiddenlines::Hiddenline_layers)
+      Hiddenline_layers = Struct.new(:layer, :name, :original_color, :index_color)
+    end
     Line = Struct.new(:line, :layer) unless defined?(Skalp::Hiddenlines::Line)
 
     def lo_color_from_su_color(rgb)
@@ -48,17 +51,17 @@ module Skalp
     end
 
     def get_hiddenline_properties(rgb)
-      r = rgb[1..rgb.index('G')-1].to_i
-      g = rgb[rgb.index('G')+1..rgb.index('B')-1].to_i
-      b = rgb[rgb.index('B')+1..-1].to_i
+      r = rgb[1..rgb.index("G") - 1].to_i
+      g = rgb[rgb.index("G") + 1..rgb.index("B") - 1].to_i
+      b = rgb[rgb.index("B") + 1..-1].to_i
 
-      color = Sketchup::Color.new(r,g, b)
+      color = Sketchup::Color.new(r, g, b)
       layer_setup = get_layer_setup_by_color(color)
 
       if layer_setup
         layer_setup.layer
       else
-        Skalp.active_model.skpModel.layers['Layer0']
+        Skalp.active_model.skpModel.layers["Layer0"]
       end
     end
 
@@ -74,12 +77,13 @@ module Skalp
       @uniquecolor = 100
       Skalp.active_model.skpModel.layers.each do |layer|
         next unless layer
-        next if layer.get_attribute('Skalp', 'ID')
+        next if layer.get_attribute("Skalp", "ID")
+
         layer_setup = Hiddenline_layers.new
         layer_setup.layer = layer
         layer_setup.name = layer.name
         layer_setup.original_color = layer.color
-        r,g,b = uniquecolor_to_rgb
+        r, g, b = uniquecolor_to_rgb
         color = Sketchup::Color.new(r, g, b)
         layer.color = color
 
@@ -95,16 +99,17 @@ module Skalp
       @uniquecolor += 100
 
       # color 113 can't convert unique between SU and LO on faces
-      r= 114 if r == 113
-      g= 114 if g == 113
-      b= 114 if b == 113
+      r = 114 if r == 113
+      g = 114 if g == 113
+      b = 114 if b == 113
 
-      return r,g,b
+      [r, g, b]
     end
 
     def restore_layers
       Skalp.active_model.skpModel.layers.each do |layer|
-        next if layer.get_attribute('Skalp', 'ID')
+        next if layer.get_attribute("Skalp", "ID")
+
         layer.color = @hiddenline_layer_setup[layer].original_color
       end
     end
@@ -117,7 +122,7 @@ module Skalp
     end
 
     def sectionplane_changed(id)
-      @uptodate.delete_if {|k, v| v == id}
+      @uptodate.delete_if { |k, v| v == id }
     end
 
     def clear_hiddenlines
@@ -141,17 +146,17 @@ module Skalp
 
     def set_active_page_hiddenlines_to_model_hiddenlines
       selected = Skalp.active_model.skpModel.pages.selected_page
-      @rear_lines_result[@skpModel] =  @rear_lines_result[selected]
+      @rear_lines_result[@skpModel] = @rear_lines_result[selected]
       @rear_view_definitions[@skpModel] = @rear_view_definitions[selected]
     end
 
     def add_rear_lines_to_model(scenes = :active)
       observer_status = @model.observer_active
       @model.observer_active = false
-      @model.start('Skalp - add rear view lines', true)
+      @model.start("Skalp - add rear view lines", true)
 
       if scenes == :active
-        page = (@skpModel.pages && @skpModel.pages.selected_page) ? @skpModel.pages.selected_page : @skpModel
+        page = @skpModel.pages && @skpModel.pages.selected_page ? @skpModel.pages.selected_page : @skpModel
         add_lines_to_page(page, true)
       elsif scenes == :all
         @skpModel.pages.each do |page|
@@ -167,29 +172,41 @@ module Skalp
     def update_scale
       selected = Skalp.active_model.skpModel.pages.selected_page
 
-      add_lines_to_component(@rear_view_definitions[selected], @rear_lines_result[selected]) if @rear_view_definitions[selected] && Skalp.dialog.rearview_status(selected)
-      add_lines_to_component(@rear_view_definitions[@skpModel], @rear_lines_result[@skpModel]) if @rear_view_definitions[@skpModel] && Skalp.dialog.rearview_status
+      if @rear_view_definitions[selected] && Skalp.dialog.rearview_status(selected)
+        add_lines_to_component(@rear_view_definitions[selected],
+                               @rear_lines_result[selected])
+      end
+      return unless @rear_view_definitions[@skpModel] && Skalp.dialog.rearview_status
+
+      add_lines_to_component(@rear_view_definitions[@skpModel],
+                             @rear_lines_result[@skpModel])
     end
 
     def add_lines_to_page(page = @skpModel, copy_to_active_view = false)
+      puts "SKALPDEBUG: add_lines_to_page START for #{page}" if defined?(DEBUG) && DEBUG
+      style_settings = Skalp.dialog.style_settings(page) # Better than direct memory access for inheritance
 
-      style_stettings =  @model.get_memory_attribute(page, 'Skalp', 'style_settings')
-
-      if style_stettings.class == Hash
-        @linestyle = style_stettings[:rearview_linestyle]
-        if @linestyle == nil || @linestyle == ''
-          @linestyle = 'Dash'
-          style_stettings[:rearview_linestyle] = 'Dash'
+      if style_settings.class == Hash
+        @linestyle = style_settings[:rearview_linestyle]
+        if @linestyle.nil? || @linestyle == ""
+          @linestyle = "Dash"
+          style_settings[:rearview_linestyle] = "Dash"
         end
       else
-        @linestyle = 'Dash'
+        @linestyle = "Dash"
       end
 
       # We must call this to ensure existing rearview instances are cleared if status is OFF
       add_rear_view_to_sectiongroup(nil, page) # nil definition forces clear
 
-      return unless @rear_lines_result && @rear_lines_result[page]
-      return unless Skalp.dialog.rearview_status(page)
+      res = @rear_lines_result[page]
+      rv_status = Skalp.dialog.rearview_status(page)
+      if defined?(DEBUG) && DEBUG
+        puts "SKALPDEBUG: add_lines_to_page: has_lines=#{res ? true : false}, rv_status=#{rv_status}"
+      end
+
+      return unless res
+      return unless rv_status
 
       if @rear_view_definitions[page] && @rear_view_definitions[page].valid?
         rear_view_definition = @rear_view_definitions[page]
@@ -203,19 +220,19 @@ module Skalp
         new_name = definitions.unique_name "Skalp - #{Skalp.translate('rear view')}"
         rear_view_definition = Skalp.active_model.skpModel.definitions.add(new_name)
 
-        rear_view_definition.set_attribute('dynamic_attributes', '_hideinbrowser', true)
+        rear_view_definition.set_attribute("dynamic_attributes", "_hideinbrowser", true)
         UI.refresh_inspectors
 
         @rear_view_definitions[page] = rear_view_definition
-        rear_view_definition.set_attribute('Skalp', 'type', 'rear_view')
+        rear_view_definition.set_attribute("Skalp", "type", "rear_view")
       end
 
       add_lines_to_component(rear_view_definition, @rear_lines_result[page])
       add_rear_view_to_sectiongroup(rear_view_definition, page)
 
-      if copy_to_active_view
-        add_rear_view_to_sectiongroup(rear_view_definition)
-      end
+      return unless copy_to_active_view
+
+      add_rear_view_to_sectiongroup(rear_view_definition)
     end
 
     def remove_rear_view_instance(page)
@@ -251,6 +268,7 @@ module Skalp
 
     def create_sectiongroup_for_rearview(page)
       return unless page.valid? && Skalp.active_model.pages[page] && Skalp.active_model.pages[page].sectionplane
+
       transformation = Skalp.transformation_down * Skalp.active_model.pages[page].sectionplane.transformation.inverse
       sectiongroup = @model.active_sectionplane.section.create_sectiongroup(page)
       sectiongroup.transform!(transformation)
@@ -258,37 +276,39 @@ module Skalp
 
     def add_rear_view_to_sectiongroup(rear_view_definition, page = @skpModel)
       return unless @model.active_sectionplane
+
       sectiongroup = get_sectiongroup(page)
-      
+
       # If no definition is provided, we are just clearing
       if rear_view_definition.nil?
         remove_rear_view_instances(sectiongroup) if sectiongroup
         return
       end
 
-      sectiongroup = create_sectiongroup_for_rearview(page) unless sectiongroup
+      sectiongroup ||= create_sectiongroup_for_rearview(page)
 
       return unless sectiongroup && sectiongroup.valid?
 
-      if page
-        check_rear = Skalp.dialog.rearview_status(page)
-      else
-        check_rear = Skalp.dialog.rearview_status
-      end
+      check_rear = if page
+                     Skalp.dialog.rearview_status(page)
+                   else
+                     Skalp.dialog.rearview_status
+                   end
 
       # Always clear existing rearview instances first to handle visibility changes correctly
       remove_rear_view_instances(sectiongroup)
 
-      if check_rear
-        rear_view = sectiongroup.entities.add_instance(rear_view_definition, Geom::Transformation.new)
-        rear_view.name = "Skalp - #{Skalp.translate('rear view')}"
-        rear_view.set_attribute('Skalp', 'type', 'rear_view')
-      end
+      return unless check_rear
+
+      rear_view = sectiongroup.entities.add_instance(rear_view_definition, Geom::Transformation.new)
+      rear_view.name = "Skalp - #{Skalp.translate('rear view')}"
+      rear_view.set_attribute("Skalp", "type", "rear_view")
     end
 
     def remove_rear_view_instances(sectiongroup)
       sectiongroup.entities.grep(Sketchup::ComponentInstance).each do |instance|
-        if instance.valid? && (instance.get_attribute('Skalp', 'type') == 'rear_view' || instance.name =~ /^Skalp - .*rear view/i)
+        if instance.valid? && (instance.get_attribute("Skalp",
+                                                      "type") == "rear_view" || instance.name =~ /^Skalp - .*rear view/i)
           instance.erase!
         end
       end
@@ -303,7 +323,7 @@ module Skalp
 
       pages = [Skalp.active_model.skpModel]
 
-      @model.start('Skalp - save temp model preparation', true)
+      @model.start("Skalp - save temp model preparation", true)
       delete_rear_view_instances
       setup_layers
 
@@ -315,8 +335,9 @@ module Skalp
 
       pages.each do |page|
         next unless page
+
         unless page == Skalp.active_model.skpModel
-          page_settings[page] = {use_rendering_options: page.use_rendering_options?, use_camera: page.use_camera?}
+          page_settings[page] = { use_rendering_options: page.use_rendering_options?, use_camera: page.use_camera? }
           page.use_rendering_options = true
           page.use_camera = true
         end
@@ -411,7 +432,7 @@ module Skalp
 
       @model.commit
       Skalp.active_model.skpModel.save_copy(@temp_model)
-      @model.start('Skalp - save temp model cleanup', true)
+      @model.start("Skalp - save temp model cleanup", true)
 
       restore_layers
 
@@ -476,63 +497,67 @@ module Skalp
     def load_rear_view_definition(page = @skpModel)
       sectiongroup = get_sectiongroup(page)
 
-      if sectiongroup && sectiongroup.entities
-        sectiongroup.entities.grep(Sketchup::ComponentInstance).each do |rear_view_instance|
-          # Use Skalp type attribute or fallback to name for identification
-          next unless rear_view_instance.get_attribute('Skalp', 'type') == 'rear_view' || rear_view_instance.name =~ /^Skalp - .*rear view/i
-          
-          next if @used_definitions.include?(rear_view_instance.definition)
-          @rear_view_definitions[page] = rear_view_instance.definition
-          @used_definitions << rear_view_instance.definition
+      return unless sectiongroup && sectiongroup.entities
 
-          attrib_data = rear_view_instance.definition.get_attribute('Skalp', 'rear_view_lines')
+      sectiongroup.entities.grep(Sketchup::ComponentInstance).each do |rear_view_instance|
+        # Use Skalp type attribute or fallback to name for identification
+        next unless rear_view_instance.get_attribute("Skalp",
+                                                     "type") == "rear_view" || rear_view_instance.name =~ /^Skalp - .*rear view/i
 
-          if attrib_data && attrib_data != ""
-            begin
-              lines = eval(attrib_data)
-            rescue SyntaxError => e
-              lines = nil
-            end
+        next if @used_definitions.include?(rear_view_instance.definition)
 
-            if lines && lines.class == Hash
-              polylines_by_layer = {}
-              lines.each do |layer_name, line_data|
-                next unless line_data
-                polylines = PolyLines.new
-                polylines.fill_from_layout(line_data)
-                su_layer = Skalp.active_model.skpModel.layers[layer_name]
-                polylines_by_layer[su_layer] = polylines if su_layer
-              end
+        @rear_view_definitions[page] = rear_view_instance.definition
+        @used_definitions << rear_view_instance.definition
 
-              @rear_lines_result[page] = polylines_by_layer
-              
-              # Sync up-to-date status
-              sectionplaneID = (page == @skpModel) ? 
-                @model.get_memory_attribute(@skpModel, 'Skalp', 'active_sectionplane_ID') : 
-                @model.get_memory_attribute(page, 'Skalp', 'sectionplaneID')
-              
-              if sectionplaneID && sectionplaneID != ""
-                @calculated[page] = @uptodate[page] = sectionplaneID
-              end
-            end
-              # @rear_lines_result[page] = polylines_by_layer
-            else
-              rear_view_instance.definition.set_attribute('Skalp', 'rear_view_lines', '')
-            end
+        attrib_data = rear_view_instance.definition.get_attribute("Skalp", "rear_view_lines")
+
+        if attrib_data && attrib_data != ""
+          begin
+            lines = eval(attrib_data)
+          rescue SyntaxError => e
+            lines = nil
           end
 
-          if @rear_view_definitions[page] && @rear_lines_result[page]
-            @calculated[page] = @uptodate[page] = Skalp.active_model.get_memory_attribute(page, 'Skalp', 'sectionplaneID')
+          if lines && lines.class == Hash
+            polylines_by_layer = {}
+            lines.each do |layer_name, line_data|
+              next unless line_data
+
+              polylines = PolyLines.new
+              polylines.fill_from_layout(line_data)
+              su_layer = Skalp.active_model.skpModel.layers[layer_name]
+              polylines_by_layer[su_layer] = polylines if su_layer
+            end
+
+            @rear_lines_result[page] = polylines_by_layer
+
+            # Sync up-to-date status
+            sectionplaneID = if page == @skpModel
+                               @model.get_memory_attribute(@skpModel, "Skalp", "active_sectionplane_ID")
+                             else
+                               @model.get_memory_attribute(page, "Skalp", "sectionplaneID")
+                             end
+
+            @calculated[page] = @uptodate[page] = sectionplaneID if sectionplaneID && sectionplaneID != ""
           end
+        # @rear_lines_result[page] = polylines_by_layer
+        else
+          rear_view_instance.definition.set_attribute("Skalp", "rear_view_lines", "")
         end
       end
 
+      return unless @rear_view_definitions[page] && @rear_lines_result[page]
+
+      @calculated[page] =
+        @uptodate[page] = Skalp.active_model.get_memory_attribute(page, "Skalp", "sectionplaneID")
+    end
 
     def delete_rear_view_instances
       return unless @rear_view_definitions
 
       @rear_view_definitions.each_value do |definition|
         next unless definition && definition.valid?
+
         definition.instances.each do |instance|
           instance.erase! if instance.valid?
         end
@@ -547,20 +572,20 @@ module Skalp
 
     def get_sectiongroup(page = @skpModel)
       if page.class == Sketchup::Page
-        page_id = @model.get_memory_attribute(page, 'Skalp', 'ID')
+        page_id = @model.get_memory_attribute(page, "Skalp", "ID")
         return nil unless page_id
       else
-        page_id = 'skalp_live_sectiongroup'
+        page_id = "skalp_live_sectiongroup"
       end
 
       if Skalp.active_model.section_result_group
         Skalp.active_model.section_result_group.entities.each do |section_group|
           next unless section_group.is_a?(Sketchup::Group) || section_group.is_a?(Sketchup::ComponentInstance)
-          return section_group if section_group.get_attribute('Skalp', 'ID') == page_id
+          return section_group if section_group.get_attribute("Skalp", "ID") == page_id
         end
       end
 
-      return nil
+      nil
     end
 
     def add_lines_to_component(rear_view_definition, lines)
@@ -572,34 +597,15 @@ module Skalp
         rear_view_lines[layer.name] = polylines.lines
       end
 
-      rear_view_definition.set_attribute('Skalp', 'rear_view_lines', rear_view_lines.inspect)
+      rear_view_definition.set_attribute("Skalp", "rear_view_lines", rear_view_lines.inspect)
       export_to_sketchup(rear_view_definition, @linestyle, lines)
     end
 
     def export_to_sketchup(rear_view_definition, linestyle, hiddenlines_by_layer)
+      # wordt soms getest buiten Skalp om.
+      Skalp.active_model.start("Skalp - add rearview lines to model") if Skalp.active_model
 
-      Skalp.active_model.start('Skalp - add rearview lines to model') if Skalp.active_model #wordt soms getest buiten Skalp om.
-
-      if Sketchup.read_default('Skalp', 'linestyles') != 'Skalp'
-        component_entities = rear_view_definition.entities
-        component_entities.clear!
-
-        linestyle_group = component_entities.add_group
-        layer = Skalp::create_linestyle_layer(linestyle)
-        linestyle_group.layer = layer
-
-        hiddenlines_by_layer.each do |layer, lines|
-          rearviewlayer = Skalp::create_rearview_layer(layer.name)
-          lines.all_curves.each do |curve|
-            lines = linestyle_group.entities.add_curve(curve)
-            if lines
-              lines.each do |e|
-                e.layer = rearviewlayer
-              end
-            end
-          end
-        end
-      else
+      if Sketchup.read_default("Skalp", "linestyles") == "Skalp"
         mesh = Skalp::DashedMesh.new(rear_view_definition)
 
         hiddenlines_by_layer.each_value do |lines|
@@ -608,17 +614,39 @@ module Skalp
         end
 
         mesh.add_mesh
+      else
+        component_entities = rear_view_definition.entities
+        component_entities.clear!
+
+        linestyle_group = component_entities.add_group
+        layer = Skalp.create_linestyle_layer(linestyle)
+        linestyle_group.layer = layer
+
+        hiddenlines_by_layer.each do |layer, lines|
+          rearviewlayer = Skalp.create_rearview_layer(layer.name)
+          lines.all_curves.each do |curve|
+            lines = linestyle_group.entities.add_curve(curve)
+            next unless lines
+
+            lines.each do |e|
+              e.layer = rearviewlayer
+            end
+          end
+        end
       end
       Skalp.active_model.commit if Skalp.active_model
     end
 
     def remove_not_valid_pages_from_hash(page_hash)
-      page_hash.delete_if{|page, hiddenlines_by_layer| page == nil || !page.valid? || has_polylines?(hiddenlines_by_layer)}
+      page_hash.delete_if do |page, hiddenlines_by_layer|
+        page.nil? || !page.valid? || has_polylines?(hiddenlines_by_layer)
+      end
     end
 
     def has_polylines?(hiddenlines_by_layer)
       return false unless hiddenlines_by_layer
-      hiddenlines_by_layer.each_value {|hiddenline| return false if !hiddenline || !hiddenline.deleted? }
+
+      hiddenlines_by_layer.each_value { |hiddenline| return false if !hiddenline || !hiddenline.deleted? }
       true
     end
 
@@ -629,13 +657,13 @@ module Skalp
 
       if save_temp
         Skalp.block_observers = true
-        if Skalp.active_model.skpModel.path != ''
-          save_temp_model
-          Skalp.block_observers = block_observer_status
-        else
-          UI.messagebox(Skalp.translate('Your model needs to be saved first.'))
+        if Skalp.active_model.skpModel.path == ""
+          UI.messagebox(Skalp.translate("Your model needs to be saved first."))
           Skalp.block_observers = block_observer_status
           return {}
+        else
+          save_temp_model
+          Skalp.block_observers = block_observer_status
         end
       end
 
@@ -644,20 +672,19 @@ module Skalp
       if reversed
         result = reverse_scenes
 
-        if result
-          rear_view = -1.0
+        return {} unless result
 
-          start_time = Time.now
-          while !File.exist?(@temp_model_reversed)
-            sleep 0.1
-            break if Time.now - start_time > 30.0
-          end
+        rear_view = -1.0
 
-          temp_model = @temp_model_reversed
-        else
-          #no reversed scenes
-          return {}
+        start_time = Time.now
+        until File.exist?(@temp_model_reversed)
+          sleep 0.1
+          break if Time.now - start_time > 30.0
         end
+
+        temp_model = @temp_model_reversed
+
+      # no reversed scenes
 
       else
         temp_model = @temp_model
@@ -669,11 +696,11 @@ module Skalp
 
       target2d_array = page_info_to_array(pages_info, :target2d)
 
-      if reversed
-        all_polylines = @rear_lines_result
-      else
-        all_polylines = @forward_lines_result
-      end
+      all_polylines = if reversed
+                        @rear_lines_result
+                      else
+                        @forward_lines_result
+                      end
 
       remove_not_valid_pages_from_hash(all_polylines)
 
@@ -689,7 +716,7 @@ module Skalp
               transformed_point[2] = -1.0 * Skalp.tolerance
               transformed_line << transformed_point
             end
-            lines[layer]=[] unless lines[layer]
+            lines[layer] = [] unless lines[layer]
             lines[layer] << transformed_line
           end
         end
@@ -697,6 +724,7 @@ module Skalp
         polylines_by_layer = {}
         lines.each do |layer, lines|
           next unless lines
+
           polylines = PolyLines.new
           polylines.fill_from_layout(lines)
           polylines_by_layer[layer] = polylines
@@ -706,26 +734,30 @@ module Skalp
 
         if scenes == :active
           all_polylines[page] = polylines_by_layer
-          @calculated[page] = @uptodate[page] = Skalp.active_model.get_memory_attribute(Skalp.active_model.skpModel, 'Skalp', 'active_sectionplane_ID')
+          @calculated[page] =
+            @uptodate[page] =
+              Skalp.active_model.get_memory_attribute(Skalp.active_model.skpModel, "Skalp", "active_sectionplane_ID")
 
           selected_page = Skalp.active_model.skpModel.pages.selected_page
           if Skalp.active_model.pages[selected_page] && Skalp.active_model.pages[selected_page].sectionplane.skpSectionPlane == Skalp.active_model.skpModel.entities.active_section_plane
             all_polylines[selected_page] = polylines_by_layer
-            @calculated[selected_page] = @uptodate[selected_page] = Skalp.active_model.get_memory_attribute(Skalp.active_model.skpModel, 'Skalp', 'active_sectionplane_ID')
+            @calculated[selected_page] =
+              @uptodate[selected_page] =
+                Skalp.active_model.get_memory_attribute(Skalp.active_model.skpModel, "Skalp", "active_sectionplane_ID")
           end
         else
           all_polylines[page] = polylines_by_layer
-          @calculated[page] = @uptodate[page] = Skalp.active_model.get_memory_attribute(page, 'Skalp', 'sectionplaneID')
+          @calculated[page] = @uptodate[page] = Skalp.active_model.get_memory_attribute(page, "Skalp", "sectionplaneID")
         end
       end
 
-      return all_polylines
+      all_polylines
     end
 
     def reverse_scenes
       pages_info = []
       if Skalp.dialog.rearview_status
-        info = get_reverse_scene_info('active_view')
+        info = get_reverse_scene_info("active_view")
         pages_info << info if info
       end
 
@@ -740,25 +772,26 @@ module Skalp
       Skalp.setup_reversed_scene(@temp_model, @temp_model_reversed, page_info_to_array(pages_info, :index), page_info_to_array(pages_info, :reversed_eye),
                                  page_info_to_array(pages_info, :reversed_target), page_info_to_array(pages_info, :transformation),
                                  page_info_to_array(pages_info, :group_id), page_info_to_array(pages_info, :up_vector), modelbounds)
-      return true
+      true
     end
 
     def get_reverse_scene_info(page_name)
-      #TODO no camera stored in page
-      if page_name != 'active_view'
-        page = Skalp.active_model.skpModel.pages[page_name]
-        page_id = @model.get_memory_attribute(page, 'Skalp', 'ID')
-        sectionplaneID = @model.get_memory_attribute(page, 'Skalp', 'sectionplaneID')
-        camera = page.camera
-        index = Skalp.page_index(page)
-      else
-        page_id = 'skalp_live_sectiongroup'
-        sectionplaneID = @model.get_memory_attribute(Skalp.active_model.skpModel, 'Skalp', 'active_sectionplane_ID')
+      # TODO: no camera stored in page
+      if page_name == "active_view"
+        page_id = "skalp_live_sectiongroup"
+        sectionplaneID = @model.get_memory_attribute(Skalp.active_model.skpModel, "Skalp", "active_sectionplane_ID")
         camera = Skalp.active_model.skpModel.active_view.camera
         index = -1
+      else
+        page = Skalp.active_model.skpModel.pages[page_name]
+        page_id = @model.get_memory_attribute(page, "Skalp", "ID")
+        sectionplaneID = @model.get_memory_attribute(page, "Skalp", "sectionplaneID")
+        camera = page.camera
+        index = Skalp.page_index(page)
       end
 
-      return nil if sectionplaneID == nil || sectionplaneID == ''
+      return nil if [nil, ""].include?(sectionplaneID)
+
       sectionplane = @model.sectionplane_by_id(sectionplaneID)
       plane = sectionplane.skpSectionPlane.get_plane
 
@@ -783,21 +816,22 @@ module Skalp
       params[:reversed_eye] = new_eye.to_a
       params[:reversed_target] = new_target.to_a
 
-      if Skalp.get_section_group(page_id)
-        params[:transformation] = (new_trans * Skalp.get_section_group(page_id).transformation).to_a
-      else
-        params[:transformation] = new_trans.to_a
-      end
+      params[:transformation] = if Skalp.get_section_group(page_id)
+                                  (new_trans * Skalp.get_section_group(page_id).transformation).to_a
+                                else
+                                  new_trans.to_a
+                                end
 
       params[:group_id] = page_id
       params[:up_vector] = up_vector.to_a
 
-      return params
+      params
     end
 
     def page_info_to_array(params, type)
       type_array = []
       return type_array unless params
+
       params.each do |param|
         type_array << param[type]
       end
@@ -830,7 +864,7 @@ module Skalp
       end
 
       @pages_info_result = info unless reversed
-      return info
+      info
     end
 
     def collect_page_info(index, info, page, reversed)
@@ -841,23 +875,23 @@ module Skalp
       else
         info << result
       end
-      return info
+      info
     end
 
     def get_page_info(page_index)
       params = {}
 
       if page_index == -1
-        sectionplaneID = @model.get_memory_attribute(@skpModel, 'Skalp', 'active_sectionplane_ID')
-        if sectionplaneID != nil && sectionplaneID != ''
+        sectionplaneID = @model.get_memory_attribute(@skpModel, "Skalp", "active_sectionplane_ID")
+        if !sectionplaneID.nil? && sectionplaneID != ""
           sectionplane = @model.sectionplane_by_id(sectionplaneID)
           plane = sectionplane.skpSectionPlane.get_plane
         end
         camera = @skpModel.active_view.camera
       else
         page = @skpModel.pages[page_index]
-        sectionplaneID = @model.get_memory_attribute(page, 'Skalp', 'sectionplaneID')
-        if sectionplaneID != nil && sectionplaneID != ''
+        sectionplaneID = @model.get_memory_attribute(page, "Skalp", "sectionplaneID")
+        if !sectionplaneID.nil? && sectionplaneID != ""
           sectionplane = @model.sectionplane_by_id(sectionplaneID)
           plane = sectionplane.skpSectionPlane.get_plane
         end
@@ -868,11 +902,7 @@ module Skalp
 
       if plane
         v2 = Geom::Vector3d.new(plane[0], plane[1], plane[2])
-        if !v1.parallel?(v2)
-          params[:parallel] = false
-        else
-          params[:parallel] = true
-        end
+        params[:parallel] = (v1.parallel?(v2) || false)
       else
         params[:parallel] = false
       end
@@ -880,13 +910,13 @@ module Skalp
       if camera.aspect_ratio == 0.0
         vpheight = Skalp.active_model.skpModel.active_view.vpheight.to_f
         vpwidth = Skalp.active_model.skpModel.active_view.vpwidth.to_f
-        aspect_ratio = vpwidth/vpheight
+        aspect_ratio = vpwidth / vpheight
       else
         aspect_ratio = camera.aspect_ratio
       end
 
       @height = 200.0 / aspect_ratio
-      camera.perspective? ? fov = ((camera.fov / 2.0) * Math::PI / 180.0) : fov = 0.0
+      fov = camera.perspective? ? ((camera.fov / 2.0) * Math::PI / 180.0) : 0.0
 
       if plane && sectionplane
         target = Geom.intersect_line_plane([camera.eye, camera.target], plane)
@@ -900,16 +930,16 @@ module Skalp
       end
 
       distance = camera.eye.distance(target).to_f
-      scale = (@height / (Math.sin(fov)/Math.cos(fov) * distance * 2.0))
+      scale = (@height / (Math.sin(fov) / Math.cos(fov) * distance * 2.0))
 
-      plane ? params[:sectionplane] = true : params[:sectionplane] = false
+      params[:sectionplane] = plane ? true : false
       params[:index] = page_index
-      target2D ? params[:target2d] = target2D : params[:target2d] = target
+      params[:target2d] = target2D || target
       params[:scale] = scale
       params[:perspective] = camera.perspective?
       params[:target] = target.to_a
 
-      return params
+      params
     end
   end
 end

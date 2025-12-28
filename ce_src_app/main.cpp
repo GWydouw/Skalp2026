@@ -49,13 +49,14 @@ std::vector<hiddenlines> get_exploded_entities(std::string path, double height, 
 
 int main(int argc, const char* argv[]) {
     
-    if (argc < 2){
-        std::cout << "Wrong number of arguments." << std::endl;
+    if (argc < 3){
+        std::cout << "Skalp External Application" << std::endl;
+        std::cout << "Usage: Skalp <command> <path> [extra_args]" << std::endl;
         return -1;
     }
     
-	std::string path = argv[2];
-		std::string file_path = argv[2];
+    std::string path = argv[2];
+    std::string file_path = argv[2];
 
 	size_t path_end = path.find_last_of("\\/");
     if (path_end != std::string::npos){

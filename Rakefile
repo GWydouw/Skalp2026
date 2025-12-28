@@ -71,7 +71,7 @@ module Config
 
   # Loaders to inject for dev mode
   DEV_LOADERS = {
-    "tools/debug_loader.rb" => "debug_loader.rb",
+    "tools/debug_loader.rb" => "Skalp_Skalp2026/dev_loader.rb",
     "tests/undo_research.rb" => "undo_research.rb",
     "tools/debug_impl.rb" => "skalp_debug_impl.rb"
   }.freeze

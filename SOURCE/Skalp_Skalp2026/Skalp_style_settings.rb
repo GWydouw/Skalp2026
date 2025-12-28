@@ -8,7 +8,9 @@ module Skalp
       puts "--- #{object.name} ---"
     end
 
-    return unless Skalp.active_model.get_memory_attribute(object, 'Skalp', 'style_settings') || object.class == Sketchup::Model
+    unless Skalp.active_model.get_memory_attribute(object, "Skalp", "style_settings") || object.class == Sketchup::Model
+      return
+    end
 
     settings.each do |key, value|
       if key == :style_rules
@@ -35,18 +37,26 @@ module Skalp
   end
 
   module StyleSettings
-    STYLE_SETTINGS = [:drawing_scale, :rearview_status, :rearview_linestyle, :section_cut_width_status, :depth_clipping_status, :depth_clipping_distance, :style_rules]
+    STYLE_SETTINGS = %i[drawing_scale rearview_status rearview_linestyle section_cut_width_status
+                        depth_clipping_status depth_clipping_distance style_rules]
 
     def style_settings(object = Sketchup.active_model)
       return {} unless Skalp.active_model
-      page_settings = Skalp.active_model.get_memory_attribute(object, 'Skalp', 'style_settings')
 
-      if page_settings == nil || page_settings == ''
-        model_settings = Skalp.active_model.get_memory_attribute(Sketchup.active_model, 'Skalp', 'style_settings')
-        model_settings.class == Hash ? model_settings : {}
-      else
-        page_settings.class == Hash ? page_settings : {}
-      end
+      # Always start with model settings as the base
+      model_settings = Skalp.active_model.get_memory_attribute(Sketchup.active_model, "Skalp", "style_settings")
+      model_settings = (model_settings.is_a?(Hash) ? model_settings : {})
+
+      return model_settings if object == Sketchup.active_model || object.nil?
+
+      page_settings = Skalp.active_model.get_memory_attribute(object, "Skalp", "style_settings")
+
+      return model_settings.merge(page_settings) if page_settings.is_a?(Hash)
+
+      # Merge page settings over model settings to handle inheritance correctly
+      # This ensures that if a page doesn't have a value, it uses the model's.
+
+      model_settings
     end
 
     def check_SU_style
@@ -72,7 +82,7 @@ module Skalp
 
       set_drawing_scale_in_dialog(drawing_scale)
 
-      if fog_status then
+      if fog_status
         set_fog_distance_in_dialog(fog_distance)
         fog_status_switch_on
       else
@@ -101,15 +111,11 @@ module Skalp
     end
 
     def check_rearview_uptodate
-      if Sketchup.active_model.pages.selected_page
-        index = Sketchup.active_model.pages.selected_page
-      else
-        index = Sketchup.active_model
-      end
+      index = Sketchup.active_model.pages.selected_page || Sketchup.active_model
 
       result = Skalp.active_model.hiddenlines.uptodate[index]
 
-      if result || rearview_status == false then
+      if result || rearview_status == false
         rearview_status_black
         true
       else
@@ -133,19 +139,22 @@ module Skalp
     def settings_to_active_page_if_save_settings_is_on
       selected_page = Sketchup.active_model.pages.selected_page
       return unless selected_page && save_settings_status
+
       settings_to_page(selected_page)
     end
 
     def settings_to_page(page)
       return unless Skalp.active_model
-      Skalp.active_model.set_memory_attribute(page, 'Skalp', 'style_settings', Hash.new)
-      page_settings = Skalp.active_model.get_memory_attribute(page, 'Skalp', 'style_settings')
+
+      Skalp.active_model.set_memory_attribute(page, "Skalp", "style_settings", {})
+      page_settings = Skalp.active_model.get_memory_attribute(page, "Skalp", "style_settings")
       model_settings = style_settings
       STYLE_SETTINGS.each { |setting| page_settings[setting] = model_settings[setting] }
     end
 
     def settings_from_page(page)
       return unless Skalp.active_model
+
       page_settings = style_settings(page)
 
       if page_settings
@@ -159,7 +168,8 @@ module Skalp
 
     def remove_settings(object)
       return unless Skalp.active_model
-      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', nil)
+
+      Skalp.active_model.set_memory_attribute(object, "Skalp", "style_settings", nil)
     end
 
     def save_settings_status
@@ -168,40 +178,42 @@ module Skalp
       page = Sketchup.active_model.pages.selected_page
       return false unless page
 
-      style = Skalp.active_model.get_memory_attribute(page, 'Skalp', 'style_settings')
-      style!=nil && style.class == Hash
+      style = Skalp.active_model.get_memory_attribute(page, "Skalp", "style_settings")
+      !style.nil? && style.class == Hash
     end
 
     def save_rearview_update(status, object = Sketchup.active_model)
       return unless Skalp.active_model
+
       if status
-        Skalp.active_model.set_memory_attribute(object, 'Skalp', 'rearview_update', 'true')
+        Skalp.active_model.set_memory_attribute(object, "Skalp", "rearview_update", "true")
       else
-        Skalp.active_model.set_memory_attribute(object, 'Skalp', 'rearview_update', 'false')
+        Skalp.active_model.set_memory_attribute(object, "Skalp", "rearview_update", "false")
       end
     end
 
     def rearview_update(object = Sketchup.active_model)
       return unless Skalp.active_model
-      Skalp.active_model.get_memory_attribute(object, 'Skalp', 'rearview_update') == 'true'
+
+      Skalp.active_model.get_memory_attribute(object, "Skalp", "rearview_update") == "true"
     end
 
     def save_rearview_status(status, object = Sketchup.active_model)
       settings = style_settings(object)
       settings[:rearview_status] = status
-      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
+      Skalp.active_model.set_memory_attribute(object, "Skalp", "style_settings", settings) if Skalp.active_model
     end
 
     def save_rearview_linestyle(linetype, object = Sketchup.active_model)
       settings = style_settings(object)
       settings[:rearview_linestyle] = linetype
-      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
+      Skalp.active_model.set_memory_attribute(object, "Skalp", "style_settings", settings) if Skalp.active_model
     end
 
     def rearview_linestyle(object = Sketchup.active_model)
       linestyle = style_settings(object)[:rearview_linestyle]
-      if linestyle == nil || linestyle == ''
-        linestyle = 'Dash'
+      if [nil, ""].include?(linestyle)
+        linestyle = "Dash"
         save_rearview_linestyle(linestyle, object)
       end
 
@@ -214,22 +226,24 @@ module Skalp
 
     def save_lineweights_update(status, object = Sketchup.active_model)
       return unless Skalp.active_model
+
       if status
-        Skalp.active_model.set_memory_attribute(object, 'Skalp', 'lineweights_update', 'true')
+        Skalp.active_model.set_memory_attribute(object, "Skalp", "lineweights_update", "true")
       else
-        Skalp.active_model.set_memory_attribute(object, 'Skalp', 'lineweights_update', 'false')
+        Skalp.active_model.set_memory_attribute(object, "Skalp", "lineweights_update", "false")
       end
     end
 
     def lineweights_update(object = Sketchup.active_model)
       return false unless Skalp.active_model
-      Skalp.active_model.get_memory_attribute(object, 'Skalp', 'lineweights') == 'true'
+
+      Skalp.active_model.get_memory_attribute(object, "Skalp", "lineweights") == "true"
     end
 
     def save_lineweights_status(status, object = Sketchup.active_model)
       settings = style_settings(object)
       settings[:section_cut_width_status] = status
-      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
+      Skalp.active_model.set_memory_attribute(object, "Skalp", "style_settings", settings) if Skalp.active_model
     end
 
     def rear_view_status(object = Sketchup.active_model)
@@ -243,7 +257,7 @@ module Skalp
     def save_drawing_scale(scale, object = Sketchup.active_model)
       settings = style_settings(object)
       settings[:drawing_scale] = scale.to_f
-      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
+      Skalp.active_model.set_memory_attribute(object, "Skalp", "style_settings", settings) if Skalp.active_model
     end
 
     def drawing_scale(object = Sketchup.active_model)
@@ -253,7 +267,7 @@ module Skalp
     def save_fog_status(status, object = Sketchup.active_model)
       settings = style_settings(object)
       settings[:depth_clipping_status] = status
-      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
+      Skalp.active_model.set_memory_attribute(object, "Skalp", "style_settings", settings) if Skalp.active_model
     end
 
     def fog_status(object = Sketchup.active_model)
@@ -267,7 +281,7 @@ module Skalp
     def save_fog_distance(distance, object = Sketchup.active_model)
       settings = style_settings(object)
       settings[:depth_clipping_distance] = (distance.class == Distance ? distance : Distance.new(distance))
-      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
+      Skalp.active_model.set_memory_attribute(object, "Skalp", "style_settings", settings) if Skalp.active_model
     end
 
     def fog_action
@@ -283,11 +297,11 @@ module Skalp
           Skalp.active_model.view_observer = nil
         end
 
-        Skalp.active_model.skpModel.rendering_options['DisplayFog'] = false
+        Skalp.active_model.skpModel.rendering_options["DisplayFog"] = false
 
         if save_settings_status
           page = Sketchup.active_model.pages.selected_page
-          page.use_rendering_options? && page.rendering_options['DisplayFog'] = false
+          page.use_rendering_options? && page.rendering_options["DisplayFog"] = false
         end
       end
     end
@@ -299,45 +313,64 @@ module Skalp
     def save_style_rules(rules, object = Sketchup.active_model)
       settings = style_settings(object)
       settings[:style_rules] = rules
-      Skalp.active_model.set_memory_attribute(object, 'Skalp', 'style_settings', settings) if Skalp.active_model
+      Skalp.active_model.set_memory_attribute(object, "Skalp", "style_settings", settings) if Skalp.active_model
     end
 
-    #DIALOG CALLBACK ACTIONS
+    # DIALOG CALLBACK ACTIONS
     def set_drawing_scale(scale)
       save_drawing_scale(scale)
-      save_drawing_scale(scale, Sketchup.active_model.pages.selected_page) if save_settings_status && Sketchup.active_model.pages.selected_page
+      return unless save_settings_status && Sketchup.active_model.pages.selected_page
+
+      save_drawing_scale(scale,
+                         Sketchup.active_model.pages.selected_page)
     end
 
     def set_rearview_switch(status)
       save_rearview_status(status)
-      save_rearview_status(status, Sketchup.active_model.pages.selected_page) if save_settings_status && Sketchup.active_model.pages.selected_page
+      return unless save_settings_status && Sketchup.active_model.pages.selected_page
+
+      save_rearview_status(status,
+                           Sketchup.active_model.pages.selected_page)
     end
 
     def set_lineweights_switch(status)
       save_lineweights_status(status)
-      save_lineweights_status(status, Sketchup.active_model.pages.selected_page) if save_settings_status && Sketchup.active_model.pages.selected_page
+      return unless save_settings_status && Sketchup.active_model.pages.selected_page
+
+      save_lineweights_status(status,
+                              Sketchup.active_model.pages.selected_page)
     end
 
     def set_fog_switch(status)
       save_fog_status(status)
-      save_fog_status(status, Sketchup.active_model.pages.selected_page) if save_settings_status && Sketchup.active_model.pages.selected_page
+      if save_settings_status && Sketchup.active_model.pages.selected_page
+        save_fog_status(status,
+                        Sketchup.active_model.pages.selected_page)
+      end
       fog_action
     end
 
     def set_fog_distance(distance)
       save_fog_distance(distance)
-      save_fog_distance(distance, Sketchup.active_model.pages.selected_page) if save_settings_status && Sketchup.active_model.pages.selected_page
+      if save_settings_status && Sketchup.active_model.pages.selected_page
+        save_fog_distance(distance,
+                          Sketchup.active_model.pages.selected_page)
+      end
       fog_action
     end
 
-    #INTERACT WITH MODEL
+    # INTERACT WITH MODEL
     def turnoff_rearview_lines_in_model
       return unless Skalp.active_model
-      Skalp.active_model.hiddenlines.remove_rear_view_instance(Sketchup.active_model.pages.selected_page) if Sketchup.active_model.pages.selected_page
+
+      return unless Sketchup.active_model.pages.selected_page
+
+      Skalp.active_model.hiddenlines.remove_rear_view_instance(Sketchup.active_model.pages.selected_page)
     end
 
     def turnon_rearview_lines_in_model
       return unless Skalp.active_model
+
       Skalp.active_model.active_section && Skalp.active_model.active_section.place_rear_view_lines_in_model
     end
 
@@ -417,7 +450,8 @@ module Skalp
 
     def set_fog_distance_in_dialog(distance)
       return unless Skalp.dialog
-      script("$('#fog_distance_input').val('#{distance.to_s}')")
+
+      script("$('#fog_distance_input').val('#{distance}')")
       fog_action
     end
 
@@ -427,32 +461,32 @@ module Skalp
 
     def rearview_status_black
       script("$('#rear_lines').css('color', 'black')")
-      update_symbol_black #TODO change when lineweighs will be implemented
+      update_symbol_black # TODO: change when lineweighs will be implemented
     end
 
     def rearview_status_red
       script("$('#rear_lines').css('color', 'red')")
-      update_symbol_red #TODO change when lineweighs will be implemented
+      update_symbol_red # TODO: change when lineweighs will be implemented
     end
 
     def update_symbol_black
-      set_icon('sections_update', 'icons/update_icon_black.png')
+      set_icon("sections_update", "icons/update_icon_black.png")
     end
 
     def update_symbol_red
-      set_icon('sections_update', 'icons/update_icon_red.png')
+      set_icon("sections_update", "icons/update_icon_red.png")
     end
 
     def align_view_symbol_black
       script("$('#fog_label').css('color', 'black')")
-      set_icon('align_view', 'icons/align_view.png')
+      set_icon("align_view", "icons/align_view.png")
     end
 
     def align_view_symbol_red
       script("$('#fog_label').css('color', 'red')")
-      set_icon('align_view', 'icons/align_view_red.png')
+      set_icon("align_view", "icons/align_view_red.png")
     end
-    
+
     # Make these methods available both as module methods and as public instance methods
     module_function :style_settings, :save_style_rules
     public :style_settings, :save_style_rules
