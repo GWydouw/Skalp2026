@@ -183,7 +183,6 @@ module Skalp
     end
 
     def add_lines_to_page(page = @skpModel, copy_to_active_view = false)
-      puts "SKALPDEBUG: add_lines_to_page START for #{page}" if defined?(DEBUG) && DEBUG
       style_settings = Skalp.dialog.style_settings(page) # Better than direct memory access for inheritance
 
       if style_settings.class == Hash
@@ -199,14 +198,8 @@ module Skalp
       # We must call this to ensure existing rearview instances are cleared if status is OFF
       add_rear_view_to_sectiongroup(nil, page) # nil definition forces clear
 
-      res = @rear_lines_result[page]
-      rv_status = Skalp.dialog.rearview_status(page)
-      if defined?(DEBUG) && DEBUG
-        puts "SKALPDEBUG: add_lines_to_page: has_lines=#{res ? true : false}, rv_status=#{rv_status}"
-      end
-
-      return unless res
-      return unless rv_status
+      return unless @rear_lines_result && @rear_lines_result[page]
+      return unless Skalp.dialog.rearview_status(page)
 
       if @rear_view_definitions[page] && @rear_view_definitions[page].valid?
         rear_view_definition = @rear_view_definitions[page]

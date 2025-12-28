@@ -215,16 +215,16 @@ module Skalp
               next unless style_keys.include?(style_key) || style_keys.include?(style_key.to_sym)
 
               begin
-                puts "[LOG] Transferring #{object_name}: style_settings['#{style_key}'] -> 'ss_#{style_key}'"
-
                 if [:style_rules, "style_rules"].include?(style_key) && style_value.respond_to?(:rules)
                   object.set_attribute("Skalp", "ss_#{style_key}", style_value.rules.inspect)
                 elsif !style_value.is_a?(Hash)
                   # HEURISTIC FIX: If page has rearview_status false but model has it true, force it to true
                   # This fixes models where rearview was globally enabled but stagnant page values stayed false.
                   if style_key == :rearview_status && ["false", false].include?(style_value)
-                    model_rv = Skalp.active_model.get_memory_attribute(Sketchup.active_model, "Skalp",
-                                                                       "rearview_status")
+                    # Try to find Model's rearview setting in current memory attributes
+                    model_attrs = @mem_attributes[Sketchup.active_model]
+                    model_rv = model_attrs["rearview_status"] if model_attrs
+
                     if ["true", true].include?(model_rv)
                       style_value = true
                       puts "[LOG] Healing #{object_name}: rearview_status forced to TRUE to match Model"
@@ -243,10 +243,7 @@ module Skalp
           next if value.is_a?(Hash) # Skip other complex hashes
 
           begin
-            if value
-              puts "[LOG] Transferring #{object_name}: '#{key}' -> '#{value}'"
-              object.set_attribute("Skalp", key, value)
-            end
+            object.set_attribute("Skalp", key, value) if value
           rescue StandardError => e
             puts "[ERROR] Failed to transfer #{object_name}: '#{key}' -> '#{value}': #{e.message}"
           end
@@ -280,23 +277,6 @@ module Skalp
     end
 
     def log_native_attributes_state
-      objects = []
-      objects << @skpModel if @skpModel
-      objects.concat(@skpModel.pages.to_a) if @skpModel.pages
-
-      objects.each do |obj|
-        next unless obj && obj.valid?
-
-        dict = obj.attribute_dictionary("Skalp")
-        next unless dict
-
-        object_name = obj.is_a?(Sketchup::Model) ? "Model" : "Page '#{obj.name}'"
-        puts "--- Native Attributes: #{object_name} ---"
-        dict.each_pair do |k, v|
-          puts "  #{k}: #{v}"
-        end
-      end
-      puts "=================================================\n"
     end
 
     def check_attributes(objects)

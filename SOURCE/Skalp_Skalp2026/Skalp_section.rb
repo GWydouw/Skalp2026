@@ -276,11 +276,7 @@ module Skalp
       correct_faces(sectiongroup)
 
       type = @page || @skpModel
-      rv_status = Skalp.dialog.style_settings(type)[:rearview_status]
-      if defined?(DEBUG) && DEBUG
-        puts "SKALPDEBUG: place_rear_view_lines_in_model CHECK: type=#{type}, status=#{rv_status}"
-      end
-      place_rear_view_lines_in_model(sectiongroup) if rv_status
+      place_rear_view_lines_in_model(sectiongroup) if Skalp.dialog.style_settings(type)[:rearview_status]
       @model.section_result_group.locked = true
     end
 
@@ -294,14 +290,11 @@ module Skalp
 
       type = @page || @skpModel
 
-      unless @sectionplane && @sectionplane.respond_to?(:skalpID)
-        puts "SKALPDEBUG: Rearview failed: @sectionplane is invalid or missing skalpID" if defined?(DEBUG) && DEBUG
-        return
-      end
-      id = @sectionplane.skalpID
-      puts "SKALPDEBUG: place_rear_view_lines_in_model: id=#{id}, type=#{type}" if defined?(DEBUG) && DEBUG
+      return unless @sectionplane && @sectionplane.respond_to?(:skalpID)
 
-      active_page = @skpModel.pages && type == @skpModel ? @skpModel.pages.selected_page : type
+      id = @sectionplane.skalpID
+
+      active_page = type
       if id == @model.hiddenlines.calculated[active_page]
         place_lines_or_definition_in_model(active_page, target_group)
       elsif id == @model.hiddenlines.calculated[@skpModel]
@@ -347,10 +340,7 @@ module Skalp
         existing = target_group.entities.grep(Sketchup::ComponentInstance).find { |i| i.definition == definition }
         target_group.entities.add_instance(definition, Geom::Transformation.new) unless existing
       elsif @model.hiddenlines.rear_lines_result[page]
-        puts "SKALPDEBUG: Falling back to add_lines_to_page (slow path) for #{page}" if defined?(DEBUG) && DEBUG
         @model.hiddenlines.add_lines_to_page(page, true)
-      elsif defined?(DEBUG) && DEBUG
-        puts "SKALPDEBUG: No definition found, no rear_lines_result for page #{page}"
       end
 
       @model.section_result_group.locked = true

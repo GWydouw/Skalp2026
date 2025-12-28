@@ -616,12 +616,7 @@ module Skalp
       command = %(#{path}Skalp "get_exploded_entities" "#{temp_dir}" "#{height}" "#{array_to_string_array(index_array)}" "#{array_to_string_array(scale_array)}" "#{array_to_string_array(perspective_array)}" "#{point_array_to_string_array(target_array)}" "#{rear_view}")
     end
 
-    puts "SKALPDEBUG: COMMAND: #{command}" if defined?(DEBUG) && DEBUG
     stdout = start_new_process(command.encode("utf-8"))
-    if defined?(DEBUG) && DEBUG
-      puts "SKALPDEBUG: STDOUT LENGTH: #{stdout ? stdout.length : 'NIL'}"
-      puts "SKALPDEBUG: STDOUT CONTENT: #{stdout.inspect}" if stdout
-    end
 
     hiddenline_data = nil
     exploded_lines = []
