@@ -631,20 +631,18 @@ module Skalp
       type = line[0, 3]
       data = line[3..-1]
 
-      return [] if !data.nil? && (data.include?("inf") || data.include?("INF"))
-
       case type
       when "*D*"
         pp data
       when "*I*"
         hiddenline_data = Hiddenlines_data.new(data)
       when "*T*"
-        hiddenline_data.target = eval(data)
+        hiddenline_data.target = Skalp.safe_eval(data)
       when "*L*"
         rgb = data[0..data.index("[") - 1]
         data = data[data.index("[")..-1]
         layer = Skalp.active_model.hiddenlines.get_hiddenline_properties(rgb)
-        hiddenline_data.add_line(eval(data), layer)
+        hiddenline_data.add_line(Skalp.safe_eval(data), layer)
       when "*E*"
         exploded_lines << hiddenline_data
       end
@@ -689,11 +687,14 @@ module Skalp
       require "open3"
       result = nil
       error = nil
+      puts "[DEBUG] Skalp External Command: #{cmd}"
       Open3.popen3(cmd) do |stdin, stdout, stderr|
         result = stdout.read
         error = stderr.read
       end
-      puts "SKALPDEBUG: STDERR: #{error}" if defined?(DEBUG) && DEBUG && error && !error.empty?
+      puts "[DEBUG] Skalp External Stderr: #{error}" unless error.empty?
+      puts "[DEBUG] Skalp External Stdout snippet: #{result[0..500]}" if result
+      return result
     end
 
     result
@@ -1555,5 +1556,27 @@ module Skalp
 
   def close_message_dialog
     @message_dialog.close
+  end
+
+  def safe_eval(string)
+    return nil if string.nil? || string.empty?
+
+    # Check if string contains NaN or Infinity and log where it came from
+    if string =~ /\b(NaN|nan|Infinity|inf|INF)\b/
+      puts "=" * 60
+      puts "⚠️  Skalp.safe_eval: NaN/Infinity detected!"
+      puts "    Value found: #{::Regexp.last_match(1)}"
+      puts "    String preview: #{string[0..200]}..."
+      puts "    Called from:"
+      caller[0..5].each { |line| puts "      #{line}" }
+      puts "=" * 60
+    end
+
+    # Replace NaN and Infinity with nil to avoid NameError during eval
+    clean_string = string.gsub(/\b(NaN|nan|Infinity|inf|INF)\b/, "nil")
+    eval(clean_string)
+  rescue StandardError => e
+    puts "Skalp.safe_eval error: #{e.message} for string: #{string[0..100]}..."
+    nil
   end
 end

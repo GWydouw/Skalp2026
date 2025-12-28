@@ -77,13 +77,13 @@ module Skalp
       selected_page = Sketchup.active_model&.pages&.selected_page
       context = save_settings_status && selected_page ? selected_page : Sketchup.active_model
 
-      if defined?(DEBUG) && DEBUG
-        puts "[DEBUG] update_dialog START"
-        puts "        context: #{context.is_a?(Sketchup::Page) ? context.name : 'Model'}"
-        puts "        save_settings_status: #{save_settings_status}"
-        puts "        rearview_status: #{rearview_status(context)}"
-        puts "        drawing_scale: #{drawing_scale(context)}"
-      end
+      # if defined?(DEBUG) && DEBUG
+      #   puts "[DEBUG] update_dialog START"
+      #   puts "        context: #{context.is_a?(Sketchup::Page) ? context.name : 'Model'}"
+      #   puts "        save_settings_status: #{save_settings_status}"
+      #   puts "        rearview_status: #{rearview_status(context)}"
+      #   puts "        drawing_scale: #{drawing_scale(context)}"
+      # end
       save_settings_status ? save_settings_checkbox_on : save_settings_checkbox_off
       rearview_status(context) ? rearview_status_switch_on : rearview_status_switch_off
       rearview_update(context) ? rearview_update_checkbox_on : rearview_update_checkbox_off
@@ -93,8 +93,10 @@ module Skalp
 
       set_drawing_scale_in_dialog(drawing_scale(context))
 
+      # Always set fog distance in dialog (even when fog is off)
+      set_fog_distance_in_dialog(fog_distance(context))
+
       if fog_status(context)
-        set_fog_distance_in_dialog(fog_distance(context))
         fog_status_switch_on
       else
         fog_status_switch_off
@@ -104,6 +106,9 @@ module Skalp
       check_SU_style
       check_rearview_uptodate
       style_rules(context).to_dialog
+    rescue StandardError => e
+      Skalp.debug_log "[ERROR] update_dialog failed: #{e.message}"
+      Skalp.debug_log e.backtrace.first(5).join("\n")
     end
 
     def blur_dialog_settings
@@ -297,9 +302,13 @@ module Skalp
     end
 
     def save_fog_distance(distance, object = Sketchup.active_model)
+      puts "[DEBUG] save_fog_distance called with distance=#{distance.inspect}, object=#{object.is_a?(Sketchup::Page) ? object.name : 'Model'}"
       settings = style_settings(object)
+      puts "[DEBUG] style_settings BEFORE: #{settings.inspect}"
       settings[:depth_clipping_distance] = (distance.class == Distance ? distance : Distance.new(distance))
+      puts "[DEBUG] style_settings AFTER: #{settings.inspect}"
       Skalp.active_model.set_memory_attribute(object, "Skalp", "style_settings", settings) if Skalp.active_model
+      puts "[DEBUG] save_fog_distance completed"
     end
 
     def fog_action
@@ -369,11 +378,14 @@ module Skalp
     end
 
     def set_fog_distance(distance)
+      puts "[DEBUG] set_fog_distance called with: #{distance.inspect}"
       save_fog_distance(distance)
       if save_settings_status && Sketchup.active_model.pages.selected_page
         save_fog_distance(distance,
                           Sketchup.active_model.pages.selected_page)
       end
+      # Update dialog with formatted distance (e.g., "15" -> "15.0cm")
+      set_fog_distance_in_dialog(fog_distance)
       fog_action
     end
 
@@ -469,7 +481,9 @@ module Skalp
     def set_fog_distance_in_dialog(distance)
       return unless Skalp.dialog
 
-      script("$('#fog_distance_input').val('#{distance}')")
+      # Show "0" as default if no distance is set
+      display_value = distance.nil? ? "0" : distance.to_s
+      script("$('#fog_distance_input').val('#{display_value}')")
       fog_action
     end
 

@@ -12,6 +12,103 @@ module Skalp
       @layer_list = []
     end
 
+    # Check if section should be auto-saved to page
+    # Conditions:
+    # 1. Sectionplane matches the one stored in the page
+    # 2. Layer visibility matches the page's stored visibility
+    # 3. Hidden entities match the page's stored hidden entities
+    def should_auto_save?(page)
+      return false unless page
+      return false unless @model.active_sectionplane
+
+      stored_sectionplane_id = @model.get_memory_attribute(page, "Skalp", "sectionplaneID")
+      active_sectionplane_id = @model.get_memory_attribute(@skpModel, "Skalp", "active_sectionplane_ID")
+
+      # Condition 1: Sectionplane must match
+      return false unless stored_sectionplane_id == active_sectionplane_id
+
+      # Condition 2 & 3: Visibility must match (layers + hidden entities)
+      visibility_matches?(page)
+    end
+
+    # Check if current model visibility matches page's stored visibility
+    def visibility_matches?(page)
+      return false unless page.respond_to?(:layers)
+
+      # Compare layer visibility
+      page_visible_layers = page.layers # Array<Layer> or nil (all visible)
+
+      if page_visible_layers.nil?
+        # Page stores "all layers visible" - check if current model has all visible
+        @skpModel.layers.each do |layer|
+          return false unless layer.visible?
+        end
+      else
+        # Check each layer matches stored visibility
+        @skpModel.layers.each do |layer|
+          page_has_visible = page_visible_layers.include?(layer)
+          return false unless layer.visible? == page_has_visible
+        end
+      end
+
+      # Compare hidden entities
+      return true unless page.respond_to?(:hidden_entities)
+
+      page_hidden = Set.new(page.hidden_entities)
+
+      # Get currently hidden top-level entities in model
+      model_hidden = Set.new
+      @skpModel.entities.each do |entity|
+        model_hidden.add(entity) if entity.respond_to?(:hidden?) && entity.hidden?
+      end
+
+      page_hidden == model_hidden
+    rescue StandardError => e
+      puts "[Section] visibility_matches? error: #{e.message}" if defined?(DEBUG) && DEBUG
+      false
+    end
+
+    # Auto-save section to page if conditions are met
+    def auto_save_section_to_page(page)
+      return false unless should_auto_save?(page)
+
+      # Skip if page already has a valid sectiongroup with content
+      existing = get_existing_sectiongroup(page)
+      if existing && existing.valid? && existing.entities.size > 0
+        if defined?(DEBUG) && DEBUG
+          puts "[Section] Auto-save skipped: page '#{page.name}' already has valid sectiongroup"
+        end
+        return false
+      end
+
+      puts "[Section] Auto-saving section to page: #{page.name}" if defined?(DEBUG) && DEBUG
+
+      # Create/update sectiongroup for this page
+      @model.start("Skalp - auto-save section", true)
+      sectiongroup = create_sectiongroup(page)
+      sectionfaces_to_sectiongroup(sectiongroup)
+      manage_sections(page)
+      @model.commit
+
+      true
+    rescue StandardError => e
+      puts "[Section] auto_save_section_to_page error: #{e.message}" if defined?(DEBUG) && DEBUG
+      @model.abort if @model
+      false
+    end
+
+    # Get existing sectiongroup for a page
+    def get_existing_sectiongroup(page)
+      return nil unless @model.section_result_group
+
+      page_id = @model.get_memory_attribute(page, "Skalp", "ID")
+      return nil unless page_id
+
+      @model.section_result_group.entities.grep(Sketchup::Group).find do |group|
+        group.get_attribute("Skalp", "ID") == page_id
+      end
+    end
+
     def update(page = nil, force_update = true)
       return unless @model
 
@@ -87,7 +184,7 @@ module Skalp
       if @section2Ds.size > 0
         sectiongroup.entities.build do |builder|
           type = @page || @skpModel
-          use_lineweight = Skalp.dialog.lineweights_status(type)
+          use_lineweight = Skalp.dialog ? Skalp.dialog.lineweights_status(type) : false
 
           normal = Geom::Vector3d.new 0, 0, 1
           result = false
@@ -233,8 +330,8 @@ module Skalp
                 edge.soft = false
                 edge.hidden = false
               end
-            rescue ArgumentError => error
-              e = "#{error}, pt1: #{pt1}, pt2: #{pt2} "
+            rescue ArgumentError => e
+              e = "#{e}, pt1: #{pt1}, pt2: #{pt2} "
               Skalp.send_info("Add_ege duplicate points error")
               Skalp.send_bug(e)
             end
@@ -242,7 +339,9 @@ module Skalp
         end
       end
       transformation_inverse = @sectionplane.transformation.inverse
-      place_rear_view_lines_in_model(sectiongroup) if Skalp.dialog.style_settings(@page)[:rearview_status]
+      if Skalp.dialog && Skalp.dialog.style_settings(@page)[:rearview_status]
+        place_rear_view_lines_in_model(sectiongroup)
+      end
       @model.section_result_group.locked = true
 
       return unless sectiongroup.valid?
@@ -276,35 +375,39 @@ module Skalp
       correct_faces(sectiongroup)
 
       type = @page || @skpModel
-      place_rear_view_lines_in_model(sectiongroup) if Skalp.dialog.style_settings(type)[:rearview_status]
+      if Skalp.dialog && Skalp.dialog.style_settings(type)[:rearview_status]
+        place_rear_view_lines_in_model(sectiongroup)
+      end
       @model.section_result_group.locked = true
     end
 
     def place_rear_view_lines_in_model(target_group = nil)
       target_group ||= @sectiongroup
-      puts "[DEBUG] place_rear_view_lines_in_model for: #{target_group}"
       return unless target_group && target_group.valid?
       return unless Skalp.models[@skpModel]
+
+      Skalp.debug_log "[DEBUG] place_rear_view_lines_in_model for: #{target_group}"
 
       observer_status = Skalp.models[@skpModel].observer_active
       Skalp.models[@skpModel].observer_active = false
 
       type = @page || @skpModel
-      puts "[DEBUG] type: #{type.is_a?(Sketchup::Page) ? type.name : 'Model'}"
+      # puts "[DEBUG] type: #{type.is_a?(Sketchup::Page) ? type.name : 'Model'}"
 
       return unless @sectionplane && @sectionplane.respond_to?(:skalpID)
 
       id = @sectionplane.skalpID
-      puts "[DEBUG] sectionplane id: #{id}"
+      Skalp.debug_log "[DEBUG] sectionplane id: #{id}"
 
       active_page = type
-      puts "[DEBUG] active_page calculated[#{active_page}]: #{@model.hiddenlines.calculated[active_page]}"
+      selected_page = @skpModel.pages.selected_page
+
       if id == @model.hiddenlines.calculated[active_page]
-        puts "[DEBUG] Exact match found for active_page"
+        Skalp.debug_log "[DEBUG] Exact match found for active_page: #{active_page.respond_to?(:name) ? active_page.name : active_page.to_s}"
         place_lines_or_definition_in_model(active_page, target_group)
       elsif id == @model.hiddenlines.calculated[@skpModel]
         # Fallback: check if calculated for model (live section)
-        puts "[DEBUG] Match found for Model fallback"
+        Skalp.debug_log "[DEBUG] Match found for Model fallback"
         place_lines_or_definition_in_model(@skpModel, target_group)
       else
         found = false
@@ -317,42 +420,31 @@ module Skalp
           end
         end
         if found
-          puts "[DEBUG] Match found for other page: #{type.name}"
+          Skalp.debug_log "[DEBUG] Match found for other page: #{type.is_a?(Sketchup::Page) ? type.name : 'Model'}"
           place_lines_or_definition_in_model(type, target_group, true)
+        elsif @model.hiddenlines.rear_view_definitions[active_page] &&
+              @model.hiddenlines.rear_view_definitions[active_page].valid? &&
+              @model.hiddenlines.rear_view_definitions[active_page].entities.size > 0
+          Skalp.debug_log "[DEBUG] NO match found in calculated hash, using saved definition for active_page"
+          place_lines_or_definition_in_model(active_page, target_group)
+        elsif selected_page && @model.hiddenlines.rear_view_definitions[selected_page] &&
+              @model.hiddenlines.rear_view_definitions[selected_page].valid? &&
+              @model.hiddenlines.rear_view_definitions[selected_page].entities.size > 0
+          Skalp.debug_log "[DEBUG] Using saved rear_view_definition for selected_page: #{selected_page.name}"
+          place_lines_or_definition_in_model(selected_page, target_group)
+        elsif @model.hiddenlines.rear_view_definitions[@skpModel] &&
+              @model.hiddenlines.rear_view_definitions[@skpModel].valid? &&
+              @model.hiddenlines.rear_view_definitions[@skpModel].entities.size > 0
+          # puts "[DEBUG] Using saved rear_view_definition for Model fallback"
+          place_lines_or_definition_in_model(@skpModel, target_group)
         else
-          puts "[DEBUG] NO match found in calculated hash"
-          # Fallback: use saved rear_view_definitions if available (for freshly loaded models)
-          # Check multiple possible keys since definitions may be keyed by Page, Model, or selected_page
-          selected_page = @skpModel.pages.selected_page
-          puts "[DEBUG] Checking rear_view_definitions keys: active_page=#{active_page.class}, selected_page=#{selected_page&.name}, Model"
-          puts "[DEBUG] rear_view_definitions keys: #{@model.hiddenlines.rear_view_definitions.keys.map do |k|
-            k.is_a?(Sketchup::Page) ? k.name : k.class.to_s
-          end}"
-
-          if @model.hiddenlines.rear_view_definitions[active_page] &&
-             @model.hiddenlines.rear_view_definitions[active_page].valid? &&
-             @model.hiddenlines.rear_view_definitions[active_page].entities.size > 0
-            puts "[DEBUG] Using saved rear_view_definition for active_page"
-            place_lines_or_definition_in_model(active_page, target_group)
-          elsif selected_page && @model.hiddenlines.rear_view_definitions[selected_page] &&
-                @model.hiddenlines.rear_view_definitions[selected_page].valid? &&
-                @model.hiddenlines.rear_view_definitions[selected_page].entities.size > 0
-            puts "[DEBUG] Using saved rear_view_definition for selected_page: #{selected_page.name}"
-            place_lines_or_definition_in_model(selected_page, target_group)
-          elsif @model.hiddenlines.rear_view_definitions[@skpModel] &&
-                @model.hiddenlines.rear_view_definitions[@skpModel].valid? &&
-                @model.hiddenlines.rear_view_definitions[@skpModel].entities.size > 0
-            puts "[DEBUG] Using saved rear_view_definition for Model fallback"
-            place_lines_or_definition_in_model(@skpModel, target_group)
-          else
-            # No valid definition found for this page - don't use definitions from other pages!
-            # The lines will need to be recalculated for this page
-            puts "[DEBUG] No rear_view_definition found for current page (#{selected_page&.name || 'Model'})"
-            puts "[DEBUG] Available definitions are for: #{@model.hiddenlines.rear_view_definitions.keys.select do |k|
-              k.is_a?(Sketchup::Page)
-            end.map(&:name).join(', ')}"
-            puts "[DEBUG] Rearview lines will need to be recalculated for this page"
-          end
+          # No valid definition found for this page - don't use definitions from other pages!
+          # The lines will need to be recalculated for this page
+          # puts "[DEBUG] No rear_view_definition found for current page (#{selected_page&.name || 'Model'})"
+          # puts "[DEBUG] Available definitions are for: #{@model.hiddenlines.rear_view_definitions.keys.select do |k|
+          #   k.is_a?(Sketchup::Page)
+          # end.map(&:name).join(', ')}"
+          Skalp.debug_log "[DEBUG] Rearview lines will need to be recalculated for this page"
 
         end
       end
@@ -367,16 +459,6 @@ module Skalp
       if @model.hiddenlines.rear_view_definitions[page] && @model.hiddenlines.rear_view_definitions[page].valid? && !force
         def_check = @model.hiddenlines.rear_view_definitions[page]
         definition = def_check if def_check.entities.size > 0
-      end
-
-      # Fallback: search for any valid definition with entities
-      unless definition
-        @model.hiddenlines.rear_view_definitions.each_value do |def_candidate|
-          if def_candidate && def_candidate.valid? && def_candidate.entities.size > 0
-            definition = def_candidate
-            break
-          end
-        end
       end
 
       if definition
@@ -552,7 +634,7 @@ module Skalp
     end
 
     def create_lineweight_mask(type)
-      scale = Skalp.dialog.drawing_scale(type)
+      scale = Skalp.dialog ? Skalp.dialog.drawing_scale(type) : 1.0
       @section2Ds.each do |section2d|
         next unless section2d.node.value.visibility
 
@@ -599,7 +681,7 @@ module Skalp
 
     def add_polygons_to_sectionmesh
       type = @page || @skpModel
-      use_lineweight = Skalp.dialog.lineweights_status(type)
+      use_lineweight = Skalp.dialog ? Skalp.dialog.lineweights_status(type) : false
 
       Skalp.active_model.entity_strings = {}
       @object_list = []
@@ -613,7 +695,7 @@ module Skalp
 
       @section_mesh = Geom::PolygonMesh.new
       type = @page || @skpModel
-      scale = Skalp.dialog.drawing_scale(type)
+      scale = Skalp.dialog ? Skalp.dialog.drawing_scale(type) : 1.0
 
       if use_lineweight
         create_lineweight_mask(type)
@@ -699,6 +781,8 @@ module Skalp
         linetype = "Dash"
       end
 
+      return unless Skalp.dialog
+
       section_scale = Skalp.dialog.drawing_scale(type)
       for section2d in @section2Ds
         if @visibility.check_visibility(section2d.node.value.skpEntity)
@@ -727,7 +811,7 @@ module Skalp
             hatched_polygons << Skalp::DXF_export::Hatched_polygon.new(polygon.outerloop, polygon.innerloops, material, section_scale, export_layer) # SkalpHatch.hatchdefs[0]
           end
         else
-          puts "node not visible"
+
         end
       end
 
@@ -777,7 +861,7 @@ module Skalp
 
     def correct_faces(sectiongroup)
       type = @page || @skpModel
-      hide_edges(sectiongroup) if Skalp.dialog.lineweights_status(type)
+      hide_edges(sectiongroup) if Skalp.dialog && Skalp.dialog.lineweights_status(type)
 
       normal = Geom::Vector3d.new 0, 0, 1
       result = false
@@ -840,6 +924,8 @@ module Skalp
       return unless face.valid?
 
       type = @page || @skpModel
+      return unless Skalp.dialog
+
       scale = Skalp.dialog.drawing_scale(type)
 
       material = face.material
@@ -927,7 +1013,14 @@ module Skalp
         pt_array[4] = p3
         pt_array[5] = p3uv
       end
-      face.position_material(material, pt_array, true)
+
+      begin
+        face.position_material(material, pt_array, true)
+      rescue ArgumentError
+        # Suppress "Could not compute valid matrix from points" error
+        # This happens often with degenerate geometry and spams the log.
+        # Fallback is just unpositioned texture, which is acceptable.
+      end
 
       # handig om de punten te bekijken als er iets mis is:
       # num = -1 ; pt_array.each {|point| @skpModel.entities.add_cpoint(point);@skpModel.entities.add_text("#{num+=1}", point); puts point}

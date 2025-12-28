@@ -658,7 +658,9 @@ $(function () {
     });
 
     $("#fog_distance_input").bind('blur keyup', function (e) {
+        console.log('fog_distance_input event:', e.type, 'keyCode:', e.keyCode, 'value:', this.value);
         if (e.type == 'blur' || e.keyCode == '13') {
+            console.log('Calling set_fog_distance with:', this.value);
             set_fog_distance(this.value)
         }
     });

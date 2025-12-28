@@ -59,6 +59,10 @@ SketchupRequirements:
 SketchupRequirements/GlobalConstants:
   Enabled: false
 
+# Target SketchUp 2026 only - no backwards compatibility needed
+SketchupSuggestions/Compatibility:
+  SketchupVersion: '26.0'
+
 # SketchUp uses 2-space indentation, standard for Ruby
 Layout/IndentationWidth:
   Width: 2

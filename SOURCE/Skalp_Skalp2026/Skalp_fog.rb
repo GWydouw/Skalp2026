@@ -16,8 +16,9 @@ module Skalp
     view.camera = my_camera
   end
 
-  def align_view(skpSectionPlane, perspective=nil)
+  def align_view(skpSectionPlane, perspective = nil)
     return unless skpSectionPlane
+
     view = Sketchup.active_model.active_view
     active_camera = view.camera
 
@@ -28,11 +29,11 @@ module Skalp
     up = get_up_vector(plane)
     my_camera = Sketchup::Camera.new eye, target, up
 
-    if (active_camera.eye - active_camera.target).samedirection?(my_camera.eye - my_camera.target)
-      my_camera.perspective = !view.camera.perspective?
-    else
-      my_camera.perspective = view.camera.perspective?
-    end
+    my_camera.perspective = if (active_camera.eye - active_camera.target).samedirection?(my_camera.eye - my_camera.target)
+                              !view.camera.perspective?
+                            else
+                              view.camera.perspective?
+                            end
 
     # Get a handle to the current view and change its camera.
     view.camera = my_camera
@@ -49,7 +50,7 @@ module Skalp
     active_page = model.pages.selected_page
 
     unless direction.parallel?(plane[0..2])
-      result = UI.messagebox(Skalp.translate('Skalp will Align your view with the Section Plane.'), MB_OKCANCEL)
+      result = UI.messagebox(Skalp.translate("Skalp will Align your view with the Section Plane."), MB_OKCANCEL)
 
       if result == 2
         Skalp.dialog.fog_status_switch_off
@@ -61,14 +62,12 @@ module Skalp
 
     set_fog_rendering_options(model)
 
-    if Skalp.dialog.save_settings_status
-      set_fog_rendering_options(active_page)
-    end
+    set_fog_rendering_options(active_page) if Skalp.dialog.save_settings_status
 
-    unless Skalp.active_model.view_observer
-      Skalp.active_model.view_observer = SkalpViewObserver.new
-      Sketchup.active_model.active_view.add_observer(Skalp.active_model.view_observer)
-    end
+    return if Skalp.active_model.view_observer
+
+    Skalp.active_model.view_observer = SkalpViewObserver.new
+    Sketchup.active_model.active_view.add_observer(Skalp.active_model.view_observer)
   end
 
   def get_section_distance
@@ -79,13 +78,51 @@ module Skalp
   end
 
   def set_fog_rendering_options(object = Sketchup.active_model)
-    tolerance = Sketchup.read_default('Skalp', 'tolerance2').to_f
+    tolerance = Sketchup.read_default("Skalp", "tolerance2").to_f
 
     section_distance = get_section_distance
-    rendering_options = rendering_options?(object).rendering_options
-    rendering_options['DisplayFog'] = true
 
-    rendering_options['FogStartDist'] = section_distance
-    rendering_options['FogEndDist'] = section_distance + (tolerance * 2) + Skalp.dialog.fog_distance.to_inch
+    # Page doesn't have rendering_options method, it should always be model
+    ro_container = if object.is_a?(Sketchup::Model)
+                     object
+                   else
+                     Sketchup.active_model
+                   end
+
+    rendering_options = ro_container.rendering_options
+    rendering_options["DisplayFog"] = true
+
+    # Debug: trace where fog_distance comes from
+    raw_fog_dist = Skalp.dialog.fog_distance(object)
+    puts "=" * 60
+    puts "Skalp Fog Debug: Fog Distance Trace"
+    puts "  object: #{object.is_a?(Sketchup::Page) ? object.name : 'Model'}"
+    puts "  raw fog_distance value: #{raw_fog_dist.inspect}"
+    puts "  raw fog_distance class: #{raw_fog_dist.class}"
+
+    # Also check style_settings directly
+    if Skalp.dialog.respond_to?(:style_settings)
+      settings = Skalp.dialog.style_settings(object)
+      puts "  style_settings[:depth_clipping_distance]: #{settings[:depth_clipping_distance].inspect}"
+    end
+    puts "=" * 60
+
+    fog_dist_val = if raw_fog_dist.nil?
+                     0.0
+                   elsif raw_fog_dist.respond_to?(:to_inch)
+                     raw_fog_dist.to_inch
+                   else
+                     raw_fog_dist.to_f
+                   end
+
+    rendering_options["FogStartDist"] = section_distance
+    rendering_options["FogEndDist"] = section_distance + (tolerance * 2) + fog_dist_val
+
+    puts "Skalp Fog Debug: dist=#{section_distance}, fog_dist=#{fog_dist_val}, end=#{rendering_options['FogEndDist']}"
+
+    # If it's a page, we need to update the page to save these rendering options
+    return unless object.is_a?(Sketchup::Page) && object.use_rendering_options?
+
+    object.update(16) # 16 = Drawing Style (which includes rendering options)
   end
 end

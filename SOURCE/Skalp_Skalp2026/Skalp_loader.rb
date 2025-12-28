@@ -681,6 +681,9 @@ module Skalp
     skalp_require_license
 
     require "Skalp_Skalp2026/Skalp_preferences"
+    require "Skalp_Skalp2026/Skalp_logger"
+    Skalp::DebugLogger.clear # Clear previous logs on reload/start
+
     require "Skalp_Skalp2026/Skalp_observers"
     require "Skalp_Skalp2026/Skalp_html_inputbox"
     require "Skalp_Skalp2026/Skalp_box_section"
@@ -689,6 +692,7 @@ module Skalp
     require "Skalp_Skalp2026/Skalp_lib2"
     require "Skalp_Skalp2026/Skalp_geom2"
     require "Skalp_Skalp2026/Skalp_material_dialog"
+    require "Skalp_Skalp2026/Skalp_material_replacement"
     require "Skalp_Skalp2026/Skalp_paintbucket"
     require "Skalp_Skalp2026/Skalp_dwg_export_dialog"
     require "Skalp_Skalp2026/Skalp_cad_converter"
@@ -774,7 +778,7 @@ module Skalp
     end
 
     def self.activate_model(skpModel)
-      puts ">>> [DEBUG] activate_model called for: #{begin
+      Skalp.debug_log ">>> [DEBUG] activate_model called for: #{begin
         skpModel.title
       rescue StandardError
         'unknown'
@@ -785,24 +789,24 @@ module Skalp
 
       # CRITICAL FIX: Don't re-activate if already active
       if @models && @models[skpModel]
-        puts ">>> [DEBUG] Model ALREADY ACTIVATED, returning early"
+        Skalp.debug_log ">>> [DEBUG] Model ALREADY ACTIVATED, returning early"
         return
       end
 
-      puts ">>> [DEBUG] Model NOT in @models, creating new instance..."
-      puts ">>> [DEBUG] @models keys: #{@models ? @models.keys.map { |m| m.object_id }.join(', ') : 'nil'}"
+      Skalp.debug_log ">>> [DEBUG] Model NOT in @models, creating new instance..."
+      # Skalp.debug_log ">>> [DEBUG] @models keys: #{@models ? @models.keys.map { |m| m.object_id }.join(', ') : 'nil'}"
       @models[skpModel] = Model.new(skpModel)
-      puts ">>> [DEBUG] Model created successfully, loading observers..."
+      Skalp.debug_log ">>> [DEBUG] Model created successfully, loading observers..."
       @models[skpModel].load_observers
-      puts ">>> [DEBUG] Observers loaded, checking dialog..."
+      Skalp.debug_log ">>> [DEBUG] Observers loaded, checking dialog..."
 
       return unless Skalp.dialog
 
-      puts ">>> [DEBUG] Dialog exists, updating..."
+      Skalp.debug_log ">>> [DEBUG] Dialog exists, updating..."
 
       Skalp.dialog.update_styles(skpModel)
       Skalp.dialog.update(1)
-      puts ">>> [DEBUG] activate_model COMPLETED"
+      Skalp.debug_log ">>> [DEBUG] activate_model COMPLETED"
     end
 
     def self.change_active_model(skpModel)

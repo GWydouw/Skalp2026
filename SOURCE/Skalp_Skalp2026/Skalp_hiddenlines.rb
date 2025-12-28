@@ -1,3 +1,7 @@
+# Require RearView classes before Hiddenlines that depends on them
+require_relative "Skalp_rear_view_state"
+require_relative "Skalp_rear_view_manager"
+
 module Skalp
   class Hiddenlines_data
     attr_accessor :page, :target, :lines
@@ -15,9 +19,25 @@ module Skalp
   end
 
   class Hiddenlines
-    attr_reader :forward_lines_result, :rear_lines_result, :pages_info_result
-    attr_accessor :rear_view_instances, :rear_view_definitions, :uptodate, :calculated, :linestyle,
-                  :hiddenline_layer_setup
+    attr_reader :forward_lines_result, :pages_info_result, :rear_view, :model
+    attr_accessor :rear_view_instances, :linestyle, :hiddenline_layer_setup
+
+    # Backward-compatible accessors that delegate to @rear_view manager
+    def uptodate
+      @rear_view.uptodate_hash
+    end
+
+    def calculated
+      @rear_view.calculated_hash
+    end
+
+    def rear_view_definitions
+      @rear_view.definitions_hash
+    end
+
+    def rear_lines_result
+      @rear_view.polylines_hash
+    end
 
     R_MASK  = 0b111111110000000000000000 unless defined? R_MASK
     G_MASK  = 0b000000001111111100000000 unless defined? G_MASK
@@ -37,17 +57,20 @@ module Skalp
     end
 
     def initialize(model)
-      @uptodate = {}
-      @calculated = {}
       @model = model
       @skpModel = @model.skpModel
-      @rear_view_definitions = {}
       @forward_lines_result = {}
-      @rear_lines_result = {}
-      load_rear_view_definitions
+
+      # Initialize the new unified RearViewManager
+      @rear_view = RearViewManager.new(self)
+      @rear_view.load_all
 
       @temp_model = SKALP_PATH + "lib/temp.skp"
       @temp_model_reversed = SKALP_PATH + "lib/temp_reversed.skp"
+    end
+
+    def inspect
+      "#<#{self.class}:#{object_id} @model=#{@model}>"
     end
 
     def get_hiddenline_properties(rgb)
@@ -122,12 +145,12 @@ module Skalp
     end
 
     def sectionplane_changed(id)
-      @uptodate.delete_if { |k, v| v == id }
+      @rear_view.clear_for_sectionplane(id)
     end
 
     def clear_hiddenlines
       @forward_lines_result = {}
-      @rear_lines_result = {}
+      # rear_lines_result is now managed by @rear_view, but we keep forward_lines separate for now
     end
 
     def update_hiddenlines(scenes = :active)
@@ -136,23 +159,28 @@ module Skalp
     end
 
     def update_forward_lines(scenes = :active)
-      @forward_lines_result = get_lines(scenes, false)
+      result = get_lines(scenes, false)
+      @forward_lines_result = result || {}
     end
 
-    def update_rear_lines(scenes = :active, save_temp = true)
-      @rear_lines_result = get_lines(scenes, true, save_temp)
-      @model.model_changes = false if @rear_lines_result != {}
+    def update_rear_lines(scenes = :active, save_temp = true, auto_add_to_model = true)
+      result = get_lines(scenes, true, save_temp)
+      @model.model_changes = false if result
+
+      # Fix timing issue: add lines to model immediately after calculation
+      # This ensures rear_lines_result[page] is populated before add_lines_to_page is called
+      add_rear_lines_to_model(scenes) if auto_add_to_model && result && result != {}
     end
 
     def set_active_page_hiddenlines_to_model_hiddenlines
       selected = Skalp.active_model.skpModel.pages.selected_page
       return unless selected
 
-      @rear_lines_result[@skpModel] = @rear_lines_result[selected]
-      @rear_view_definitions[@skpModel] = @rear_view_definitions[selected]
+      # Forward lines remain separate for now
       @forward_lines_result[@skpModel] = @forward_lines_result[selected]
-      @calculated[@skpModel] = @calculated[selected]
-      @uptodate[@skpModel] = @uptodate[selected]
+
+      # Rear view state is synced via manager
+      @rear_view.sync_to_model(selected)
     end
 
     def add_rear_lines_to_model(scenes = :active)
@@ -177,23 +205,23 @@ module Skalp
     def update_scale
       selected = Skalp.active_model.skpModel.pages.selected_page
 
-      if @rear_view_definitions[selected] && Skalp.dialog.rearview_status(selected)
-        add_lines_to_component(@rear_view_definitions[selected],
-                               @rear_lines_result[selected])
+      if rear_view_definitions[selected] && Skalp.dialog.rearview_status(selected)
+        add_lines_to_component(rear_view_definitions[selected],
+                               rear_lines_result[selected])
       end
-      return unless @rear_view_definitions[@skpModel] && Skalp.dialog.rearview_status
+      return unless rear_view_definitions[@skpModel] && Skalp.dialog.rearview_status
 
-      add_lines_to_component(@rear_view_definitions[@skpModel],
-                             @rear_lines_result[@skpModel])
+      add_lines_to_component(rear_view_definitions[@skpModel],
+                             rear_lines_result[@skpModel])
     end
 
     def add_lines_to_page(page = @skpModel, copy_to_active_view = false)
-      puts "[DEBUG] add_lines_to_page for: #{page.is_a?(Sketchup::Page) ? page.name : 'Model'}"
+      Skalp.debug_log "[DEBUG] add_lines_to_page for: #{page.is_a?(Sketchup::Page) ? page.name : 'Model'}"
       style_settings = Skalp.dialog.style_settings(page) # Better than direct memory access for inheritance
       rv_status = Skalp.dialog.rearview_status(page)
-      puts "[DEBUG] rv_status: #{rv_status}"
-      has_lines = @rear_lines_result && @rear_lines_result[page]
-      puts "[DEBUG] has_lines: #{has_lines ? 'YES' : 'NO'}"
+      Skalp.debug_log "[DEBUG] rv_status: #{rv_status}"
+      has_lines = rear_lines_result && rear_lines_result[page]
+      Skalp.debug_log "[DEBUG] has_lines: #{has_lines ? 'YES' : 'NO'}"
 
       if style_settings.class == Hash
         @linestyle = style_settings[:rearview_linestyle]
@@ -208,11 +236,28 @@ module Skalp
       # We must call this to ensure existing rearview instances are cleared if status is OFF
       add_rear_view_to_sectiongroup(nil, page) # nil definition forces clear
 
-      return unless @rear_lines_result && @rear_lines_result[page]
-      return unless Skalp.dialog.rearview_status(page)
+      # Debug: trace why rearview group might not be created
+      page_name = page.is_a?(Sketchup::Page) ? page.name : "Model"
+      has_rear_lines = rear_lines_result && rear_lines_result[page]
+      rv_status_val = Skalp.dialog.rearview_status(page)
 
-      if @rear_view_definitions[page] && @rear_view_definitions[page].valid?
-        rear_view_definition = @rear_view_definitions[page]
+      puts "[DEBUG add_lines_to_page] page=#{page_name}"
+      puts "  rear_lines_result exists?: #{!rear_lines_result.nil?}"
+      puts "  rear_lines_result[page] exists?: #{has_rear_lines ? 'YES' : 'NO'}"
+      puts "  rearview_status(page): #{rv_status_val}"
+
+      unless has_rear_lines
+        puts "  => RETURNING EARLY: no rear_lines_result for this page"
+        return
+      end
+
+      unless rv_status_val
+        puts "  => RETURNING EARLY: rearview_status is OFF for this page"
+        return
+      end
+
+      if rear_view_definitions[page] && rear_view_definitions[page].valid?
+        rear_view_definition = rear_view_definitions[page]
 
         rear_view_definition.instances.each do |instance|
           instance.erase!
@@ -226,11 +271,15 @@ module Skalp
         rear_view_definition.set_attribute("dynamic_attributes", "_hideinbrowser", true)
         UI.refresh_inspectors
 
-        @rear_view_definitions[page] = rear_view_definition
+        # Ensure manager knows about the new definition
+        @rear_view[page].definition = rear_view_definition
+
+        # NOTE: we don't set rear_view_definitions[page] directly as it's a method
+        # The manager handles the association.
         rear_view_definition.set_attribute("Skalp", "type", "rear_view")
       end
 
-      add_lines_to_component(rear_view_definition, @rear_lines_result[page])
+      add_lines_to_component(rear_view_definition, rear_lines_result[page])
       add_rear_view_to_sectiongroup(rear_view_definition, page)
 
       return unless copy_to_active_view
@@ -242,14 +291,14 @@ module Skalp
       observer_status = @model.observer_active
       @model.observer_active = false
 
-      if @rear_view_definitions[page] && !@rear_view_definitions[page].deleted?
-        @rear_view_definitions[page].instances.each do |instance|
+      if rear_view_definitions[page] && !rear_view_definitions[page].deleted?
+        rear_view_definitions[page].instances.each do |instance|
           instance.erase! unless instance.deleted?
         end
       end
 
-      if @rear_view_definitions[@skpModel] && !@rear_view_definitions[@skpModel].deleted?
-        @rear_view_definitions[@skpModel].instances.each do |instance|
+      if rear_view_definitions[@skpModel] && !rear_view_definitions[@skpModel].deleted?
+        rear_view_definitions[@skpModel].instances.each do |instance|
           instance.erase! unless instance.deleted?
         end
       end
@@ -306,6 +355,14 @@ module Skalp
       rear_view = sectiongroup.entities.add_instance(rear_view_definition, Geom::Transformation.new)
       rear_view.name = "Skalp - #{Skalp.translate('rear view')}"
       rear_view.set_attribute("Skalp", "type", "rear_view")
+
+      # Fix for delayed visibility: Ensure the sectiongroup containing the rearview is visible on the page
+      if page && page.is_a?(Sketchup::Page)
+        Skalp.sectiongroup_visibility(sectiongroup, true, page)
+      else
+        # Global visibility for "Live" group or active view
+        Skalp.sectiongroup_visibility(sectiongroup, true, nil)
+      end
     end
 
     def remove_rear_view_instances(sectiongroup)
@@ -488,117 +545,13 @@ module Skalp
       @model.observer_active = observers
     end
 
-    def load_rear_view_definitions
-      @used_definitions = []
-
-      Skalp.active_model.skpModel.pages.each do |page|
-        load_rear_view_definition(page)
-      end
-      load_rear_view_definition
-    end
-
-    def load_rear_view_definition(page = @skpModel)
-      page_name = page.is_a?(Sketchup::Page) ? page.name : "Model"
-      sectiongroup = get_sectiongroup(page)
-
-      if defined?(DEBUG) && DEBUG
-        puts "[DEBUG] load_rear_view_definition for page: #{page_name}"
-        puts "        sectiongroup: #{sectiongroup ? sectiongroup.name : 'NIL'}"
-      end
-
-      return unless sectiongroup && sectiongroup.entities
-
-      if defined?(DEBUG) && DEBUG
-        component_count = sectiongroup.entities.grep(Sketchup::ComponentInstance).count
-        puts "        component instances in sectiongroup: #{component_count}"
-      end
-
-      sectiongroup.entities.grep(Sketchup::ComponentInstance).each do |rear_view_instance|
-        if defined?(DEBUG) && DEBUG
-          type_attrib = rear_view_instance.get_attribute("Skalp", "type")
-          puts "        checking component: '#{rear_view_instance.name}' (type=#{type_attrib})"
-          puts "        definition name: '#{rear_view_instance.definition.name}'"
-        end
-
-        # Use Skalp type attribute or fallback to name for identification
-        # Check both instance name AND definition name since instance name may be empty
-        is_rearview = rear_view_instance.get_attribute("Skalp", "type") == "rear_view" ||
-                      rear_view_instance.name =~ /^Skalp - .*rear view/i ||
-                      rear_view_instance.definition.name =~ /^Skalp - .*rear view/i ||
-                      rear_view_instance.definition.name =~ /^Skalp - rear view/i
-        next unless is_rearview
-
-        if defined?(DEBUG) && DEBUG
-          puts "        FOUND rearview component: #{rear_view_instance.name}"
-          puts "        definition: #{rear_view_instance.definition.name}"
-          already_used = @used_definitions.include?(rear_view_instance.definition)
-          puts "        definition already used: #{already_used}"
-        end
-
-        # NOTE: We still track used definitions to avoid duplicates, but we
-        # associate the definition with THIS page regardless
-        # (previously: next if @used_definitions.include?(rear_view_instance.definition))
-        # This was causing pages to not have their rearview definition loaded if
-        # another page already used the same definition.
-
-        @rear_view_definitions[page] = rear_view_instance.definition
-        unless @used_definitions.include?(rear_view_instance.definition)
-          @used_definitions << rear_view_instance.definition
-        end
-
-        # Initialize uptodate at load time so UI status is correct
-        sectionplaneID = @model.get_memory_attribute(page, "Skalp", "sectionplaneID")
-        @uptodate[page] = sectionplaneID if sectionplaneID && sectionplaneID != ""
-
-        puts "        ✓ Loaded rear_view_definition for page: #{page_name}" if defined?(DEBUG) && DEBUG
-
-        attrib_data = rear_view_instance.definition.get_attribute("Skalp", "rear_view_lines")
-
-        if attrib_data && attrib_data != ""
-          begin
-            lines = eval(attrib_data)
-          rescue SyntaxError => e
-            lines = nil
-          end
-
-          if lines && lines.class == Hash
-            polylines_by_layer = {}
-            lines.each do |layer_name, line_data|
-              next unless line_data
-
-              polylines = PolyLines.new
-              polylines.fill_from_layout(line_data)
-              su_layer = Skalp.active_model.skpModel.layers[layer_name]
-              polylines_by_layer[su_layer] = polylines if su_layer
-            end
-
-            @rear_lines_result[page] = polylines_by_layer
-
-            # Sync up-to-date status
-            sectionplaneID = if page == @skpModel
-                               @model.get_memory_attribute(@skpModel, "Skalp", "active_sectionplane_ID")
-                             else
-                               @model.get_memory_attribute(page, "Skalp", "sectionplaneID")
-                             end
-
-            @calculated[page] = @uptodate[page] = sectionplaneID if sectionplaneID && sectionplaneID != ""
-          end
-        # @rear_lines_result[page] = polylines_by_layer
-        else
-          rear_view_instance.definition.set_attribute("Skalp", "rear_view_lines", "")
-        end
-      end
-
-      return unless @rear_view_definitions[page] && @rear_lines_result[page]
-
-      @calculated[page] =
-        @uptodate[page] = Skalp.active_model.get_memory_attribute(page, "Skalp", "sectionplaneID")
-    end
+    # Original load_rear_view_definitions removed.
+    # Logic is now handled by RearViewManager#load_all and RearViewState.
 
     def delete_rear_view_instances
-      return unless @rear_view_definitions
+      return unless rear_view_definitions
 
-      @rear_view_definitions.each_value do |definition|
+      rear_view_definitions.each_value do |definition|
         next unless definition && definition.valid?
 
         definition.instances.each do |instance|
@@ -608,7 +561,9 @@ module Skalp
     end
 
     def delete_rear_view_instance(page = @skpModel)
-      @rear_view_definitions[page].instances.each do |instance|
+      return unless rear_view_definitions[page]
+
+      rear_view_definitions[page].instances.each do |instance|
         instance.erase!
       end
     end
@@ -703,7 +658,7 @@ module Skalp
         if Skalp.active_model.skpModel.path == ""
           UI.messagebox(Skalp.translate("Your model needs to be saved first."))
           Skalp.block_observers = block_observer_status
-          return {}
+          return nil
         else
           save_temp_model
           Skalp.block_observers = block_observer_status
@@ -715,7 +670,7 @@ module Skalp
       if reversed
         result = reverse_scenes
 
-        return {} unless result
+        return nil unless result
 
         rear_view = -1.0
 
@@ -740,7 +695,7 @@ module Skalp
       target2d_array = page_info_to_array(pages_info, :target2d)
 
       all_polylines = if reversed
-                        @rear_lines_result
+                        rear_lines_result
                       else
                         @forward_lines_result
                       end
@@ -779,23 +734,36 @@ module Skalp
           all_polylines[page] = polylines_by_layer
           active_sectionplane_id = Skalp.active_model.get_memory_attribute(Skalp.active_model.skpModel, "Skalp",
                                                                            "active_sectionplane_ID")
-          @calculated[page] = @uptodate[page] = active_sectionplane_id
+
+          # Update manager state for this page
+          @rear_view.update(page,
+                            definition: @rear_view[page].definition,
+                            polylines: polylines_by_layer,
+                            sectionplane_id: active_sectionplane_id)
 
           selected_page = Skalp.active_model.skpModel.pages.selected_page
-          # Only sync polylines if sectionplanes match, but always sync uptodate
           if selected_page
+            # Only sync polylines if sectionplanes match
             if Skalp.active_model.pages[selected_page] &&
                Skalp.active_model.pages[selected_page].sectionplane &&
                Skalp.active_model.pages[selected_page].sectionplane.skpSectionPlane == Skalp.active_model.skpModel.entities.active_section_plane
               all_polylines[selected_page] = polylines_by_layer
-              @calculated[selected_page] = active_sectionplane_id
+              @rear_view.update(selected_page,
+                                definition: @rear_view[selected_page].definition,
+                                polylines: polylines_by_layer,
+                                sectionplane_id: active_sectionplane_id)
+            else
+              # Always sync sectionplane_id so UI indicator is correct
+              @rear_view.sync_sectionplane_id(selected_page, active_sectionplane_id)
             end
-            # Always update uptodate for selected_page so UI indicator is correct
-            @uptodate[selected_page] = active_sectionplane_id
           end
         else
           all_polylines[page] = polylines_by_layer
-          @calculated[page] = @uptodate[page] = Skalp.active_model.get_memory_attribute(page, "Skalp", "sectionplaneID")
+          sectionplane_id = Skalp.active_model.get_memory_attribute(page, "Skalp", "sectionplaneID")
+          @rear_view.update(page,
+                            definition: @rear_view[page].definition,
+                            polylines: polylines_by_layer,
+                            sectionplane_id: sectionplane_id)
         end
       end
 
@@ -841,6 +809,8 @@ module Skalp
       return nil if [nil, ""].include?(sectionplaneID)
 
       sectionplane = @model.sectionplane_by_id(sectionplaneID)
+      return nil unless sectionplane && sectionplane.skpSectionPlane && sectionplane.skpSectionPlane.valid?
+
       plane = sectionplane.skpSectionPlane.get_plane
 
       vector = Geom::Vector3d.new(plane[0], plane[1], plane[2])
@@ -852,7 +822,27 @@ module Skalp
 
       centerline = [center, center2]
       new_target = Geom.intersect_line_plane(centerline, plane)
+
+      # Debug: check if intersection failed
+      if new_target.nil?
+        puts "[DEBUG RearView] get_reverse_scene_info: intersect_line_plane returned nil for #{page_name}"
+        puts "  centerline: #{centerline.inspect}"
+        puts "  plane: #{plane.inspect}"
+        return nil
+      end
+
       dist = new_target.distance(camera.eye)
+
+      # Debug: log camera info for vertical sections
+      if plane[2].abs < 0.1 # Vertical section (normal is mostly horizontal)
+        puts "[DEBUG RearView] Vertical section detected for #{page_name}"
+        puts "  plane normal: [#{plane[0]}, #{plane[1]}, #{plane[2]}]"
+        puts "  camera.eye: #{camera.eye.to_a}"
+        puts "  camera.direction: #{camera.direction.to_a}"
+        puts "  new_target: #{new_target.to_a}"
+        puts "  dist: #{dist}"
+      end
+
       eye_vector = vector.reverse
       eye_vector.length = dist
       new_eye = new_target.offset(eye_vector)

@@ -97,6 +97,10 @@ module Skalp
       puts ">>> [DEBUG] Model.initialize COMPLETED"
     end
 
+    def inspect
+      "#<#{self.class}:#{object_id} @skpModel=#{@skpModel}>"
+    end
+
     def modified_multi_tags(objects)
       objects.each do |entity|
         data = {
@@ -462,36 +466,46 @@ module Skalp
           style_value = value[style_key]
           if style_key == :style_rules && style_value.respond_to?(:rules)
             object.set_attribute(dict_name, "ss_#{style_key}", style_value.rules.inspect)
-          elsif !style_value.is_a?(Hash)
+          elsif style_key == :depth_clipping_distance && style_value.respond_to?(:to_s)
+            # Distance objects must be serialized to string for SketchUp to store
             object.set_attribute(dict_name, "ss_#{style_key}", style_value.to_s)
+          elsif !style_value.is_a?(Hash)
+            # Ensure we don't force .to_s if it's already a native type (Boolean, Numeric)
+            object.set_attribute(dict_name, "ss_#{style_key}", style_value)
           end
         end
       # Write simple types to native attributes
-      elsif value.nil? || value.is_a?(String) || value.is_a?(Numeric) || value.is_a?(TrueClass) || value.is_a?(FalseClass)
-        object.set_attribute(dict_name, key, value)
+      elsif value.nil? || value.is_a?(String) || value.is_a?(Numeric) || value.is_a?(TrueClass) || value.is_a?(FalseClass) || value.is_a?(Length)
+        object.set_attribute(dict_name, key.to_s, value)
       end
     end
 
     def get_memory_attribute(object, dict_name, key)
       return nil unless object # Guard against nil object
 
-      # Handle style_settings specially: reconstruct Hash from flattened native attributes
-      if ["style_settings", :style_settings].include?(key)
+      # MIGRATION SU2026: If the key is style_settings, we need to reconstruct it from flattened native attributes
+      if key.to_s == "style_settings" || key.to_sym == :style_settings
+        # First check if we already have it in native attributes as flattened keys (ss_*)
         reconstructed = {}
         has_any = false
         STYLE_SETTINGS_KEYS.each do |style_key|
           native_value = object.get_attribute(dict_name, "ss_#{style_key}")
-          next unless native_value
+          next if native_value.nil?
 
           has_any = true
-          # Convert back from string to appropriate type
           reconstructed[style_key] = case style_key
-                                     when :drawing_scale, :depth_clipping_distance
+                                     when :drawing_scale
                                        native_value.to_f
+                                     when :depth_clipping_distance
+                                       Distance.new(native_value)
                                      when :rearview_status, :section_cut_width_status, :depth_clipping_status
-                                       ["true", true].include?(native_value)
+                                       Skalp.to_boolean(native_value)
                                      when :style_rules
-                                       native_value ? Skalp::StyleRules.new(eval(native_value)) : nil
+                                       begin
+                                         native_value ? Skalp::StyleRules.new(eval(native_value)) : nil
+                                       rescue StandardError
+                                         nil
+                                       end
                                      else
                                        native_value
                                      end
@@ -504,10 +518,21 @@ module Skalp
             old_hash = old_blob.is_a?(String) ? eval(old_blob) : old_blob
             if old_hash.is_a?(Hash)
               STYLE_SETTINGS_KEYS.each do |style_key|
-                if !reconstructed.key?(style_key) && old_hash.key?(style_key)
-                  reconstructed[style_key] = old_hash[style_key]
-                  has_any = true
-                end
+                next unless !reconstructed.key?(style_key) && old_hash.key?(style_key)
+
+                val = old_hash[style_key]
+                # Ensure correct type even from old blob
+                reconstructed[style_key] = case style_key
+                                           when :drawing_scale
+                                             val.to_f
+                                           when :depth_clipping_distance
+                                             Distance.new(val)
+                                           when :rearview_status, :section_cut_width_status, :depth_clipping_status
+                                             Skalp.to_boolean(val)
+                                           else
+                                             val
+                                           end
+                has_any = true
               end
             end
           rescue StandardError => e
@@ -517,13 +542,19 @@ module Skalp
 
         if has_any
           # HEURISTIC: Only consider page settings as an "override" if they are meaningful
-          # (i.e., not just defaults like false/0.0/empty rules).
-          # Model settings are always considered meaningful.
           is_meaningful = object.is_a?(Sketchup::Model) ||
                           reconstructed.any? do |k, v|
                             case k
-                            when :drawing_scale, :depth_clipping_distance
+                            when :drawing_scale
                               v.to_f > 0.01
+                            when :depth_clipping_distance
+                              # Distance objects have input_value, not to_f
+                              val = begin
+                                v.respond_to?(:input_value) ? v.input_value : v.to_f
+                              rescue StandardError
+                                0
+                              end
+                              val > 0.01
                             when :rearview_status, :section_cut_width_status, :depth_clipping_status
                               v == true
                             when :style_rules
@@ -553,13 +584,25 @@ module Skalp
 
         return nil
       end
+
       # For other keys: read from native attributes first
       value = object.get_attribute(dict_name, key.to_s)
+
+      # Type reconstruction for common non-style_settings keys
+      value = Skalp.to_boolean(value) if key.to_s =~ /_status$|lineweights|rearview_update/i && !value.nil?
 
       # Fallback to memory_attributes for old data during migration
       if value.nil? && @memory_attributes.include?(object)
         value = @memory_attributes[object][key.to_s] || @memory_attributes[object][key.to_sym]
       end
+
+      # if defined?(DEBUG) && DEBUG && !value.nil? && key.to_s != "style_settings"
+      #   puts "[LOG] get_memory_attribute('#{if object.is_a?(Sketchup::Model)
+      #                                         'Model'
+      #                                       else
+      #                                         (object.respond_to?(:name) ? object.name : object.to_s)
+      #                                       end}', '#{key}') -> #{value} (#{value.class})"
+      # end
 
       value
     end

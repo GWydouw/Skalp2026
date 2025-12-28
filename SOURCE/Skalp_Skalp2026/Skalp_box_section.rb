@@ -376,7 +376,7 @@ module Skalp
       def show
         path = File.join(File.dirname(__FILE__), "ui", "settings.html")
         @dialog = UI::HtmlDialog.new({ dialog_title: "SectionBox Settings",
-                                       preferences_key: "com.skalp.sectionbox.settings", scrollable: false, resizable: false, width: 350, height: 450, style: UI::HtmlDialog::STYLE_DIALOG })
+                                       preferences_key: "com.skalp.sectionbox.settings", scrollable: false, resizable: false, width: 350, height: 450, style: UI::HtmlDialog::STYLE_UTILITY })
         @dialog.set_file(path)
         @dialog.add_action_callback("ready") do
           defaults = Data.get_defaults
@@ -442,7 +442,7 @@ module Skalp
 
         path = File.join(File.dirname(__FILE__), "ui", "scale_manager.html")
         @dialog = UI::HtmlDialog.new({ dialog_title: "Drawing Scale Manager",
-                                       preferences_key: "com.skalp.sectionbox.scale_manager", scrollable: false, resizable: true, width: 400, height: 500, style: UI::HtmlDialog::STYLE_DIALOG })
+                                       preferences_key: "com.skalp.sectionbox.scale_manager", scrollable: false, resizable: true, width: 400, height: 500, style: UI::HtmlDialog::STYLE_UTILITY })
         @dialog.set_file(path)
         @dialog.add_action_callback("ready") do
           scales = Data.get_scales
@@ -476,7 +476,7 @@ module Skalp
 
         path = File.join(File.dirname(__FILE__), "ui", "manager.html")
         @dialog = UI::HtmlDialog.new({ dialog_title: "Skalp SectionBox Manager",
-                                       preferences_key: "com.skalp.sectionbox.manager", scrollable: false, resizable: true, width: 300, height: 500, style: UI::HtmlDialog::STYLE_DIALOG })
+                                       preferences_key: "com.skalp.sectionbox.manager", scrollable: false, resizable: true, width: 300, height: 500, style: UI::HtmlDialog::STYLE_UTILITY })
         @dialog.set_file(path)
         @dialog.add_action_callback("ready") { |d, p| sync_data }; @dialog.add_action_callback("sync") do |d, p|
                                                                      sync_data
@@ -602,7 +602,7 @@ module Skalp
         @@frame_observer ||= SectionBoxFrameChangeObserver.new
         model.add_observer(@@model_observer)
         model.selection.add_observer(@@selection_observer)
-        model.pages.add_frame_change_observer(@@frame_observer)
+        Sketchup.add_frame_change_observer(@@frame_observer)
         @@observers_active = true
       end
 
@@ -695,7 +695,7 @@ module Skalp
 
         model.remove_observer(@@model_observer) if @@model_observer
         model.selection.remove_observer(@@selection_observer) if @@selection_observer
-        model.pages.remove_frame_change_observer(@@frame_observer) if @@frame_observer
+        Sketchup.remove_frame_change_observer(@@frame_observer) if @@frame_observer
         @@observers_active = false
       end
 

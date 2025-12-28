@@ -13,66 +13,180 @@
 <body onload="ready_materialSelector()" onmouseleave="su_focus()" onresize="position()" scroll="no"
     style="OVERFLOW: hidden">
     <div id="app">
-        <div>
-            <img class="in-model" src="icons/14x13_in_model.png" onclick="in_model_materials()">
-            <select v-model="selected_library" class="form-control material-select" onchange="library(this.value)"
-                onfocus="this.selectedIndex = 1">
-                <option v-for="library in libraries" v-bind:value="library">
+        <div class="header-container">
+            <img class="in-model" src="icons/dlg_in_model.svg" @click="in_model_materials()" title="Home" width="24"
+                height="24">
+            <select v-model="selected_library" class="form-control material-select"
+                @change="library($event.target.value)">
+                <option v-for="library in libraries" :value="library">
                     {{library}}
                 </option>
             </select>
-        </div>
-        <div class="mygrid-wrapper-div">
-            <div v-if="skalp_materials === true" class="material-div" v-for="material in materials"
-                @mouseenter="hide_context_menu">
-                <img v-on:mouseover="hover_material(material.name)"
-                    v-on:contextmenu.prevent="show_context_menu($event, material.name)" class='image-border' width='54'
-                    height='18' v-bind:src="material.source" v-bind:style="{top: material.preview_top + 'px'}" alt=''
-                    data-toggle='tooltip' data-placement='top' v-bind:title="material.name"
-                    v-on:click="selectmaterial(material.name)">
-                <span v-on:mouseover="hover_material(material.name)"
-                    v-on:contextmenu.prevent="show_context_menu($event, material.name)" class="material-text"
-                    v-bind:style="{top: material.text_top + 'px'}" v-bind:title="material.name"
-                    v-on:click="selectmaterial(material.name)">{{material.name}}</span>
+            <!-- Menu Icon -->
+            <div id="library_actions_icon" class="menu-icon" onclick="toggle_main_menu(event)" title="Menu">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="#555" stroke-width="1.5" />
+                    <circle cx="8" cy="12" r="1" fill="#555" />
+                    <circle cx="12" cy="12" r="1" fill="#555" />
+                    <circle cx="16" cy="12" r="1" fill="#555" />
+                </svg>
             </div>
-            <div class="material-div" v-else @mouseenter="hide_context_menu">
-                <img v-on:mouseover="hover_material(material.name)" class='clip-image' width='54' height='54'
-                    v-bind:src="material.source" v-bind:style="{top: material.preview_top + 'px'}" alt=''
-                    data-toggle='tooltip' data-placement='top' v-bind:title="material.name"
-                    v-on:contextmenu.prevent="show_context_menu($event, material.name)">
-                <span v-on:mouseover="hover_material(material.name)" class="material-text"
-                    v-bind:style="{top: material.text_top + 'px'}" v-bind:title="material.name"
-                    v-on:click="selectmaterial(material.name)" v-on:mouseover="isHovering = true"
-                    v-on:mouseleave="isHovering = false"
-                    v-on:contextmenu.prevent="show_context_menu($event, material.name)">{{material.name}}</span>
-            </div>
-        </div>
-        <div id="library_actions">
-            <select class="material-menu" onchange="material_menu(this, this.value)">
-                <option value="material">Material</option>
-                <option value="save_all">Save All to New Library</option>
-                <option value="export">Export Patterns to LayOut</option>
-            </select>
-            <select class="library-menu" onchange="library_menu(this, this.value)">
-                <option value="library">Library</option>
-                <option value="new">New</option>
-            </select>
         </div>
 
+        <div id="picker-banner"
+            style="display:none; background:#ffeb3b; color:#333; text-align:center; padding: 8px; border-bottom:1px solid #ddd; font-weight:bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1); flex: 0 0 auto;">
+            Select replacement material... <button onclick="cancel_picker_mode()"
+                style="margin-left:10px; padding:2px 8px; cursor:pointer;">Cancel</button>
+        </div>
+
+        <div class="scroll-wrapper">
+            <div class="scroll-indicator top"></div>
+            <div class="mygrid-wrapper-div" onscroll="onGridScroll(this)"
+                @contextmenu.prevent="show_empty_context_menu($event)">
+                <div class="material-div" v-for="material in materials"
+                    :class="{ 'selected': selected_material === material.name }" @click="selectmaterial(material.name)"
+                    @mouseenter="hide_context_menu" @contextmenu.stop.prevent="show_context_menu($event, material.name)"
+                    :title="material.name">
+
+                    <!-- Preview Box -->
+                    <div class="material-preview-box" :class="{ 'large': !skalp_materials }"
+                        :style="material.source ? { backgroundImage: 'url(\'' + material.source + '\')' } : {}"
+                        :title="material.name">
+                    </div>
+
+                    <!-- Text -->
+                    <span class="material-text" :class="{ 'selected': selected_material === material.name }"
+                        :title="material.name">
+                        {{material.name}}
+                    </span>
+                </div>
+            </div>
+            <div class="scroll-indicator bottom"></div>
+        </div>
+
+        <div id="context-menu"
+            style="display:none; position:absolute; background:#fff; border:1px solid #ccc; z-index:1000;"
+            @mouseleave="hide_context_menu" onmouseenter="event.stopPropagation()">
+            <ul style="list-style:none; margin:0; padding:5px;">
+                <li onclick="context_edit_material(event)" data-only-model>Edit</li>
+                <li onclick="context_rename_material(event)">Rename</li>
+                <li onclick="context_duplicate_material(event)">Duplicate</li>
+                <li class="separator"></li>
+                <li onclick="context_remove_material(event)">Delete</li>
+                <li class="separator"></li>
+                <li onclick="context_copy_material(event)">Copy to Library</li>
+                <li onclick="context_move_material(event)" data-only-library>Move to Library</li>
+                <li onclick="context_merge_material(event)" data-only-model>Replace with...</li>
+            </ul>
+        </div>
+
+        <div id="empty-zone-context-menu"
+            style="display:none; position:absolute; background:#fff; border:1px solid #ccc; z-index:1000;"
+            @mouseleave="hide_empty_context_menu" onmouseenter="event.stopPropagation()">
+            <ul style="list-style:none; margin:0; padding:5px;">
+                <li onclick="context_create_material(event)">Create new Material</li>
+            </ul>
+        </div>
+
+        <div id="main-menu"
+            style="display:none; position:absolute; background:#fff; border:1px solid #ccc; z-index:1001; min-width: 150px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <ul style="list-style:none; margin:0; padding:5px;">
+                <li onclick="menu_new_library(event)">New Library</li>
+                <li onclick="menu_rename_library(event)" data-only-library>Rename Library</li>
+                <li onclick="menu_delete_library(event)" data-only-library>Delete Library</li>
+                <li class="separator"></li>
+                <li onclick="menu_save_all(event)">Save All to New Library</li>
+                <li class="separator"></li>
+                <li onclick="menu_export_layout(event)">Export Patterns to LayOut</li>
+            </ul>
+        </div>
     </div>
+
 
     <script src="js/material_dialog.js"></script>
     <script>
         let current_context_material = null;
         let context_menu_active = false;
+        let main_menu_active = false;
+        var picker_mode_active = false;
+        var material_to_replace = null;
+        var selected_material = ""; // Track selected for highlighting
+
+        function toggle_main_menu(event) {
+            const menu = document.getElementById("main-menu");
+            if (menu.style.display === "block") {
+                hide_main_menu();
+            } else {
+                show_main_menu(event);
+            }
+            event.stopPropagation();
+        }
+
+        function show_main_menu(event) {
+            main_menu_active = true;
+            const menu = document.getElementById("main-menu");
+
+            const currentLib = app.selected_library || "";
+            const isExternalLibrary = !(currentLib.indexOf("in model") > -1);
+            const isSkalpInModel = (currentLib === "Skalp materials in model");
+
+            // Grey out Rename/Delete Library if in-model
+            menu.querySelectorAll("[data-only-library]").forEach(el => {
+                if (isExternalLibrary) {
+                    el.classList.remove('disabled');
+                } else {
+                    el.classList.add('disabled');
+                }
+            });
+
+            // Grey out Save All if not Skalp materials in model
+            const saveAll = menu.querySelector("[onclick*='save_all']");
+            if (saveAll) {
+                if (isSkalpInModel) {
+                    saveAll.classList.remove('disabled');
+                } else {
+                    saveAll.classList.add('disabled');
+                }
+            }
+
+            // Grey out Export Patterns to LayOut if NOT Skalp materials in model
+            const exportLayout = menu.querySelector("[onclick*='export_layout']");
+            if (exportLayout) {
+                if (isSkalpInModel) {
+                    exportLayout.classList.remove('disabled');
+                } else {
+                    exportLayout.classList.add('disabled');
+                }
+            }
+
+            const icon = document.getElementById("library_actions_icon");
+            const rect = icon.getBoundingClientRect();
+
+            menu.style.display = "block";
+            // Position below the icon, aligned to right
+            menu.style.top = (rect.bottom + 5) + "px";
+            menu.style.right = (window.innerWidth - rect.right) + "px";
+            menu.style.left = "auto";
+        }
+
+        function hide_main_menu() {
+            main_menu_active = false;
+            document.getElementById("main-menu").style.display = "none";
+        }
 
         function show_context_menu(event, material) {
+            hide_main_menu(); // Hide main menu if opening context
             context_menu_active = true;
-            const isExternalLibrary = !(app.selected_library === "Skalp materials in model" || app.selected_library === "SketchUp materials in model");
+            const currentLib = app.selected_library || "";
+            const isExternalLibrary = !(currentLib.indexOf("in model") > -1);
 
-            // Toon of verberg 'data-only-library' menu items
+            // Grey out/disable library-only items in context menu
             document.querySelectorAll("#context-menu [data-only-library]").forEach(el => {
-                el.style.display = isExternalLibrary ? 'block' : 'none';
+                if (isExternalLibrary) {
+                    el.classList.remove('disabled');
+                } else {
+                    el.classList.add('disabled');
+                }
             });
 
             // Toon of verberg 'data-only-model' menu items
@@ -84,13 +198,39 @@
             event.preventDefault();
             current_context_material = material;
             const menu = document.getElementById("context-menu");
+
+            // First show visibility hidden to calculate dimensions
+            menu.style.opacity = "0";
             menu.style.display = "block";
-            menu.style.left = event.pageX + "px";
-            menu.style.top = event.pageY + "px";
+
+            const menuWidth = menu.offsetWidth;
+            const menuHeight = menu.offsetHeight;
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+
+            let top = event.pageY;
+            let left = event.pageX;
+
+            // Check vertical overflow
+            if (top + menuHeight > windowHeight) {
+                top = top - menuHeight; // Open upwards
+                if (top < 0) top = 0; // Top safety
+            }
+
+            // Check horizontal overflow
+            if (left + menuWidth > windowWidth) {
+                left = windowWidth - menuWidth - 10; // Align left, with padding
+            }
+
+            menu.style.top = top + "px";
+            menu.style.left = left + "px";
+            menu.style.opacity = "1";
+
             // Remove any old context-active classes
             document.querySelectorAll('.context-active').forEach(el => el.classList.remove('context-active'));
             event.currentTarget.classList.add('context-active');
         }
+
 
         function hide_context_menu() {
             context_menu_active = false;
@@ -99,19 +239,89 @@
             document.querySelectorAll('.context-active').forEach(el => el.classList.remove('context-active'));
         }
 
+        function show_empty_context_menu(event) {
+            hide_main_menu();
+            hide_context_menu();
+
+            event.preventDefault();
+            const menu = document.getElementById("empty-zone-context-menu");
+
+            menu.style.opacity = "0";
+            menu.style.display = "block";
+
+            const menuWidth = menu.offsetWidth;
+            const menuHeight = menu.offsetHeight;
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+
+            let top = event.pageY;
+            let left = event.pageX;
+
+            if (top + menuHeight > windowHeight) top = top - menuHeight;
+            if (left + menuWidth > windowWidth) left = windowWidth - menuWidth - 10;
+            if (top < 0) top = 0;
+
+            menu.style.top = top + "px";
+            menu.style.left = left + "px";
+            menu.style.opacity = "1";
+        }
+
+        function hide_empty_context_menu() {
+            document.getElementById("empty-zone-context-menu").style.display = "none";
+        }
+
+        function context_create_material(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
+            sketchup.material_menu('create_new', '');
+            hide_empty_context_menu();
+        }
+
+        function start_picker_mode(target_material) {
+            picker_mode_active = true;
+            material_to_replace = target_material;
+            document.getElementById("picker-banner").style.display = "block";
+            document.getElementById("picker-banner").childNodes[0].nodeValue = "Replace '" + target_material + "' with... ";
+        }
+
+        function cancel_picker_mode() {
+            picker_mode_active = false;
+            material_to_replace = null;
+            document.getElementById("picker-banner").style.display = "none";
+        }
+
+        function confirm_replacement(new_material) {
+            if (new_material === material_to_replace) {
+                alert("Please select a different material.");
+                return;
+            }
+            sketchup.material_menu('replace_confirmed', material_to_replace + "|||" + new_material);
+            cancel_picker_mode();
+        }
+
         document.addEventListener("click", function (event) {
             hide_context_menu();
+            hide_empty_context_menu();
+            if (!event.target.closest('#main-menu') && !event.target.closest('.menu-icon')) {
+                hide_main_menu();
+            }
         });
 
         document.addEventListener("keydown", function (event) {
             if (event.key === "Escape") {
-                hide_context_menu();
+                if (picker_mode_active) {
+                    cancel_picker_mode();
+                } else {
+                    hide_context_menu();
+                    hide_empty_context_menu();
+                    hide_main_menu();
+                }
             }
         });
 
         // Globale mousemove-listener voor context-menu hiding
         document.addEventListener('mousemove', function (event) {
             const menu = document.getElementById("context-menu");
+            if (!menu) return;
             const overMenu = menu.contains(event.target);
             const overActive = event.target.closest('.material-div')?.classList.contains('context-active');
             if (menu.style.display === "block" && !overMenu && !overActive) {
@@ -119,50 +329,104 @@
             }
         });
 
-        function context_edit_material() {
+        function context_edit_material(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
             app.selectmaterial(current_context_material);
             sketchup.material_menu('edit', current_context_material);
         }
 
-        function context_copy_material() {
+        function context_copy_material(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
             app.selectmaterial(current_context_material);
             sketchup.material_menu('copy', current_context_material);
         }
 
-        function context_move_material() {
+        function context_move_material(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
             app.selectmaterial(current_context_material);
             sketchup.material_menu('move', current_context_material);
         }
 
-        function context_remove_material() {
+        function context_remove_material(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
             app.selectmaterial(current_context_material);
             sketchup.material_menu('remove', current_context_material);
         }
-        function context_rename_material() {
+        function context_rename_material(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
             app.selectmaterial(current_context_material);
             sketchup.material_menu('rename', current_context_material);
         }
 
-        function context_merge_material() {
+        function context_merge_material(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
             app.selectmaterial(current_context_material);
-            sketchup.material_menu('merge', current_context_material);
+            hide_context_menu();
+            start_picker_mode(current_context_material);
         }
 
+        function context_duplicate_material(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
+            app.selectmaterial(current_context_material);
+            sketchup.material_menu('duplicate', current_context_material);
+        }
+
+        // Main Menu Actions
+        function menu_new_library(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
+            sketchup.library_menu('new');
+            hide_main_menu();
+        }
+
+        function menu_rename_library(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
+            sketchup.library_menu('rename');
+            hide_main_menu();
+        }
+
+        function menu_delete_library(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
+            sketchup.library_menu('delete');
+            hide_main_menu();
+        }
+
+        function menu_save_all(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
+            sketchup.material_menu('save_all');
+            hide_main_menu();
+        }
+
+        function menu_export_layout(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
+            sketchup.material_menu('export');
+            hide_main_menu();
+        }
+
+        function onGridScroll(el) {
+            updateScrollIndicators(el);
+        }
+
+        function updateScrollIndicators(el) {
+            if (!el) el = document.querySelector('.mygrid-wrapper-div');
+            if (!el) return;
+
+            const appEl = document.getElementById('app');
+            const scrollTop = el.scrollTop;
+            const scrollHeight = el.scrollHeight;
+            const clientHeight = el.clientHeight;
+
+            // Subtle threshold
+            if (scrollTop > 5) {
+                appEl.classList.add('can-scroll-up');
+            } else {
+                appEl.classList.remove('can-scroll-up');
+            }
+
+            if (scrollTop + clientHeight < scrollHeight - 5) {
+                appEl.classList.add('can-scroll-down');
+            } else {
+                appEl.classList.remove('can-scroll-down');
+            }
+        }
     </script>
-
-    <div id="context-menu"
-        style="display:none; position:absolute; background:#fff; border:1px solid #ccc; z-index:1000;"
-        @mouseleave="hide_context_menu" onmouseenter="event.stopPropagation()">
-        <ul style="list-style:none; margin:0; padding:5px;">
-            <li onclick="context_edit_material()">Edit</li>
-            <li onclick="context_rename_material()" data-only-library>Rename</li>
-            <li onclick="context_remove_material()">Remove</li>
-            <li onclick="context_copy_material()">Copy to Library</li>
-            <li onclick="context_move_material()" data-only-library>Move to Library</li>
-            <li onclick="context_merge_material()" data-only-model>Merge with...</li>
-        </ul>
-    </div>
-
 </body>
-
-</html>

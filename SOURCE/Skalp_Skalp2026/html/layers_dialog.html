@@ -20,7 +20,7 @@
         body {
             margin: 0;
             padding: 0;
-            background-color: #dcdcdc;
+            background-color: #ebebeb;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -38,7 +38,7 @@
         /* TOOLBAR */
         #toolbar {
             height: 38px;
-            background-color: #dcdcdc;
+            background-color: #ebebeb;
             display: flex;
             align-items: center;
             padding: 0 8px;
@@ -64,9 +64,9 @@
 
         #filter {
             width: 100%;
-            height: 24px;
+            height: 22px;
             border: 1px solid #aaa;
-            border-radius: 4px;
+            border-radius: 6px;
             padding-left: 24px;
             padding-right: 5px;
             outline: none;
@@ -616,7 +616,7 @@
             var x = window.screenX.toString();
             var y = window.screenY.toString();
             var params = x.concat(";", y, ";", id.toString());
-            window.location = 'skp:materialSelector@' + params;
+            sketchup.materialSelector(params);
         }
 
         function render() {
@@ -664,7 +664,7 @@
             var x = window.screenX.toString();
             var y = window.screenY.toString();
             var params = x.concat(";", y, ";", id.toString());
-            window.location = 'skp:materialSelector@' + params;
+            sketchup.materialSelector(params);
         }
 
         // Context menu functions
@@ -676,7 +676,7 @@
             }).show();
 
             $('#edit-pattern-item').off('click').on('click', function () {
-                window.location = 'skp:editPattern@' + patternName;
+                sketchup.editPattern(patternName);
                 contextMenu.hide();
             });
 
@@ -701,11 +701,11 @@
             var w = window.innerWidth.toString();
             var h = window.innerHeight.toString();
             var params = w.concat(";", h, ";", x, ";", y);
-            window.location = 'skp:dialog_position@' + params;
+            sketchup.dialog_position(params);
         }
 
         function loaded() {
-            window.location = 'skp:loaded@';
+            sketchup.loaded('');
         }
 
     </script>
@@ -719,7 +719,7 @@
         <div id="toolbar">
             <div id="search-container">
                 <div class="search-icon"></div>
-                <input type="text" id="filter" placeholder="Filter">
+                <input type="text" id="filter" placeholder="Search">
             </div>
         </div>
 

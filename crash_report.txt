@@ -1,0 +1,226 @@
+Analyzing crashes since 2022-01-01...
+Processed 100000 lines...
+Processed 200000 lines...
+Processed 300000 lines...
+Processed 400000 lines...
+
+=== ANALYSIS REPORT ===
+Total Lines Processed: 458690
+Relevant Crashes (>= 2022-01-01): 204474
+
+--- TOP 20 CRASHES ---
+
+1. COUNT: 81278
+   ERROR: ArgumentError: Could not compute valid matrix from points @ [\"eval:648:in `position_material\'\", \"eval:648:
+   LATEST SAMPLE: 2022-01-01 17:12:10 (v2021.0.0011 on SU21.1.331)
+
+2. COUNT: 20226
+   ERROR: TypeError: reference to deleted Face @ [\"eval:528:in `normal\'\", \"eval:528:in `block i
+   LATEST SAMPLE: 2022-01-03 11:01:57 (v2021.0.0011 on SU21.1.332)
+
+3. COUNT: 17166
+   ERROR: TypeError: reference to deleted DrawingElement @ [\"eval:527:in `layer=\'\", \"eval:527:in `block i
+   LATEST SAMPLE: 2022-01-03 09:10:41 (v2021.0.0011 on SU21.1.332)
+
+4. COUNT: 10127
+   ERROR: NoMethodError: undefined method `style_settings\' for nil:NilClass @ [\"eval:94:in `section_to_sectiongroup\'\", \"eval
+   LATEST SAMPLE: 2022-01-03 09:57:01 (v2021.0.0011 on SU21.1.332)
+
+5. COUNT: 8697
+   ERROR: ArgumentError: Could not compute valid matrix from points @ [\"eval:822:in `position_material\'\", \"eval:822:
+   LATEST SAMPLE: 2022-11-28 09:28:30 (v2022.0.9999 on SU22.0.353)
+
+6. COUNT: 7424
+   ERROR: ArgumentError: Could not compute valid matrix from points @ 2021/SketchUp/Plugins/Skalp_Skalp/Skalp_lib2.rb:186
+   LATEST SAMPLE: 2022-01-02 11:50:57 (v2021.0.0011 on SU21.1.332)
+
+7. COUNT: 6856
+   ERROR: ArgumentError: Could not compute valid matrix from points @ [\"eval:824:in `position_material\'\", \"eval:824:
+   LATEST SAMPLE: 2023-03-01 09:45:36 (v2023.0.0004 on SU23.0.367)
+
+8. COUNT: 6712
+   ERROR: NoMethodError: undefined method `drawing_scale\' for nil:NilClass @ [\"eval:568:in `correct_UV_material\'\", \"eval:52
+   LATEST SAMPLE: 2022-01-03 09:57:01 (v2021.0.0011 on SU21.1.332)
+
+9. COUNT: 4167
+   ERROR: ArgumentError: Could not compute valid matrix from points @ [\"eval:825:in `position_material\'\", \"eval:825:
+   LATEST SAMPLE: 2022-05-05 16:40:12 (v2022.0.0006 on SU22.0.316)
+
+10. COUNT: 4014
+   ERROR: ArgumentError: Could not compute valid matrix from points @ [\"eval:833:in `position_material\'\", \"eval:833:
+   LATEST SAMPLE: 2025-04-09 07:48:29 (v2025.0.0005 on SU25.0.575)
+
+11. COUNT: 3304
+   ERROR: ArgumentError: Could not compute valid matrix from points @ [\"eval:832:in `position_material\'\", \"eval:832:
+   LATEST SAMPLE: 2024-04-17 19:24:14 (v2024.0.0006 on SU24.0.484)
+
+12. COUNT: 2882
+   ERROR: RuntimeError: Cannot nest calls to entities.build @ 2022/SketchUp/Plugins/Skalp_Skalp/Skalp_loader.rb:614
+   LATEST SAMPLE: 2022-05-14 23:44:01 (v2022.0.0009 on SU22.0.354)
+
+13. COUNT: 1577
+   ERROR: RuntimeError: Cannot nest calls to entities.build @ [\"eval:88:in `build\'\", \"eval:88:in `sectionfac
+   LATEST SAMPLE: 2022-02-06 10:26:04 (v2022.0.0003 on SU22.0.316)
+
+14. COUNT: 1499
+   ERROR: ArgumentError: Could not compute valid matrix from points @ 2022/SketchUp/Plugins/Skalp_Skalp/Skalp_lib2.rb:186
+   LATEST SAMPLE: 2022-02-27 02:33:39 (v2022.0.0004 on SU22.0.354)
+
+15. COUNT: 1425
+   ERROR: Errno::EACCES: Permission denied @ apply2files - C:/Users/doris/AppData/Roaming/SketchUp/SketchUp 2025/SketchUp/Plugins/Skalp_Skalp/lib/skalp_output.txt @ 2025/SketchUp/Plugins/Skalp_Skalp/Skalp_lib2.rb:673
+   LATEST SAMPLE: 2025-10-06 10:44:16 (v2025.0.0006 on SU25.0.660)
+
+16. COUNT: 1231
+   ERROR: WIN32OLERuntimeError: failed to parse display name of moniker `winmgmts:\\\\.\\root\\cimv2:Win32_ProcessStartup\'\n    HRESULT error code:0x80041002\n       @ 2023/SketchUp/Plugins/Skalp_Skalp/Skalp_lib2.rb:627
+   LATEST SAMPLE: 2023-10-20 09:17:45 (v2023.0.0004 on SU23.0.419)
+
+17. COUNT: 1145
+   ERROR: ArgumentError: Could not compute valid matrix from points @ 2023/SketchUp/Plugins/Skalp_Skalp/Skalp_lib2.rb:186
+   LATEST SAMPLE: 2023-03-28 00:36:30 (v2023.0.0004 on SU23.0.366)
+
+18. COUNT: 721
+   ERROR: ArgumentError: Could not compute valid matrix from points @ [\"eval:818:in `position_material\'\", \"eval:818:
+   LATEST SAMPLE: 2022-03-08 02:27:45 (v2022.0.0005 on SU22.0.315)
+
+19. COUNT: 633
+   ERROR: RuntimeError: Cannot nest calls to entities.build @ 2023/SketchUp/Plugins/Skalp_Skalp/Skalp_loader.rb:611
+   LATEST SAMPLE: 2023-05-15 15:23:10 (v2023.0.0004 on SU23.0.397)
+
+20. COUNT: 598
+   ERROR: RuntimeError: Cannot nest calls to entities.build @ 2022/SketchUp/Plugins/Skalp_Skalp/Skalp_loader.rb:606
+   LATEST SAMPLE: 2022-03-17 21:45:03 (v2022.0.0005 on SU22.0.316)
+
+--- SKALP VERSIONS ---
+2021.0.0011: 145349
+2022.0.0009: 12434
+2023.0.0004: 12221
+2022.0.0013: 11530
+2025.0.0006: 5822
+2022.0.0005: 3169
+2020.0.0037: 2295
+2024.0.0006: 1861
+2024.0.0007: 1749
+2022.0.0004: 1001
+2022.0.0011: 855
+2023.0.9999: 787
+2024.0.0008: 683
+2022.0.0014: 635
+2024.0.0011: 631
+2022.0.9999: 587
+2022.0.0006: 393
+2.0.0199: 378
+2022.0.0003: 319
+2025.0.0003: 239
+3.0.0078: 227
+2025.0.0005: 180
+2022.0.0008: 161
+2025.0.0004: 118
+2020.0.0019: 116
+2023.0.0005: 100
+2024.0.0010: 100
+: 98
+4.0.0082: 81
+3.0.0036: 74
+2022.0.0019: 67
+4.0.0088: 49
+2024.0.9999: 27
+2020.0.0021: 23
+2025.0.9999: 21
+2022.0.0020: 20
+2022.0.0018: 14
+2022.0.0010: 11
+2021.0.0010: 8
+4.0.0036: 6
+2025.0.0007: 5
+2021.0.0007: 5
+2020.0.0034: 4
+2.0.0193: 4
+1.1.0039: 3
+2025.0.0002: 3
+2024.0.0015: 2
+2.0.0124: 2
+2025.0.0001: 2
+2026.0.9999: 1
+2022.0.0021: 1
+4.0.0038: 1
+2021.0.0018: 1
+2022.0.0012: 1
+
+--- SKETCHUP VERSIONS ---
+21.1.332: 96277
+21.0.339: 33879
+22.0.354: 14853
+22.0.353: 12808
+21.0.391: 8343
+23.0.419: 3587
+23.1.340: 3149
+25.0.660: 3063
+22.0.316: 2990
+21.1.299: 2550
+21.1.331: 2278
+23.1.341: 2166
+24.0.553: 1463
+21.0.392: 1423
+23.0.418: 1387
+20.2.171: 1061
+25.0.571: 1061
+23.0.367: 1043
+24.0.554: 923
+25.0.659: 812
+24.0.595: 787
+24.0.594: 641
+24.0.484: 613
+20.0.362: 494
+25.0.570: 484
+22.0.315: 482
+23.0.316: 474
+24.0.598: 462
+25.0.633: 424
+23.0.366: 383
+21.1.298: 341
+20.0.373: 320
+20.2.172: 271
+21.1.279: 266
+23.1.319: 257
+25.0.574: 201
+25.0.575: 199
+20.0.363: 195
+18.0.16975: 189
+23.0.397: 188
+23.0.118: 166
+24.0.483: 164
+25.0.634: 146
+17.2.2555: 142
+17.0.18899: 140
+18.0.16976: 112
+23.0.396: 109
+: 98
+23.1.329: 85
+20.1.235: 79
+93.0.119: 65
+23.1.315: 47
+17.3.116: 43
+19.2.222: 37
+15.3.331: 36
+23.0.237: 34
+19.0.685: 30
+19.1.174: 25
+19.3.252: 21
+19.3.253: 19
+20.1.229: 17
+23.1.318: 12
+23.1.314: 11
+16.1.1450: 11
+23.1.328: 9
+21.1.278: 5
+16.0.19912: 4
+19.3.255: 4
+17.1.174: 3
+15.0.9350: 3
+14.1.1282: 3
+14.0.4900: 2
+26.1.188: 1
+19.1.173: 1
+20.1.228: 1
+22.1.165: 1
+23.1.275: 1

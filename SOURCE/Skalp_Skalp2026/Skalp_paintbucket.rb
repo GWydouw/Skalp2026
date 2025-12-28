@@ -1,28 +1,42 @@
 module Skalp
   class PaintBucket
     def activate
-      Skalp::Material_dialog::show_dialog
+      Skalp::Material_dialog.show_dialog
 
       @node = nil
       @sectionface = nil
       @modifier = :no_key
       @rule_cursor = 0
 
-      @cursor_normal = UI.create_cursor(IMAGE_PATH + "cursor_skalp_paint.png", 8, 26)
-      @cursor_none = UI.create_cursor(IMAGE_PATH + "cursor_skalp_paintno.png", 8, 26)
-      @cursor_object = UI.create_cursor(IMAGE_PATH + "cursor_skalp_paint_object.png", 8, 26)
-      @cursor_tags = UI.create_cursor(IMAGE_PATH + "cursor_skalp_paint_tags.png", 8, 26)
-      @cursor_model = UI.create_cursor(IMAGE_PATH + "cursor_skalp_paint_model.png", 8, 26)
-      @cursor_not_supported = UI.create_cursor(IMAGE_PATH + "cursor_skalp_paint_not_supported.png", 8, 26)
-      @cursor_picker = UI.create_cursor(IMAGE_PATH + "cursor_skalp_paint_picker.png", 8, 26)
-      @cursor_picker_no = UI.create_cursor(IMAGE_PATH + "cursor_skalp_paint_picker_no.png", 8, 26)
+      @cursor_normal = create_skalp_cursor("cursor_skalp_paint.png", 8, 26)
+      @cursor_none = create_skalp_cursor("cursor_skalp_paintno.png", 8, 26)
+      @cursor_object = create_skalp_cursor("cursor_skalp_paint_object.png", 8, 26)
+      @cursor_tags = create_skalp_cursor("cursor_skalp_paint_tags.png", 8, 26)
+      @cursor_model = create_skalp_cursor("cursor_skalp_paint_model.png", 8, 26)
+      @cursor_not_supported = create_skalp_cursor("cursor_skalp_paint_not_supported.png", 8, 26)
+      @cursor_picker = create_skalp_cursor("cursor_skalp_paint_picker.png", 8, 26)
+      @cursor_picker_no = create_skalp_cursor("cursor_skalp_paint_picker_no.png", 8, 26)
 
       onSetCursor
     end
 
+    def create_skalp_cursor(filename, x, y)
+      path = Skalp::IMAGE_PATH + filename
+      unless File.exist?(path)
+        puts "Skalp Error: Cursor file not found at #{path}"
+        return 0 # Fallback to standard cursor
+      end
+      cursor = UI.create_cursor(path, x, y)
+      if cursor.nil?
+        puts "Skalp Error: Failed to create cursor from #{path}"
+        return 0
+      end
+      cursor
+    end
+
     def deactivate(view)
-      Skalp::Material_dialog::close_dialog
-      Skalp::paintbucketbutton_off
+      Skalp::Material_dialog.close_dialog
+      Skalp.paintbucketbutton_off
     end
 
     def onSetCursor
@@ -40,12 +54,12 @@ module Skalp
           @cursor_type = 6
         end
       else
-        case @modifier
-        when :command
-          @cursor_type = 5
-        else
-          @cursor_type = 3
-        end
+        @cursor_type = case @modifier
+                       when :command
+                         5
+                       else
+                         3
+                       end
       end
 
       case @cursor_type
@@ -77,15 +91,15 @@ module Skalp
       key_status(key, flags, :up)
     end
 
-    def key_status(key, flags=0, status=:no_status)
+    def key_status(key, flags = 0, status = :no_status)
       case Skalp.key(flags, key, status)
       when :shift_alt
         @modifier = :shift_alt
-      when :alt #Alt  (Add)
+      when :alt # Alt  (Add)
         @modifier = :alt
-      when :shift #Shift (Invert)
+      when :shift # Shift (Invert)
         @modifier = :shift
-      when :command #cmd
+      when :command # cmd
         @modifier = :command
       when :no_key
         @modifier = :no_key
@@ -101,72 +115,72 @@ module Skalp
       ph.do_pick(x, y)
       face = ph.picked_face
 
-      if face && Skalp.active_model.entity_strings
-        node_value = Skalp.active_model.entity_strings[face.get_attribute('Skalp', 'from_sub_object')]
+      return unless face && Skalp.active_model.entity_strings
 
-        if node_value
-          @node = node_value.node
+      node_value = Skalp.active_model.entity_strings[face.get_attribute("Skalp", "from_sub_object")]
 
-          case @modifier
-          when :no_key #rule
-            rule = rules
+      return unless node_value
 
-            case rule
-            when :Model
-              Skalp::Material_dialog.selected_material = 'Skalp default' if Skalp::Material_dialog.selected_material == ''
-              Skalp::dialog.webdialog.execute_script("$('#model_material').val('#{Skalp::Material_dialog.selected_material}')")
-              Skalp.style_update = true
-              Skalp::dialog.webdialog.execute_script("save_style(false)")
-            when :ByObject
-              object = node_value.skpEntity
-              Skalp::dialog.define_sectionmaterial(Skalp::Material_dialog.selected_material, object)
-            when :ByTag
-              tag = Sketchup.active_model.layers[node_value.layer]
-              Skalp.define_layer_material(tag, Skalp::Material_dialog.selected_material) if tag
-            when :ByTexture
-              UI.messagebox('When using the ByTexture rule, you need to paint the object with the SketchUp Paint Tool to change the section.')
-            when :Label
-              UI.messagebox("Painting the 'Label' rule is not yet implemented in this Skalp version.")
-            when :Layer
-              UI.messagebox("Painting the 'Layer' rule is not yet implemented in this Skalp version.")
-            when :Scene
-              UI.messagebox("Painting the 'Scene' rule is not yet implemented in this Skalp version.")
-            when :Pattern
-              UI.messagebox("Painting the 'Pattern' rule is not yet implemented in this Skalp version.")
-            end
+      @node = node_value.node
 
-          when :shift #object
-            object = node_value.skpEntity
-            Skalp::dialog.define_sectionmaterial(Skalp::Material_dialog.selected_material, object)
-          when :alt #tag
-            tag = Sketchup.active_model.layers[node_value.layer]
-            Skalp.define_layer_material(tag, Skalp::Material_dialog.selected_material) if tag
+      case @modifier
+      when :no_key # rule
+        rule = rules
 
-            if default_rules
-              object = node_value.skpEntity
-              Skalp::dialog.define_sectionmaterial('', object)
-            end
-          when :shift_alt #model
-            Skalp::Material_dialog.selected_material = 'Skalp default' if Skalp::Material_dialog.selected_material == ''
-            Skalp::dialog.webdialog.execute_script("$('#model_material').val('#{Skalp::Material_dialog.selected_material}')")
-            Skalp.style_update = true
-            Skalp::dialog.webdialog.execute_script("save_style(false)")
+        case rule
+        when :Model
+          Skalp::Material_dialog.selected_material = "Skalp default" if Skalp::Material_dialog.selected_material == ""
+          Skalp.dialog.webdialog.execute_script("$('#model_material').val('#{Skalp::Material_dialog.selected_material}')")
+          Skalp.style_update = true
+          Skalp.dialog.webdialog.execute_script("save_style(false)")
+        when :ByObject
+          object = node_value.skpEntity
+          Skalp.dialog.define_sectionmaterial(Skalp::Material_dialog.selected_material, object)
+        when :ByTag
+          tag = Sketchup.active_model.layers[node_value.layer]
+          Skalp.define_layer_material(tag, Skalp::Material_dialog.selected_material) if tag
+        when :ByTexture
+          UI.messagebox("When using the ByTexture rule, you need to paint the object with the SketchUp Paint Tool to change the section.")
+        when :Label
+          UI.messagebox("Painting the 'Label' rule is not yet implemented in this Skalp version.")
+        when :Layer
+          UI.messagebox("Painting the 'Layer' rule is not yet implemented in this Skalp version.")
+        when :Scene
+          UI.messagebox("Painting the 'Scene' rule is not yet implemented in this Skalp version.")
+        when :Pattern
+          UI.messagebox("Painting the 'Pattern' rule is not yet implemented in this Skalp version.")
+        end
 
-            if default_rules
-              tag = Sketchup.active_model.layers[node_value.layer]
-              Skalp.define_layer_material(tag, '') if tag
-              object = node_value.skpEntity
-              Skalp::dialog.define_sectionmaterial('', object)
-            end
-          when :command
-            if face.material
-              material = face.material.name
-              Skalp::Material_dialog.create_thumbnails
-              Skalp::Material_dialog.materialdialog.execute_script("select('#{material}')")
-              Skalp::Material_dialog.materialdialog.execute_script("app.selected_library = app.libraries[1]")
-              Skalp::Material_dialog.selected_material = material
-            end
-          end
+      when :shift # object
+        object = node_value.skpEntity
+        Skalp.dialog.define_sectionmaterial(Skalp::Material_dialog.selected_material, object)
+      when :alt # tag
+        tag = Sketchup.active_model.layers[node_value.layer]
+        Skalp.define_layer_material(tag, Skalp::Material_dialog.selected_material) if tag
+
+        if default_rules
+          object = node_value.skpEntity
+          Skalp.dialog.define_sectionmaterial("", object)
+        end
+      when :shift_alt # model
+        Skalp::Material_dialog.selected_material = "Skalp default" if Skalp::Material_dialog.selected_material == ""
+        Skalp.dialog.webdialog.execute_script("$('#model_material').val('#{Skalp::Material_dialog.selected_material}')")
+        Skalp.style_update = true
+        Skalp.dialog.webdialog.execute_script("save_style(false)")
+
+        if default_rules
+          tag = Sketchup.active_model.layers[node_value.layer]
+          Skalp.define_layer_material(tag, "") if tag
+          object = node_value.skpEntity
+          Skalp.dialog.define_sectionmaterial("", object)
+        end
+      when :command
+        if face.material
+          material = face.material.name
+          Skalp::Material_dialog.create_thumbnails
+          Skalp::Material_dialog.materialdialog.execute_script("select('#{material}')")
+          Skalp::Material_dialog.materialdialog.execute_script("app.selected_library = app.libraries[1]")
+          Skalp::Material_dialog.selected_material = material
         end
       end
     end
@@ -192,41 +206,41 @@ module Skalp
       face = ph.picked_face
 
       if face && Skalp.active_model && Skalp.active_model.entity_strings
-        node_value = Skalp.active_model.entity_strings[face.get_attribute('Skalp', 'from_sub_object')]
+        node_value = Skalp.active_model.entity_strings[face.get_attribute("Skalp", "from_sub_object")]
 
         if node_value
           @node = node_value.node
           @section_material = node_value.section_material
-          @section_material = '' if @section_material == 'Skalp default'
+          @section_material = "" if @section_material == "Skalp default"
           rule = rules
 
-          case rule
-          when :Model
-            @rule_cursor = 6
-          when :ByTag
-            @rule_cursor = 2
-          when :ByObject
-            @rule_cursor = 1
-          else
-            @rule_cursor = 7
-          end
+          @rule_cursor = case rule
+                         when :Model
+                           6
+                         when :ByTag
+                           2
+                         when :ByObject
+                           1
+                         else
+                           7
+                         end
 
-            case @modifier
-            when :shift_alt
-              info_text = "Select section to paint Model."
-            when :alt #Ctrl
-              info_text = "Select section to paint Tag: '#{node_value.layer}'."
-            when :shift
-              info_text = "Select section to paint Object."
-            when :command #Alt
-              info_text = "Select section to match paint from."
+          case @modifier
+          when :shift_alt
+            info_text = "Select section to paint Model."
+          when :alt # Ctrl
+            info_text = "Select section to paint Tag: '#{node_value.layer}'."
+          when :shift
+            info_text = "Select section to paint Object."
+          when :command # Alt
+            info_text = "Select section to match paint from."
+          else
+            if OS == :MAC
+              info_text = "Select section to paint, SHIFT to paint Object, ALT to paint Tag: '#{node_value.layer}' or SHIFT+ALT to paint Model. Command = Sample Material."
             else
-              if OS == :MAC
-                info_text = "Select section to paint, SHIFT to paint Object, ALT to paint Tag: '#{node_value.layer}' or SHIFT+ALT to paint Model. Command = Sample Material."
-              else
-                info_text = "Select section to paint, SHIFT to paint Object, ALT to paint Tag: '#{node_value.layer}' or SHIFT+ALT to paint Model. Command = Sample Material."
-              end
+              info_text = "Select section to paint, SHIFT to paint Object, ALT to paint Tag: '#{node_value.layer}' or SHIFT+ALT to paint Model. Command = Sample Material."
             end
+          end
 
           Sketchup.set_status_text info_text, SB_PROMPT
         else
@@ -248,10 +262,11 @@ module Skalp
       return false unless face.is_a?(Sketchup::Face)
       return false unless Skalp.active_model.sectiongroup
       return false unless Skalp.active_model.sectiongroup.valid?
+
       Skalp.active_model.sectiongroup.entities.grep(Sketchup::Face).each do |face_in_section|
         return true if face_in_section == face
       end
-      return false
+      false
     end
 
     def rules(object = Sketchup.active_model)
@@ -269,16 +284,19 @@ module Skalp
             return rules(Sketchup.active_model.pages[page_name])
           end
         when :ByLayer
-          material = Sketchup.active_model.layers[@node.value.layer_used_by_hatch].get_attribute('Skalp', 'material') if Sketchup.active_model.layers[@node.value.layer]
-          return :ByTag if material && material != ''
+          if Sketchup.active_model.layers[@node.value.layer]
+            material = Sketchup.active_model.layers[@node.value.layer_used_by_hatch].get_attribute("Skalp",
+                                                                                                   "material")
+          end
+          return :ByTag if material && material != ""
         when :ByTexture
           return :ByTexture
         when :Layer
           material = rule[:type_setting][@node.value.layer_used_by_hatch]
           return :Tag if material
         when :Tag
-          if @node.value.tag != nil && @node.value.tag != ''
-            tags = @node.value.tag.split(',').map {|tag| Skalp.utf8(tag.strip)}
+          if !@node.value.tag.nil? && @node.value.tag != ""
+            tags = @node.value.tag.split(",").map { |tag| Skalp.utf8(tag.strip) }
             return :Label if tags.include?(rule[:type_setting].strip)
           end
         when :Pattern
@@ -289,15 +307,13 @@ module Skalp
             return :Texture if material
           end
         when :ByObject
-          if @section_material != nil && @section_material !='' && @section_material != 'Skalp default'
-            return :ByObject
-          end
+          return :ByObject if !@section_material.nil? && @section_material != "" && @section_material != "Skalp default"
         when :Model
           return :Model
         end
       end
 
-      return :Model
+      :Model
     end
   end
 end

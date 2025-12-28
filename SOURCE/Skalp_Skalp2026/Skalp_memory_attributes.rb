@@ -140,12 +140,12 @@ module Skalp
     end
 
     def read_from_model
-      puts "\n=== SKALP: Start Reading Memory Attributes (MIGRATION CHECK) ==="
+      # puts "\n=== SKALP: Start Reading Memory Attributes (MIGRATION CHECK) ==="
       saved_memory_attributes = @skpModel.attribute_dictionary("Skalp_memory_attributes")
 
       to_check = []
       if saved_memory_attributes
-        puts "[LOG] Found 'Skalp_memory_attributes' dictionary with #{saved_memory_attributes.count} entries."
+        # puts "[LOG] Found 'Skalp_memory_attributes' dictionary with #{saved_memory_attributes.count} entries."
         saved_memory_attributes.each_pair do |key, value|
           key_array = key.split("|")
           object = key_array[0]
@@ -153,39 +153,39 @@ module Skalp
 
           case object
           when "skpModel"
-            puts "[LOG] Validating Model attribute: #{key_name} = #{value}"
+            # puts "[LOG] Validating Model attribute: #{key_name} = #{value}"
             to_check << @skpModel
-            process_attributes_for_read(@mem_attributes[@skpModel], key_name, value)
+            process_attributes_for_read(@skpModel, @mem_attributes[@skpModel], key_name, value)
           else
             skpPage = find_page(object)
 
             if skpPage && @mem_attributes[skpPage]
-              puts "[LOG] Validating Page attribute for '#{skpPage.name}': #{key_name} = #{value}"
+              # puts "[LOG] Validating Page attribute for '#{skpPage.name}': #{key_name} = #{value}"
               to_check << skpPage
-              process_attributes_for_read(@mem_attributes[skpPage], key_name, value)
+              process_attributes_for_read(skpPage, @mem_attributes[skpPage], key_name, value)
             else
-              puts "[LOG] WARNING: Could not find page for ID '#{object}' (Key: #{key}). Skipping."
+              # puts "[LOG] WARNING: Could not find page for ID '#{object}' (Key: #{key}). Skipping."
             end
           end
         end
 
         check_attributes(to_check)
       else
-        puts "[LOG] No 'Skalp_memory_attributes' dictionary found. initializing defaults."
+        # puts "[LOG] No 'Skalp_memory_attributes' dictionary found. initializing defaults."
         @mem_attributes[Sketchup.active_model] = {}
         @mem_attributes[Sketchup.active_model]["style_settings"] = default_settings
         save_to_model
       end
 
       # MIGRATION SU2026: Sync migrated data to native page attributes
-      puts "\n=== SKALP: Syncing to Native Attributes ==="
+      # puts "\n=== SKALP: Syncing to Native Attributes ==="
       sync_to_native_attributes
 
-      puts "\n=== SKALP: Final Active Memory Attributes State ==="
-      log_current_state
+      # puts "\n=== SKALP: Final Active Memory Attributes State ==="
+      # log_current_state
 
-      puts "\n=== SKALP: VERIFICATION - Native Attributes State ==="
-      log_native_attributes_state
+      # puts "\n=== SKALP: VERIFICATION - Native Attributes State ==="
+      # log_native_attributes_state
     end
 
     # MIGRATION SU2026: Write @mem_attributes to native page attributes
@@ -216,6 +216,8 @@ module Skalp
 
               begin
                 if [:style_rules, "style_rules"].include?(style_key) && style_value.respond_to?(:rules)
+                  # Style rules are kept as inspected strings for now as they are complex
+                  # puts "[LOG] Transferring #{object_name}: style_settings['#{style_key}'] -> 'ss_#{style_key}' (String)"
                   object.set_attribute("Skalp", "ss_#{style_key}", style_value.rules.inspect)
                 elsif !style_value.is_a?(Hash)
                   # HEURISTIC FIX: If page has rearview_status false but model has it true, force it to true
@@ -227,11 +229,20 @@ module Skalp
 
                     if ["true", true].include?(model_rv)
                       style_value = true
-                      puts "[LOG] Healing #{object_name}: rearview_status forced to TRUE to match Model"
+                      # puts "[LOG] Healing #{object_name}: rearview_status forced to TRUE to match Model"
                     end
                   end
 
-                  object.set_attribute("Skalp", "ss_#{style_key}", style_value.to_s)
+                  # SERIALIZATION FIX: Distances must be strings for set_attribute
+                  if style_key.to_s == "depth_clipping_distance" && style_value.respond_to?(:to_s)
+                    # puts "[DEBUG] Converting Distance to string for migration: #{style_value.inspect} -> #{style_value.to_s}"
+                    style_value = style_value.to_s
+                  end
+
+                  # Sanitize and preserve types
+                  final_value = sanitize_value_for_migration(style_key, style_value)
+                  # puts "[LOG] Transferring #{object_name}: style_settings['#{style_key}'] -> 'ss_#{style_key}' (#{final_value.class})"
+                  object.set_attribute("Skalp", "ss_#{style_key}", final_value)
                 end
               rescue StandardError => e
                 puts "[ERROR] Failed to transfer #{object_name} style setting '#{style_key}': #{e.message}"
@@ -243,12 +254,38 @@ module Skalp
           next if value.is_a?(Hash) # Skip other complex hashes
 
           begin
-            object.set_attribute("Skalp", key, value) if value
+            unless value.nil?
+              final_value = sanitize_value_for_migration(key, value)
+              # puts "[LOG] Transferring #{object_name}: '#{key}' -> '#{final_value}' (#{final_value.class})"
+              object.set_attribute("Skalp", key, final_value)
+            end
           rescue StandardError => e
             puts "[ERROR] Failed to transfer #{object_name}: '#{key}' -> '#{value}': #{e.message}"
           end
         end
       end
+    end
+
+    def sanitize_value_for_migration(key, value)
+      return value unless value.is_a?(String)
+
+      # Boolean mapping (common in Skalp)
+      return true if %w[true TRUE 1].include?(value)
+      return false if %w[false FALSE 0].include?(value)
+
+      # Numeric/Distance mapping
+      key_str = key.to_s.downcase
+      case key_str
+      when /scale|width|distance|ratio|time|offset/i
+        return value.to_f if value =~ /^-?\d+\.?\d*/
+      when /id|count|version/i
+        return value.to_i if value =~ /^\d+$/
+      when /status|update|show|loop|materials/i
+        return true if value.downcase == "true"
+        return false if value.downcase == "false"
+      end
+
+      value
     end
 
     def log_current_state
@@ -273,7 +310,7 @@ module Skalp
           puts "  #{attrs.inspect}"
         end
       end
-      puts "=================================================\n"
+      # puts "=================================================\n"
     end
 
     def log_native_attributes_state
@@ -285,15 +322,17 @@ module Skalp
         style_settings = object_attributes["style_settings"]
         next unless style_settings.class == Hash
 
-        object_attributes["style_settings"] = if object.class == Sketchup::Model || style_settings[:style_rules]
-                                                default_settings.merge(style_settings)
-                                              else
-                                                nil
-                                              end
+        # Relaxed check: Allow if style_rules exists OR if we have fog distance
+        if object.class == Sketchup::Model || style_settings[:style_rules] || style_settings[:depth_clipping_distance]
+          object_attributes["style_settings"] = default_settings.merge(style_settings)
+        else
+          # Relaxed check logic for dropped settings
+          object_attributes["style_settings"] = nil
+        end
       end
     end
 
-    def process_attributes_for_read(object_attributes, key_name, value)
+    def process_attributes_for_read(object, object_attributes, key_name, value)
       object_attributes["style_settings"] = {} unless object_attributes["style_settings"]
       style_settings = object_attributes["style_settings"]
 
@@ -312,7 +351,19 @@ module Skalp
       when "fog_status"
         style_settings[:depth_clipping_status] = Skalp.to_boolean(value)
       when "fog_distance"
-        style_settings[:depth_clipping_distance] = Distance.new(value)
+      when "fog_distance"
+        # Explicitly handle nil or "nil" string which might come from bad attribute reads
+        val_to_use = if value.nil? || value == "nil"
+                       "300cm"
+                     else
+                       value
+                     end
+
+        style_settings[:depth_clipping_distance] = Distance.new(val_to_use)
+
+        # If value was nil/invalid, ensure fog is OFF by default (users preference)
+        style_settings[:depth_clipping_status] = false if value.nil? || value == "nil"
+
       when "style_rules"
         begin
           style_settings[:style_rules] = value ? StyleRules.new(eval(value)) : StyleRules.new

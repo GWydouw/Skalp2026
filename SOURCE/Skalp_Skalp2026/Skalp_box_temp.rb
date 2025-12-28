@@ -1,7 +1,7 @@
     class SettingsDialog
       def initialize(default_name = "SectionBox", &block); @default_name = default_name; @on_save = block; @dialog = nil; show; end
       def show
-        path = File.join(File.dirname(__FILE__), 'ui', 'settings.html'); @dialog = UI::HtmlDialog.new({:dialog_title => "SectionBox Settings", :preferences_key => "com.skalp.sectionbox.settings", :scrollable => false, :resizable => false, :width => 350, :height => 450, :style => UI::HtmlDialog::STYLE_DIALOG}); @dialog.set_file(path)
+        path = File.join(File.dirname(__FILE__), 'ui', 'settings.html'); @dialog = UI::HtmlDialog.new({:dialog_title => "SectionBox Settings", :preferences_key => "com.skalp.sectionbox.settings", :scrollable => false, :resizable => false, :width => 350, :height => 450, :style => UI::HtmlDialog::STYLE_UTILITY}); @dialog.set_file(path)
         @dialog.add_action_callback("ready") do; defaults = Data.get_defaults; scales = Data.get_scales; @dialog.execute_script("initScales(#{scales.to_json})")
            if @default_name.is_a?(Hash); @dialog.execute_script("loadDefaults(#{@default_name.to_json})"); @dialog.execute_script("setName(#{@default_name['name'].to_json})") if @default_name['name']; @dialog.execute_script("setSubmitText('Save')")
            else; @dialog.execute_script("loadDefaults(#{defaults.to_json})"); @dialog.execute_script("setName(#{@default_name.to_json})"); @dialog.execute_script("setSubmitText('Create')"); end
@@ -15,7 +15,7 @@
     class ScaleManager
       def initialize; @dialog = nil; show; end
       def show
-        if @dialog && @dialog.visible?; @dialog.bring_to_front; return; end; path = File.join(File.dirname(__FILE__), 'ui', 'scale_manager.html'); @dialog = UI::HtmlDialog.new({:dialog_title => "Drawing Scale Manager", :preferences_key => "com.skalp.sectionbox.scale_manager", :scrollable => false, :resizable => true, :width => 400, :height => 500, :style => UI::HtmlDialog::STYLE_DIALOG}); @dialog.set_file(path)
+        if @dialog && @dialog.visible?; @dialog.bring_to_front; return; end; path = File.join(File.dirname(__FILE__), 'ui', 'scale_manager.html'); @dialog = UI::HtmlDialog.new({:dialog_title => "Drawing Scale Manager", :preferences_key => "com.skalp.sectionbox.scale_manager", :scrollable => false, :resizable => true, :width => 400, :height => 500, :style => UI::HtmlDialog::STYLE_UTILITY}); @dialog.set_file(path)
         @dialog.add_action_callback("ready") { scales = Data.get_scales; @dialog.execute_script("loadScales(#{scales.to_json})") }; @dialog.add_action_callback("save_scales") { |d, data| Data.save_scales(data.is_a?(String) ? JSON.parse(data) : data) }
         @dialog.add_action_callback("restore_defaults") { default_scales = ["1:1", "1:2", "1:5", "1:10", "1:20", "1:50", "1:100", "1:200", "1:500", "1:1000", "1\" = 1' (1:12)", "1/8\" = 1' (1:96)", "1/4\" = 1' (1:48)", "1/2\" = 1' (1:24)", "3/4\" = 1' (1:16)", "3\" = 1' (1:4)"]; Data.save_scales(default_scales); @dialog.execute_script("loadScales(#{default_scales.to_json})") }
         @dialog.set_on_closed { @dialog = nil }; @dialog.center; @dialog.show
@@ -24,7 +24,7 @@
     class Manager
       def initialize; @dialog = nil; end
       def show
-        if @dialog && @dialog.visible?; @dialog.bring_to_front; return; end; path = File.join(File.dirname(__FILE__), 'ui', 'manager.html'); @dialog = UI::HtmlDialog.new({:dialog_title => "Skalp SectionBox Manager", :preferences_key => "com.skalp.sectionbox.manager", :scrollable => false, :resizable => true, :width => 300, :height => 500, :style => UI::HtmlDialog::STYLE_DIALOG}); @dialog.set_file(path)
+        if @dialog && @dialog.visible?; @dialog.bring_to_front; return; end; path = File.join(File.dirname(__FILE__), 'ui', 'manager.html'); @dialog = UI::HtmlDialog.new({:dialog_title => "Skalp SectionBox Manager", :preferences_key => "com.skalp.sectionbox.manager", :scrollable => false, :resizable => true, :width => 300, :height => 500, :style => UI::HtmlDialog::STYLE_UTILITY}); @dialog.set_file(path)
         @dialog.add_action_callback("ready") { |d, p| sync_data }; @dialog.add_action_callback("sync") { |d, p| sync_data }; @dialog.add_action_callback("close") { |d, p| @dialog.close }
         @dialog.add_action_callback("activate") { |d, id| Fiber.new { Engine.activate(id) }.resume }; @dialog.add_action_callback("deactivate") { |d, id| Fiber.new { Engine.deactivate_current }.resume }
         @dialog.add_action_callback("preview") { |d, id| Engine.preview(id) }; @dialog.add_action_callback("clear_preview") { |d, p| Engine.clear_preview }; @dialog.add_action_callback("modify") { |d, id| Fiber.new { Engine.modify(id) }.resume }

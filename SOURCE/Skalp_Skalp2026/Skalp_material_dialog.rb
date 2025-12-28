@@ -1,6 +1,8 @@
 module Skalp
   module Material_dialog
-    require 'json'
+    require "json"
+    require "fileutils"
+    Sketchup.require(File.join(File.dirname(__FILE__), "Skalp_material_dialog_helpers"))
 
     CACHE_DIR = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/resources/temp/"
 
@@ -8,151 +10,233 @@ module Skalp
       attr_accessor :materialdialog, :selected_material, :active_library, :external_callback
     end
 
-    def self.setup_dialog(library_actions = true)
-      @library_actions = library_actions
-      x = Sketchup.read_default('Skalp_Paint_dialog', 'x')
-      y = Sketchup.read_default('Skalp_Paint_dialog', 'y')
-      w = Sketchup.read_default('Skalp_Paint_dialog', 'w')
-      h = Sketchup.read_default('Skalp_Paint_dialog', 'h')
+    def self.show_dialog(x = nil, y = nil, webdialog = nil, id = nil, library_actions = nil)
+      @return_webdialog = webdialog
+      @id = id
 
-      x = 50 unless x
-      y = 50 unless y
-      w = 206 unless w
-      h = 398 unless h
+      # If library_actions not specified, hide it when in picker mode (webdialog present)
+      @library_actions = if library_actions.nil?
+                           webdialog.nil?
+                         else
+                           library_actions
+                         end
 
-      @materialdialog = UI::HtmlDialog.new(
-          {
-              :dialog_title => "Skalp Materials",
-              :preferences_key => "com.skalp_materials.plugin",
-              :scrollable => true,
-              :resizable => true,
-              :width => w,
-              :height => h,
-              :left => x,
-              :top => y,
-              :min_width => 198,
-              :min_height => 250,
-              :max_width => 1000,
-              :max_height => 1000,
-              :style => UI::HtmlDialog::STYLE_UTILITY
-          }) unless @materialdialog
+      x_cached = Sketchup.read_default("Skalp_Paint_dialog", "x")
+      y_cached = Sketchup.read_default("Skalp_Paint_dialog", "y")
+      w = Sketchup.read_default("Skalp_Paint_dialog", "w")
+      h = Sketchup.read_default("Skalp_Paint_dialog", "h")
 
-      unless Sketchup.read_default('Skalp_Paint_dialog', 'x')
-        Sketchup.write_default('Skalp_Paint_dialog', 'x', x)
-        Sketchup.write_default('Skalp_Paint_dialog', 'y', y)
-        Sketchup.write_default('Skalp_Paint_dialog', 'w', w)
-        Sketchup.write_default('Skalp_Paint_dialog', 'h', h)
+      x = x_cached if x.nil? || x.is_a?(TrueClass) || x.is_a?(FalseClass)
+      y = y_cached if y.nil? || y.is_a?(TrueClass) || y.is_a?(FalseClass)
+      x ||= 50
+      y ||= 50
+      w ||= 206
+      h ||= 398
+
+      # If in Picker Mode (no library actions), reduce height slightly to account for hidden footer
+      # or just leave it to show more materials. User asked to "remove the zone".
+      # Hiding the footer via JS removes the zone visually (content expands).
+      # If we want to shrink the window, we can do it here:
+      # h -= 35 if !@library_actions
+
+      @materialdialog ||= UI::HtmlDialog.new(
+        {
+          dialog_title: "Skalp Materials",
+          preferences_key: "com.skalp_materials.plugin",
+          scrollable: true,
+          resizable: true,
+          width: w,
+          height: h,
+          left: x,
+          top: y,
+          min_width: 198,
+          min_height: 250,
+          max_width: 1000,
+          max_height: 1000,
+          style: UI::HtmlDialog::STYLE_UTILITY
+        }
+      )
+
+      unless Sketchup.read_default("Skalp_Paint_dialog", "x")
+        Sketchup.write_default("Skalp_Paint_dialog", "x", x)
+        Sketchup.write_default("Skalp_Paint_dialog", "y", y)
+        Sketchup.write_default("Skalp_Paint_dialog", "w", w)
+        Sketchup.write_default("Skalp_Paint_dialog", "h", h)
       end
 
       html_file = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/html/material_dialog.html"
       @materialdialog.set_file(html_file)
-      @materialdialog.set_on_closed {
+      @materialdialog.set_on_closed do
         @materialdialog = nil
         Sketchup.active_model.select_tool(nil) if Sketchup.active_model
-        }
+      end
 
-      @materialdialog.add_action_callback("dialog_ready") { |action_context, params|
+      @materialdialog.add_action_callback("dialog_ready") do |action_context, params|
         load_dialog
         unless @return_webdialog
-          @selected_material ='Skalp default'
+          @selected_material = "Skalp default"
           @materialdialog.execute_script("select('Skalp default');")
         end
 
         if @library_actions
+          # Ensure it's shown? Default CSS is shown.
+        else
           @materialdialog.execute_script("hide_library_actions();")
         end
-      }
+      end
 
-      @materialdialog.add_action_callback("dialog_focus") { |action_context, params|
-        unless Sketchup.active_model
-          Skalp::stop_skalp
-        end
-      }
+      @materialdialog.add_action_callback("refresh") do |action_context|
+        load_dialog
+      end
 
-      @materialdialog.add_action_callback("su_focus") { |action_context, params|
-        focus_back if OS == :MAC && @materialdialog.visible?
-      }
+      @materialdialog.add_action_callback("open_context_menu") do |action_context, materialname|
+        # Check if context menu logic is needed here or in JS
+      end
 
-      @materialdialog.add_action_callback("material_menu") { |action_context, action|
-        if action == 'remove'
-          if @active_library == 'Skalp materials in model'
-            Skalp::delete_skalp_material(@selected_material)
-          else
-            Skalp::Material_dialog.delete_material_from_library(@active_library, @selected_material)
-            Skalp::Material_dialog.create_thumbnails(@active_library)
-          end
-        elsif action == 'move' && @active_library != 'Skalp materials in model'
-          libraries = Dir.glob(File.join(Skalp::MATERIAL_PATH, '*.json')).map { |f| File.basename(f, '.json') }
-          target = UI.inputbox(["Move to library:"], [libraries.first], [libraries.join('|')], "Move Material")
-          if target && target[0] != @active_library
-            move_material_between_libraries(@active_library, target[0], @selected_material)
-            Skalp::Material_dialog.create_thumbnails(@active_library)
-          end
-        elsif action == 'rename' && @active_library != 'Skalp materials in model'
-          Skalp.rename_material_in_library(@active_library, @selected_material)
-          Skalp::Material_dialog.create_thumbnails(@active_library)
-        elsif action == 'copy'
-          Skalp::save_pattern_to_library(@selected_material)
-        elsif @active_library == 'Skalp materials in model'
-          case action
-          when 'edit'
-            Skalp::edit_skalp_material(@selected_material)
-          when 'add'
-            Skalp::create_new_skalp_material
-          when 'export'
-            Skalp::export_material_textures(true)
-          when 'save_all'
-            Skalp::save_all_skalp_materials_to_new_library
-          when 'merge'
-            Skalp::merge_material_dialog_action(@selected_material)
-          end
-        else
-          UI.messagebox('These functions only work on Skalp materials inside the model.')
-        end
-      }
+      @materialdialog.add_action_callback("library") do |action_context, libraryname|
+        @active_library = libraryname
+        create_thumbnails(libraryname)
+      end
 
-      @materialdialog.add_action_callback("library_menu") { |action_context, action|
+      @materialdialog.add_action_callback("material_menu") do |action_context, action, materialname|
         case action
-        when 'new'
-          Skalp::create_library
+        when "create_new"
+          Skalp.edit_material_pattern("Skalp Pattern") if Skalp.respond_to?(:edit_material_pattern)
+        when "edit"
+          Skalp.edit_material_pattern(materialname) if Skalp.respond_to?(:edit_material_pattern)
+        when "remove"
+          if Skalp.respond_to?(:delete_skalp_material)
+            Skalp.delete_skalp_material(materialname, @active_library)
+          else
+            # Fallback
+            delete_material_from_library(@active_library, materialname)
+            create_thumbnails(@active_library)
+          end
+        when "copy"
+          Skalp.save_pattern_to_library(materialname) if Skalp.respond_to?(:save_pattern_to_library)
           load_libraries
+          create_thumbnails(@active_library)
+        when "duplicate"
+          if ["Skalp materials in model", "SketchUp materials in model"].include?(@active_library)
+            mat = Sketchup.active_model.materials[materialname]
+            if mat
+              new_name = UI.inputbox(["New Name"], ["#{materialname} copy"], "Duplicate Material")
+              if new_name && !new_name[0].empty?
+                new_mat = Sketchup.active_model.materials.add(new_name[0])
+                new_mat.texture = mat.texture
+                new_mat.color = mat.color
+                new_mat.alpha = mat.alpha
+                if mat.attribute_dictionaries
+                  mat.attribute_dictionaries.each do |dict|
+                    next if dict.name == "Skalp_memory_attributes"
+
+                    dict.each do |k, v|
+                      new_mat.set_attribute(dict.name, k, v)
+                    end
+                  end
+                end
+                create_thumbnails(@active_library)
+              end
+            end
+          else
+            Skalp::Material_dialog.duplicate_material_in_library(@active_library, materialname)
+            create_thumbnails(@active_library)
+          end
+        when "replace_confirmed"
+          # materialname is "old|||new"
+          if materialname.include?("|||")
+            parts = materialname.split("|||")
+            old = parts[0]
+            new = parts[1]
+            if Skalp::Material_dialog.respond_to?(:replace_material)
+              Skalp::Material_dialog.replace_material(old, new)
+              create_thumbnails(@active_library)
+            end
+          end
+        when "merge"
+          # kept for fallback or legacy calls, though UI now uses 'replace_confirmed' via picker
+          if Skalp::Material_dialog.respond_to?(:replace_material)
+            Skalp::Material_dialog.replace_material(materialname)
+            create_thumbnails(@active_library)
+          else
+            UI.messagebox("Replace/Merge functionality not yet loaded.")
+          end
+        when "rename"
+          if ["Skalp materials in model", "SketchUp materials in model"].include?(@active_library)
+            mat = Sketchup.active_model.materials[materialname]
+            if mat
+              new_name = UI.inputbox(["New name"], [materialname], "Rename Material")
+              if new_name && !new_name[0].empty?
+                begin
+                  mat.name = new_name[0]
+                  create_thumbnails(@active_library)
+                rescue ArgumentError => e
+                  UI.messagebox("Name already exists or is invalid. Please choose another name.")
+                end
+              end
+            end
+          else
+            if Skalp.respond_to?(:rename_material_in_library)
+              Skalp.rename_material_in_library(@active_library,
+                                               materialname)
+            end
+            create_thumbnails(@active_library)
+          end
+        when "save_all"
+          Skalp.save_all_skalp_materials_to_new_library if Skalp.respond_to?(:save_all_skalp_materials_to_new_library)
+        when "export"
+          Skalp.export_skalp_materials if Skalp.respond_to?(:export_skalp_materials)
+        when "merge"
+          # Merge logic if exists
         end
-      }
+      end
 
-      @materialdialog.add_action_callback("library") { |action_context, library|
-        create_thumbnails(library)
-      }
-
-      @materialdialog.add_action_callback("position") { |action_context, x, y, w, h|
-        if !@return_webdialog && w > 1
-          Sketchup.write_default('Skalp_Paint_dialog', 'x', x)
-          Sketchup.write_default('Skalp_Paint_dialog', 'y', y)
-          Sketchup.write_default('Skalp_Paint_dialog', 'w', w)
-          Sketchup.write_default('Skalp_Paint_dialog', 'h', h)
+      @materialdialog.add_action_callback("library_menu") do |action_context, action|
+        case action
+        when "new"
+          new_lib = Skalp.create_library if Skalp.respond_to?(:create_library)
+          load_libraries
+          if new_lib
+            @active_library = new_lib
+            @materialdialog.execute_script("library('#{new_lib}')")
+            create_thumbnails(@active_library)
+          end
+        when "rename"
+          new_lib = Skalp::Material_dialog.rename_library(@active_library)
+          load_libraries
+          if new_lib
+            @active_library = new_lib
+            @materialdialog.execute_script("library('#{new_lib}')")
+            create_thumbnails(@active_library)
+          end
+        when "delete"
+          if Skalp::Material_dialog.delete_library(@active_library)
+            load_libraries
+            @active_library = "Skalp materials in model"
+            @materialdialog.execute_script("library('Skalp materials in model')")
+            create_thumbnails(@active_library)
+          end
         end
-      }
+      end
 
-      @materialdialog.add_action_callback("window_size") { |action_context, w, h|
-        @window_width = w.to_i
-        @window_height = h.to_i
-      }
-
-      @materialdialog.add_action_callback("select") { |action_context, materialname|
-        if materialname == 'none'
-          materialname = ''
+      @materialdialog.add_action_callback("select") do |action_context, materialname|
+        if materialname == "none"
+          materialname = ""
         elsif !Sketchup.active_model.materials[materialname]
-          create_sectionmaterial_from_library(@active_library_materials[materialname])
+          if @active_library_materials
+            Skalp::Material_dialog.create_sectionmaterial_from_library(@active_library_materials[materialname])
+          end
         end
         if @return_webdialog
           if @return_webdialog == Skalp.dialog.webdialog && @id == "model_material"
-            materialname = 'Skalp default' if materialname == ''
+            materialname = "Skalp default" if materialname == ""
             @return_webdialog.execute_script("$('##{@id}').val('#{materialname}')")
             Skalp.style_update = true
             @return_webdialog.execute_script("save_style(false)")
             @materialdialog.close if @return_webdialog
-          elsif @return_webdialog == Skalp.dialog.webdialog && @id == 'material_list'
+          elsif @return_webdialog == Skalp.dialog.webdialog && @id == "material_list"
             @return_webdialog.execute_script("$('##{@id}').val('#{materialname}')")
-            Skalp::dialog.define_sectionmaterial(materialname)
+            Skalp.dialog.define_sectionmaterial(materialname)
             @materialdialog.close if @return_webdialog
           elsif @return_webdialog == Skalp.dialog.webdialog && @id != "model_material"
             @return_webdialog.execute_script("$('##{@id}').val('#{materialname}')")
@@ -161,15 +245,18 @@ module Skalp
             @return_webdialog.execute_script("$('##{@id}').change()")
             @materialdialog.close if @return_webdialog
           elsif @return_webdialog == Skalp.layers_dialog
-            if @id.to_s.include?(';')
+            # Updated to match new HtmlDialog handling in Skalp_UI: the caller passes us the reference
+            if @id.to_s.include?(";")
               Skalp.define_batch_layer_materials(@id, materialname)
-            else
-              Skalp.define_layer_material(Skalp.layers_hash[@id], materialname) if Skalp.layers_hash[@id]
+            elsif Skalp.layers_hash[@id]
+              Skalp.define_layer_material(Skalp.layers_hash[@id], materialname)
             end
-            Skalp.update_layers_dialog
+            Skalp.update_layers_dialog # This updates the new HtmlDialog
             @materialdialog.close if @return_webdialog
           elsif @return_webdialog == Skalp.hatch_dialog.webdialog
-            if Sketchup.active_model.materials[materialname] && Sketchup.active_model.materials[materialname].get_attribute('Skalp', 'ID')
+            if Sketchup.active_model.materials[materialname] && Sketchup.active_model.materials[materialname].get_attribute(
+              "Skalp", "ID"
+            )
               Skalp.hatch_dialog.material_selector_status = true
               @return_webdialog.execute_script("$('#material_list').val('#{materialname}')")
               Skalp.style_update = true
@@ -185,36 +272,36 @@ module Skalp
             @materialdialog.close
           end
         end
-      }
+      end
 
       if @return_webdialog
         @materialdialog.set_position(@x.to_i + 50, @y.to_i + 50)
         @materialdialog.bring_to_front
-        @materialdialog.show_modal
+        @materialdialog.show
       else
-        section_x = Sketchup.read_default('Skalp', 'sections_x').to_i
-        section_y = Sketchup.read_default('Skalp', 'sections_y').to_i
-        section_w = Sketchup.read_default('Skalp', 'sections_w').to_i
+        section_x = Sketchup.read_default("Skalp", "sections_x").to_i
+        section_y = Sketchup.read_default("Skalp", "sections_y").to_i
+        section_w = Sketchup.read_default("Skalp", "sections_w").to_i
 
-        if Skalp.dialog.showmore_dialog
-          section_h = Sketchup.read_default('Skalp', 'height_expand_resize')
-        else
-          section_h = 100
-        end
+        section_h = if Skalp.dialog.showmore_dialog
+                      Sketchup.read_default("Skalp", "height_expand_resize")
+                    else
+                      100
+                    end
 
-        x = Sketchup.read_default('Skalp_Paint_dialog', 'x').to_i
-        y = Sketchup.read_default('Skalp_Paint_dialog', 'y').to_i
-        w = Sketchup.read_default('Skalp_Paint_dialog', 'w').to_i
-        h = Sketchup.read_default('Skalp_Paint_dialog', 'h').to_i
+        x = Sketchup.read_default("Skalp_Paint_dialog", "x").to_i
+        y = Sketchup.read_default("Skalp_Paint_dialog", "y").to_i
+        w = Sketchup.read_default("Skalp_Paint_dialog", "w").to_i
+        h = Sketchup.read_default("Skalp_Paint_dialog", "h").to_i
 
-        if ((x+w) < section_x) || (x > (section_x + section_w)) || (y > (section_y + section_h)) || ((y+h) < section_y)
+        if ((x + w) < section_x) || (x > (section_x + section_w)) || (y > (section_y + section_h)) || ((y + h) < section_y)
           @materialdialog.set_position(x, y)
         else
-          if w < section_x
-            new_x = ((section_x - w)/2).to_i
-          else
-            new_x = section_x + section_w + 50
-          end
+          new_x = if w < section_x
+                    ((section_x - w) / 2).to_i
+                  else
+                    section_x + section_w + 50
+                  end
 
           @materialdialog.set_position(new_x, 100)
         end
@@ -223,106 +310,41 @@ module Skalp
       end
     end
 
-    def self.show_dialog(x = 100, y = 100, webdialog = nil, id = "")
-      @return_webdialog = webdialog
-      @id = id
-      @x = x
-      @y = y
-      if id == ""
-        setup_dialog(false)
-      else
-        setup_dialog(true)
-      end
-    end
-
-    # Dirty method to get the focus back
-    def self.focus_back
-      html = <<-EOT
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-<meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<script>
-    function loaded(){
-        sketchup.su_focus();
-    }
-
-</script>
-</head>
-
-<body onload="loaded()" >
-<div>
-    <span>SketchUp dommie dialog</span>
-</div>
-</body>
-</html>
-
-      EOT
-      options = {
-          :dialog_title => "Material",
-          :preferences_key => "Skalp.dummie",
-          :width => 1,
-          :height => 1,
-          :left => 0,
-          :top => 0,
-          :style => UI::HtmlDialog::STYLE_DIALOG  # New feature!
-      }
-      dialog = UI::HtmlDialog.new(options)
-      dialog.set_html(html)
-      dialog.center # New feature!
-      dialog.add_action_callback('su_focus') { |action_context, name, num_pokes|
-        dialog.close
-      }
-      dialog.show
-    end
-
     def self.load_dialog
       load_libraries
-      create_thumbnails('Skalp materials in model')
-    end
-
-    def self.update_dialog
-      create_thumbnails(@active_library)
-    end
-
-    def self.close_dialog
-      @materialdialog.close if @materialdialog
+      create_thumbnails
     end
 
     def self.load_libraries
-      libraries = ['SketchUp materials in model', 'Skalp materials in model']
-
-      active_dir = Dir.pwd
-      Dir.chdir(Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/resources/materials/")
-      Dir.glob('*.json') do |library|
-        libraries << library.gsub('.json', '')
+      libraries = ["Skalp materials in model", "SketchUp materials in model"]
+      match = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/resources/materials/*.json"
+      Dir[match].each do |file|
+        libraries << File.basename(file, ".json")
       end
-      Dir.chdir(active_dir)
-
       @materialdialog.execute_script("load_libraries(#{libraries.to_json})")
     end
 
+    # ...
     def self.add_material(name, image_top, text_top, source)
       @materials << name
-      @materials << image_top
-      @materials << text_top
+      # Removed position data (image_top, text_top)
       @materials << source
     end
 
-    def self.create_thumbnails(lib = 'Skalp materials in model')
+    def self.create_thumbnails(lib = "Skalp materials in model")
       @active_library = lib
       @materials = []
 
       case lib
-      when 'Skalp materials in model'
+      when "Skalp materials in model"
         type = true
         # Ensure PNG blobs for model materials before creating the cache
         Skalp.ensure_png_blobs_for_model_materials if Skalp.respond_to?(:ensure_png_blobs_for_model_materials)
         materials = Skalp.create_thumbnails_cache(true)
         sorted_materials = materials.keys.sort_by(&:downcase)
-        append_thumbnail("#{Skalp.translate('none')}", '', false, 0)
+
+        none_blob = create_none_thumbnail
+        append_thumbnail("#{Skalp.translate('none')}", none_blob, true, 0)
 
         n = 1
         sorted_materials.each do |material|
@@ -330,55 +352,60 @@ module Skalp
           n += 1
         end
 
-      when 'SketchUp materials in model'
+      when "SketchUp materials in model"
         type = false
 
         sorted_materials = []
         materials = Sketchup.active_model.materials
-        materials.each {|mat| sorted_materials << mat.name unless mat.get_attribute('Skalp', 'ID')}
+        materials.each { |mat| sorted_materials << mat.name unless mat.get_attribute("Skalp", "ID") }
 
         n = 0
-        sorted_materials.sort_by(&:downcase).each { |material|
-            file = Skalp::THUMBNAIL_PATH + material.to_s + '.png'
-            materials[material].write_thumbnail(file, 54)
-            append_SU_thumbnail(material, file, false, n)
-            n += 1
-        }
+        sorted_materials.sort_by(&:downcase).each do |material|
+          file = Skalp::THUMBNAIL_PATH + material.to_s + ".png"
+          materials[material].write_thumbnail(file, 54)
+          append_SU_thumbnail(material, file, false, n)
+          n += 1
+        end
       else
         type = true
         append_thumbnails_from_library(lib)
       end
 
-      @materialdialog.execute_script("load_materials(#{type}, #{@materials})")
+      @materialdialog.execute_script("load_materials(#{type}, #{@materials.to_json})")
 
-      unless @return_webdialog
-        @materialdialog.execute_script("unselect()")
-      end
+      return if @return_webdialog
+
+      @materialdialog.execute_script("unselect()")
     end
 
     def self.append_thumbnail(materialname, path, png_blob = false, order = 1)
-      top = 23 * order
-      png_blob ? source = "data:image/png;base64,#{path}" : source = path
-      add_material(materialname, top, top+2, source)
+      # No position calculation needed
+      source = png_blob ? "data:image/png;base64,#{path}" : path
+      add_material(materialname, 0, 0, source)
     end
 
     def self.append_SU_thumbnail(materialname, path, png_blob = false, order = 1)
-      top = 23 * order
-      png_blob ? source = "data:image/png;base64,#{path}" : source = path
-      add_material(materialname, top+2, top+2, source)
+      source = png_blob ? "data:image/png;base64,#{path}" : path
+      add_material(materialname, 0, 0, source)
     end
 
     def self.append_thumbnails_from_library(lib)
       return unless lib
+
       json_file = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/resources/materials/" + lib + ".json"
       return unless File.exist?(json_file)
 
       @active_library_materials = {}
       materials = {}
 
-      json_data = JSON.parse(File.read(json_file)) rescue []
+      json_data = begin
+        JSON.parse(File.read(json_file))
+      rescue StandardError
+        []
+      end
       json_data.each do |pattern_info|
         next unless pattern_info["name"].is_a?(String) && pattern_info["png_blob"]
+
         @active_library_materials[pattern_info["name"]] = pattern_info.transform_keys(&:to_sym)
         materials[pattern_info["name"]] = pattern_info["png_blob"]
       end
@@ -392,101 +419,58 @@ module Skalp
     end
 
     def self.create_sectionmaterial_from_library(pattern_info)
-      Skalp::block_color_by_layer = true
+      return unless pattern_info && pattern_info[:name]
 
-      if pattern_info[:line_color].nil? && pattern_info[:line_color].nil? && color_from_name(pattern_info[:name])
-        pattern_info[:line_color] = color_from_name(pattern_info[:name])
-        pattern_info[:fill_color] = color_from_name(pattern_info[:name])
+      material_name = pattern_info[:name]
+      Sketchup.active_model.set_attribute("Skalp_sectionmaterials", material_name, pattern_info.inspect)
+      Skalp.create_sectionmaterial(material_name)
+    end
+
+    def self.create_none_thumbnail
+      # 54x18 standard size
+      require "base64"
+
+      # Try to load ChunkyPNG if not defined
+      unless defined?(ChunkyPNG)
+        # Attempt to find the file via SketchUp's support file mechanism
+        png_lib = Sketchup.find_support_file("chunky_png.rb", "Plugins/Skalp_Skalp2026/chunky_png/lib")
+        if png_lib
+          require png_lib
+        else
+          # Fallback to standard require matching the folder structure
+          require "Skalp_Skalp2026/chunky_png/lib/chunky_png"
+        end
       end
 
-      if pattern_info[:line_color] && !pattern_info[:line_color].include?('rgb')
-        pattern_info[:line_color] = color_from_name(pattern_info[:line_color]) || 'rgb(0,0,0)'
-      end
+      raise "ChunkyPNG not loaded" unless defined?(ChunkyPNG)
 
-      if pattern_info[:fill_color] && !pattern_info[:fill_color].include?('rgb')
-        pattern_info[:fill_color] = color_from_name(pattern_info[:fill_color]) || 'rgb(255,255,255)'
-      end
+      png = ChunkyPNG::Image.new(54, 18, ChunkyPNG::Color::WHITE)
+      red = ChunkyPNG::Color.rgb(200, 0, 0)
+      border = ChunkyPNG::Color.rgb(200, 200, 200)
 
-      pattern_info[:line_color] = pattern_info[:fill_color] if pattern_info[:fill_color] && pattern_info[:line_color].nil?
+      # Draw Border
+      png.rect(0, 0, 53, 17, border)
 
-      pattern_definition = {
-        name: 'no_name',
-        pattern:   ["*ANSI31, ANSI IRON, BRICK, STONE MASONRY","45, 0,0, 0,.125"],
-        pattern_size: '3mm',
-        line_color: 'rgb(0,0,0)',
-        fill_color: 'rgb(255,255,255)',
-        pen: 0.0071,
-        section_cut_width: 0.0071,
-        alignment: false
-      }.merge(pattern_info)
+      # Draw X
+      png.line(0, 0, 53, 17, red)
+      png.line(0, 17, 53, 0, red)
 
-      if pattern_definition[:pattern][0].include?('*')
-        pattern = pattern_definition[:pattern]
-      else
-        pattern = ["*#{pattern_definition[:name]}"] + pattern_definition[:pattern]
-      end
-
-      pattern_info[:pattern] = pattern
-
-      pattern_definition[:alignment] ? alignment_string = "true" : alignment_string = "false"
-
-      pattern_string = {:name => pattern_definition[:name],
-                        :pattern => pattern,
-                        :print_scale => 1,
-                        :resolution => 600,
-                        :user_x => pattern_definition[:pattern_size],
-                        :space => :paperspace,
-                        :line_color => pattern_definition[:line_color],
-                        :fill_color => pattern_definition[:fill_color],
-                        :pen => pattern_definition[:pen], #0.18mm
-                        :section_cut_width => pattern_definition[:section_cut_width], #0.35mm
-                        :alignment => alignment_string
-      }
-
-      Skalp.active_model ? Skalp.active_model.start("Skalp - #{Skalp.translate('Create Skalp material')}", true) : Sketchup.active_model.start_operation("Skalp - #{Skalp.translate('Create Skalp material')}", true, false, false)
-
-      hatch = SkalpHatch::Hatch.new
-      hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(pattern_string[:pattern]))
-
-      tile = Tile_size.new()
-      tile.calculate(pattern_string[:user_x], :x)
-
-      create_png_result = hatch.create_png({
-                                               :type => :tile,
-                                               :line_color => pattern_string[:line_color],
-                                               :fill_color => pattern_string[:fill_color],
-                                               :pen => pattern_string[:pen], # pen_width in inch (1pt = 1.0 / 72)
-                                               :resolution => Hatch_dialog::PRINT_DPI,
-                                               :print_scale => 1,
-                                               :user_x => tile.x_value,
-                                               :space => pattern_string[:space]
-                                           })
-
-      pattern_string[:pattern] = create_png_result[:original_definition]
-      pattern_string[:user_x] = tile.x_string
-      pattern_hash = pattern_string.merge(create_png_result)
-      pattern_hash.delete(:original_definition)
-
-      Sketchup.active_model.materials[pattern_hash[:name]] ? hatch_material = Sketchup.active_model.materials[pattern_hash[:name]] : hatch_material = Sketchup.active_model.materials.add(pattern_hash[:name])
-
-      hatch_material.texture = IMAGE_PATH + 'tile.png'
-      hatch_material.texture.size = hatch.tile_width / Hatch_dialog::PRINT_DPI
-      hatch_material.metalness_enabled = false
-      hatch_material.normal_enabled = false
-
-      Skalp.set_ID(hatch_material)
-      pattern_hash[:pattern] = ["*#{pattern_hash[:name]}"] + pattern_hash[:pattern] unless pattern_hash[:pattern][0].include?('*')
-      Skalp.set_pattern_info_attribute(hatch_material, pattern_hash)
-
-      Skalp.active_model ? Skalp.active_model.commit : Sketchup.active_model.commit_operation
-      Skalp::block_color_by_layer = false
+      Base64.encode64(png.to_blob).gsub("\n", "")
+    rescue StandardError => e
+      puts "Skalp: Could not create none thumbnail: #{e}"
+      # Return a 1x1 transparent pixel valid base64
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
     end
 
     def self.delete_material_from_library(library, materialname)
       json_path = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/resources/materials/#{library}.json"
       return unless File.exist?(json_path)
 
-      json_data = JSON.parse(File.read(json_path)) rescue []
+      json_data = begin
+        JSON.parse(File.read(json_path))
+      rescue StandardError
+        []
+      end
       json_data.reject! { |info| info["name"] == materialname }
 
       File.write(json_path, JSON.pretty_generate(json_data))
@@ -498,19 +482,28 @@ end
 module Skalp
   def self.ensure_png_blobs_for_model_materials
     Sketchup.active_model.materials.each do |material|
-      next unless material.get_attribute('Skalp', 'ID')
-      info_string = material.get_attribute('Skalp', 'pattern_info')
+      next unless material.get_attribute("Skalp", "ID")
+
+      info_string = material.get_attribute("Skalp", "pattern_info")
       next unless info_string
 
-      pattern_info = eval(info_string) rescue nil
+      pattern_info = begin
+        eval(info_string)
+      rescue StandardError
+        nil
+      end
       next unless pattern_info.is_a?(Hash)
 
-      unless pattern_info[:png_blob]
-        png_blob = Skalp::create_thumbnail(pattern_info, 81, 27) rescue nil
-        if png_blob
-          pattern_info[:png_blob] = png_blob
-          material.set_attribute('Skalp', 'pattern_info', pattern_info.inspect)
-        end
+      next if pattern_info[:png_blob]
+
+      png_blob = begin
+        Skalp.create_thumbnail(pattern_info, 81, 27)
+      rescue StandardError
+        nil
+      end
+      if png_blob
+        pattern_info[:png_blob] = png_blob
+        material.set_attribute("Skalp", "pattern_info", pattern_info.inspect)
       end
     end
   end

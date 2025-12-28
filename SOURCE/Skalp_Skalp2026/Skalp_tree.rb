@@ -1,6 +1,5 @@
 module Skalp
   class Node_info
-
     attr_accessor :id, :transformation, :skpEntity, :section_material, :tag, :su_material, :su_material_used_by_hatch, :layer, :layer_used_by_hatch, :visibility, :faces, :section_results,
                   :transformation_obj, :object, :parent, :skpDefinition_entities, :node, :top_parent,
                   :multi_tags, :multi_tags_hatch
@@ -11,20 +10,20 @@ module Skalp
       @node = node
 
       if @object.is_a?(Sketchup::Model)
-        @tag = ''
+        @tag = ""
         @id = @object.path
-        @layer = 'Layer0'
-        @layer_used_by_hatch = 'Layer0'
+        @layer = "Layer0"
+        @layer_used_by_hatch = "Layer0"
         @multi_tags = {}
         @visibility = nil
-        @section_material = 'Skalp default'
+        @section_material = "Skalp default"
         @su_material = nil
         @su_material_used_by_hatch = nil
         @transformation = Geom::Transformation.new
         @transformation_obj = @transformation
         @skpEntity = @object
         @skpDefinition_entities = @object.entities
-        @top_parent = @node #OK
+        @top_parent = @node # OK
       else
         @skpEntity = @object
         @id = @skpEntity.entityID.to_s
@@ -32,10 +31,10 @@ module Skalp
         @skpEntity = skpEntity
         @skpDefinition_entities = Skalp.get_definition_entities(@skpEntity)
 
-        if @skpEntity.layer.name == 'Layer0' then
+        if @skpEntity.layer.name == "Layer0"
           @layer = parent.value.layer
           layer_inside = Skalp.layer_inside_object(@skpEntity)
-          layer_inside != 'Layer0' ? @layer_used_by_hatch = layer_inside : @layer_used_by_hatch = @layer
+          @layer_used_by_hatch = layer_inside == "Layer0" ? @layer : layer_inside
         else
           @layer = @skpEntity.layer.name
           @layer_used_by_hatch = @layer
@@ -43,13 +42,13 @@ module Skalp
 
         @visibility = @skpEntity.visible?
 
-        if @skpEntity.material then
+        if @skpEntity.material
           @su_material = @skpEntity.material
           @su_material_used_by_hatch = @su_material
         else
           @su_material = parent.value.su_material
           material = Skalp.material_inside_object(@skpEntity)
-          material ? @su_material_used_by_hatch = material : @su_material_used_by_hatch = @su_material
+          @su_material_used_by_hatch = material || @su_material
         end
 
         get_sectionmaterial
@@ -58,36 +57,40 @@ module Skalp
 
         @transformation_obj = @object.transformation
 
-        if @parent.value.skpEntity.class == Sketchup::Model || @parent == nil
-          @transformation = @object.transformation
-        else
-          @transformation = @parent.value.transformation * @object.transformation
-        end
+        @transformation = if @parent.value.skpEntity.class == Sketchup::Model || @parent.nil?
+                            @object.transformation
+                          else
+                            @parent.value.transformation * @object.transformation
+                          end
 
-        if @parent.value.top_parent && !@parent.value.top_parent.value.skpEntity.is_a?(Sketchup::Model)
-          @top_parent = @parent.value.top_parent
-        else
-          @top_parent = @node
-        end
+        @top_parent = if @parent.value.top_parent && !@parent.value.top_parent.value.skpEntity.is_a?(Sketchup::Model)
+                        @parent.value.top_parent
+                      else
+                        @node
+                      end
 
       end
 
       @section_results = {}
     end
 
+    def inspect
+      "#<#{self.class}:#{object_id} @id=#{@id} @skpEntity=#{@skpEntity}>"
+    end
+
     def get_layer
       return unless @skpEntity.valid?
 
-      if @skpEntity.layer.name == 'Layer0'
+      if @skpEntity.layer.name == "Layer0"
         layer_inside_object = Skalp.layer_inside_object(@skpEntity)
         return if @layer_used_by_hatch == layer_inside_object
-      else
-        return if @layer_used_by_hatch == @skpEntity.layer.name
+      elsif @layer_used_by_hatch == @skpEntity.layer.name
+        return
       end
 
       @section_results = {}
 
-      if @skpEntity.layer.name == 'Layer0' then
+      if @skpEntity.layer.name == "Layer0"
         @layer = parent.value.layer
         @layer_used_by_hatch = @layer
       else
@@ -99,51 +102,50 @@ module Skalp
     def get_su_material
       return unless @skpEntity.valid?
 
-      return if @su_material != nil && @su_material.valid? && @su_material_used_by_hatch == Skalp.material_inside_object(@skpEntity)
+      if !@su_material.nil? && @su_material.valid? && @su_material_used_by_hatch == Skalp.material_inside_object(@skpEntity)
+        return
+      end
+
       @section_results = {}
 
       if @skpEntity.material
         @su_material = @skpEntity.material
         @su_material_used_by_hatch = @su_material
-      else
-        if @parent != nil
-          material = Skalp.material_inside_object(@skpEntity)
-          @su_material = @parent.value.su_material
-          material ? @su_material_used_by_hatch = material : @su_material_used_by_hatch = @su_material
-        end
+      elsif !@parent.nil?
+        material = Skalp.material_inside_object(@skpEntity)
+        @su_material = @parent.value.su_material
+        @su_material_used_by_hatch = material || @su_material
       end
     end
 
     def get_tag
       return unless @skpEntity.valid?
-      return if @tag == @skpEntity.get_attribute('Skalp', 'tag')
+      return if @tag == @skpEntity.get_attribute("Skalp", "tag")
 
       @section_results = {}
 
-      if @skpEntity.get_attribute('Skalp', 'tag')
-        @tag = @skpEntity.get_attribute('Skalp', 'tag')
-      else
-        @tag = @parent.value.tag if @parent != nil
+      if @skpEntity.get_attribute("Skalp", "tag")
+        @tag = @skpEntity.get_attribute("Skalp", "tag")
+      elsif !@parent.nil?
+        @tag = @parent.value.tag
       end
     end
 
     def get_multi_tags
       return unless @skpEntity.valid?
 
-      if @skpEntity.get_attribute('AW', 'Tags')
-        @multi_tags = eval(@skpEntity.get_attribute('AW', 'Tags'))
+      if @skpEntity.get_attribute("AW", "Tags")
+        @multi_tags = eval(@skpEntity.get_attribute("AW", "Tags"))
         @multi_tags_hatch = get_multitags_hatch
-      else
-        if @parent != nil
-          @multi_tags = @parent.value.multi_tags
-          @multi_tags_hatch = get_multitags_hatch
-        end
+      elsif !@parent.nil?
+        @multi_tags = @parent.value.multi_tags
+        @multi_tags_hatch = get_multitags_hatch
       end
     end
 
     def get_multitags_hatch
-      section_table = Skalp::active_model.multi_tags_sectionmaterial_table
-      groups = Skalp::active_model.multi_tags_groups_for_section
+      section_table = Skalp.active_model.multi_tags_sectionmaterial_table
+      groups = Skalp.active_model.multi_tags_groups_for_section
 
       tag = []
       groups.each do |group|
@@ -151,24 +153,24 @@ module Skalp
       end
 
       section_table.each do |rule, hatch|
-        i = rule.index('*')
+        i = rule.index("*")
         if i
-          return hatch if rule[0..i-1] == tag[0..i-1]
-        else
-          return hatch if rule == tag
+          return hatch if rule[0..i - 1] == tag[0..i - 1]
+        elsif rule == tag
+          return hatch
         end
       end
 
-      return nil
+      nil
     end
 
     def get_sectionmaterial
       return unless @skpEntity.valid?
 
-      if @skpEntity.get_attribute('Skalp', 'sectionmaterial')
-        @section_material = @skpEntity.get_attribute('Skalp', 'sectionmaterial')
-      else
-        @section_material = @parent.value.section_material if @parent != nil
+      if @skpEntity.get_attribute("Skalp", "sectionmaterial")
+        @section_material = @skpEntity.get_attribute("Skalp", "sectionmaterial")
+      elsif !@parent.nil?
+        @section_material = @parent.value.section_material
       end
     end
 
@@ -188,7 +190,7 @@ module Skalp
       @SectionAlgorithm.calculate_section(@skpEntity, @transformation, sectionplane)
       polygons = @SectionAlgorithm.polygons
 
-      section_result.add_polygons(polygons) if polygons != nil
+      section_result.add_polygons(polygons) unless polygons.nil?
     end
   end
 
@@ -201,12 +203,12 @@ module Skalp
       @@unique_tel += 1
       @tree = tree
       if object.class == Sketchup::Model
-        @name = 'id_' + (Skalp::active_filename).gsub(' ', '_')
+        @name = "id_" + Skalp.active_filename.gsub(" ", "_")
         @parent = nil
         @value = Node_info.new(self, object)
       else
         @tree.lookup_table_by_id[@@unique_tel] = object.entityID
-        @name = 'id_' + @@unique_tel.to_s
+        @name = "id_" + @@unique_tel.to_s
         @parent = parent
         @value = Node_info.new(self, object, parent)
       end
@@ -214,32 +216,36 @@ module Skalp
       @parents = []
       @children = []
 
-      parent.addChild(self) if parent != nil
+      parent.addChild(self) unless parent.nil?
       @tree.cache[@name] = self if @tree.cachingEnabled == true
 
-      objects = value.skpDefinition_entities.grep(Sketchup::Group) + value.skpDefinition_entities.grep(Sketchup::ComponentInstance) if value.skpDefinition_entities
-      return if not objects
+      if value.skpDefinition_entities
+        objects = value.skpDefinition_entities.grep(Sketchup::Group) + value.skpDefinition_entities.grep(Sketchup::ComponentInstance)
+      end
+      return unless objects
 
       for obj in objects
         obj.deleted? && next
-        obj.get_attribute('Skalp', 'ID') && next
+        obj.get_attribute("Skalp", "ID") && next
         TreeNode.new(obj, self, @tree)
       end
     end
 
     def root
-      return @root if parent == nil
+      return @root if parent.nil?
+
       @root = parent.root
     end
 
     def addParent(parent)
-      @parents.push(parent) if (parent != nil) and (not @parents.include? parent)
+      @parents.push(parent) if !parent.nil? and (!@parents.include? parent)
     end
 
     def addChild(child)
-      return if child == nil
+      return if child.nil?
+
       child.addParent(self)
-      @children.push(child) if not @children.include? child
+      @children.push(child) unless @children.include? child
     end
 
     def removeChild(child)
@@ -253,7 +259,7 @@ module Skalp
         @tree.removeNode(node)
         node = nil
       end
-      @children =[]
+      @children = []
     end
 
     def set_modified
@@ -262,7 +268,7 @@ module Skalp
 
     def refresh(skpEntity)
       @value.section_results = {}
-      self.deleteChildren
+      deleteChildren
       for e in Skalp.get_definition_entities(skpEntity).grep(Sketchup::Group)
         TreeNode.new(e, self, @tree)
       end
@@ -274,7 +280,7 @@ module Skalp
     def removeParent(parent)
       @parents.delete(parent)
       # If we have no parents left we need to remove ourself
-      @children.dup.each { |child| self.removeChild(child) } if parents.size == 0
+      @children.dup.each { |child| removeChild(child) } if parents.size == 0
     end
 
     def set_visibility(section)
@@ -286,11 +292,7 @@ module Skalp
       else
         return unless @value.skpEntity.layer.valid?
 
-        if @parent == nil
-          parent_visibility = true
-        else
-          parent_visibility = @parent.value.visibility
-        end
+        parent_visibility = @parent.nil? || @parent.value.visibility
 
         if section && section.visibility
           if section.visibility.include_layer?(@value.skpEntity.layer) || section.visibility.include_hidden_entity?(@value.skpEntity) || parent_visibility == false
@@ -304,60 +306,62 @@ module Skalp
 
     def calculate_section(sectionplane)
       return if @value.skpEntity.valid? == false
+
       @value.update_section_result(sectionplane) if @value.visibility == true
     end
 
     def get_section_results(section, force_update = false, update_children = true, nodes_to_exclude = [])
-      return if section.sectionplane == nil
-      set_visibility(section) #TODO moet er nog verder gerekend worden indien niet zichtbaar?
+      return if section.sectionplane.nil?
 
-      if @value.section_results[section.sectionplane] == nil || force_update == true
+      set_visibility(section) # TODO: moet er nog verder gerekend worden indien niet zichtbaar?
+
+      if @value.section_results[section.sectionplane].nil? || force_update == true
         result = calculate_section(section.sectionplane)
       end
 
-      if result || @value.section_results[section.sectionplane] != nil
+      if result || !@value.section_results[section.sectionplane].nil?
         result2D = @value.section_results[section.sectionplane]
         section.section2Ds << result2D if result2D.meshes && !result2D.meshes.empty?
       end
 
       @value.visibility || return
 
-      if update_children
-        for node in @children
-          return if nodes_to_exclude.include?(node)
-          node.get_section_results(section, force_update, update_children, nodes_to_exclude)
-        end
+      return unless update_children
+
+      for node in @children
+        return if nodes_to_exclude.include?(node)
+
+        node.get_section_results(section, force_update, update_children, nodes_to_exclude)
       end
     end
 
     def update_transformation
-      return unless self.value.skpEntity.valid?
+      return unless value.skpEntity.valid?
 
-      if self.value.skpEntity.class != Sketchup::Model
+      if value.skpEntity.class != Sketchup::Model
 
-        if @tree.skpModel.active_path != nil
-          if @tree.skpModel.active_path.include?(self.value.skpEntity) && @tree.skpModel.active_path.include?(self.parent.value.skpEntity) == false
-            self.value.transformation = Geom::Transformation.new
-          end
-          if @tree.skpModel.active_path.include?(self.value.skpEntity) && @tree.skpModel.active_path.include?(self.parent.value.skpEntity)
-            self.value.transformation = Geom::Transformation.new
-          end
-          if @tree.skpModel.active_path.include?(self.parent.value.skpEntity) && @tree.skpModel.active_path.include?(self.value.skpEntity) == false
-            self.value.transformation = self.value.skpEntity.transformation
-          end
-          if @tree.skpModel.active_path.include?(self.value.skpEntity) == false && @tree.skpModel.active_path.include?(self.parent.value.skpEntity) == false
-            self.value.transformation = self.parent.value.transformation * self.value.skpEntity.transformation
-          end
+        if @tree.skpModel.active_path.nil?
+          value.transformation = parent.value.transformation * value.skpEntity.transformation
         else
-          self.value.transformation = self.parent.value.transformation * self.value.skpEntity.transformation
+          if @tree.skpModel.active_path.include?(value.skpEntity) && @tree.skpModel.active_path.include?(parent.value.skpEntity) == false
+            value.transformation = Geom::Transformation.new
+          end
+          if @tree.skpModel.active_path.include?(value.skpEntity) && @tree.skpModel.active_path.include?(parent.value.skpEntity)
+            value.transformation = Geom::Transformation.new
+          end
+          if @tree.skpModel.active_path.include?(parent.value.skpEntity) && @tree.skpModel.active_path.include?(value.skpEntity) == false
+            value.transformation = value.skpEntity.transformation
+          end
+          if @tree.skpModel.active_path.include?(value.skpEntity) == false && @tree.skpModel.active_path.include?(parent.value.skpEntity) == false
+            value.transformation = parent.value.transformation * value.skpEntity.transformation
+          end
         end
       end
 
       for node in @children
         node.update_transformation
       end
-
-    rescue => e
+    rescue StandardError => e
       Skalp.errors(e)
     end
 
@@ -397,7 +401,7 @@ module Skalp
     end
 
     def inspect
-      return @name
+      @name
     end
   end # class TreeNode
 
@@ -410,86 +414,88 @@ module Skalp
       @lookup_table_by_id = {}
       @cachingEnabled = true
       @root = TreeNode.new(@skpModel, nil, self)
-      Skalp.message1 unless Skalp.guid == Sketchup.read_default('Skalp', 'guid')
+      Skalp.message1 unless Skalp.guid == Sketchup.read_default("Skalp", "guid")
     end
 
     def print(node, depth)
       if node.value.skpEntity.class != Sketchup::Model && node.value.skpEntity.deleted?
         puts "#{depth} #{node.name} Ent #{node.value.skpEntity} DELETED "
       else
-        puts "#{depth} #{node.name} Ent #{node.value.skpEntity} ID #{node.value.skpEntity.entityID} transf: #{node.value.transformation.to_a.inspect}  " if node.value.skpEntity.class != Sketchup::Model
+        if node.value.skpEntity.class != Sketchup::Model
+          puts "#{depth} #{node.name} Ent #{node.value.skpEntity} ID #{node.value.skpEntity.entityID} transf: #{node.value.transformation.to_a.inspect}  "
+        end
         result = node.value.section_results[0]
       end
-      depth = depth + '--'
+      depth += "--"
       for child in node.children
         self.print(child, depth)
       end
     end
 
-    def test_tree (node=@root)
+    def test_tree(node = @root)
       observer_status = Skalp.active_model.observer_active
       Skalp.active_model.observer_active = false
-      layer = @skpModel.layers.add('skalp tree') if not @skpModel.layers.include?('skalp tree')
+      layer = @skpModel.layers.add("skalp tree") unless @skpModel.layers.include?("skalp tree")
 
       for face in node.value.skpEntity.entities.grep(Sketchup::Face)
-        edges=[]
+        edges = []
         for edge in face.edges
-          edges << @skpModel.entities.add_line(node.value.transformation * edge.start.position, node.value.transformation * edge.end.position)
+          edges << @skpModel.entities.add_line(node.value.transformation * edge.start.position,
+                                               node.value.transformation * edge.end.position)
         end
         face = @skpModel.entities.add_face(edges)
         for edge in edges
-          edge.layer = layer if edge != nil
+          edge.layer = layer unless edge.nil?
         end
-        face.material = "red" if face != nil
-        face.layer = layer if face != nil
+        face.material = "red" unless face.nil?
+        face.layer = layer unless face.nil?
       end
 
       for child in node.children
-        self.test_tree(child)
+        test_tree(child)
       end
       Skalp.active_model.observer_active = observer_status
     end
 
     def printroot
-      self.print(@root, '')
+      self.print(@root, "")
     end
 
     def removeNode(nodeName)
-      node = self.findNode(nodeName)
+      node = findNode(nodeName)
       @cache.delete nodeName if @cachingEnabled
-      node.parents.dup.each { |parent| parent.removeChild(node) } if node != nil
+      node.parents.dup.each { |parent| parent.removeChild(node) } unless node.nil?
     end
 
     def findNode(nodeName)
       if @cachingEnabled
         foundNode = @cache[nodeName]
-        if foundNode != nil
-          return foundNode
-        end
+        return foundNode unless foundNode.nil?
       end
       return nil if @cachingEnabled
 
       ret = nil
-      self.depthFirst() do |node|
+      depthFirst do |node|
         if node.name == nodeName
           ret = node
           break
         end
       end
-      return ret
+      ret
     end
 
     def find_nodes_by_id(id)
       node_id_array = @lookup_table_by_id.select { |k, v| v == id }
       nodes = []
       for node_id in node_id_array
-        nodes << self.findNode('id_' + node_id[0].to_s)
+        nodes << findNode("id_" + node_id[0].to_s)
       end
-      return nodes.compact
+      nodes.compact
     end
 
     def skpEntity_update_transformation(entity)
       return if entity.deleted?
+
       for node in find_nodes_by_id(entity.entityID)
         node.update_transformation
       end
@@ -497,6 +503,7 @@ module Skalp
 
     def skpEntity_update_su_material(entity)
       return if entity.deleted?
+
       nodes_to_update = find_nodes_by_id(entity.entityID)
 
       for node in nodes_to_update
@@ -506,6 +513,7 @@ module Skalp
 
     def skpEntity_update_layer(entity)
       return if entity.deleted?
+
       nodes_to_update = find_nodes_by_id(entity.entityID)
 
       for node in nodes_to_update
@@ -516,6 +524,7 @@ module Skalp
     def skpEntity_update_sectionmaterial(entity)
       return if entity.class == Sketchup::Model
       return if entity.deleted?
+
       nodes_to_update = find_nodes_by_id(entity.entityID)
 
       for node in nodes_to_update
@@ -525,6 +534,7 @@ module Skalp
 
     def skpEntity_update_tag(entity)
       return if entity.deleted?
+
       nodes_to_update = find_nodes_by_id(entity.entityID)
 
       for node in nodes_to_update
@@ -534,6 +544,7 @@ module Skalp
 
     def skpEntity_update_multi_tags(entity)
       return if entity.deleted?
+
       nodes_to_update = find_nodes_by_id(entity.entityID)
 
       for node in nodes_to_update
@@ -555,8 +566,10 @@ module Skalp
         update_children = false
         if entity.parent == @skpModel
           nodes_to_update << @root
-        else
-          nodes_to_update = find_nodes_by_id(Skalp.active_model.active_context.entityID) if Skalp.active_model.class != Sketchup::Model && Skalp.active_model.active_context && Skalp.active_model.active_context.valid?
+        elsif Skalp.active_model.class != Sketchup::Model && Skalp.active_model.active_context && Skalp.active_model.active_context.valid?
+          if Skalp.active_model.class != Sketchup::Model && Skalp.active_model.active_context && Skalp.active_model.active_context.valid?
+            nodes_to_update = find_nodes_by_id(Skalp.active_model.active_context.entityID)
+          end
         end
       else
         update_children = true
@@ -565,7 +578,10 @@ module Skalp
 
       for node in nodes_to_update
         node.set_modified
-        node.get_section_results(Skalp.active_model.active_sectionplane.section, force_update, update_children) if Skalp.active_model.active_sectionplane
+        if Skalp.active_model.active_sectionplane
+          node.get_section_results(Skalp.active_model.active_sectionplane.section, force_update,
+                                   update_children)
+        end
       end
     end
 
@@ -579,7 +595,10 @@ module Skalp
     end
 
     def root_update_section2D
-      @root.get_section_results(Skalp.active_model.active_sectionplane.section, true, false) if Skalp.active_model.active_sectionplane
+      return unless Skalp.active_model.active_sectionplane
+
+      @root.get_section_results(Skalp.active_model.active_sectionplane.section, true,
+                                false)
     end
 
     def skpEntities_delete_from_tree(entity)
@@ -590,7 +609,7 @@ module Skalp
         removeNode(node.name)
       end
 
-      return true
+      true
     end
 
     def skpEntities_delete(entityID)
@@ -629,28 +648,33 @@ module Skalp
         end
       end
 
-      return found_node
+      found_node
     end
 
     def skpEntities_add(entity)
       return if entity.deleted?
-      return unless Skalp.active_model.active_context.class == Sketchup::Model || Skalp.active_model.active_context.valid?
+      unless Skalp.active_model.active_context.class == Sketchup::Model || Skalp.active_model.active_context.valid?
+        return
+      end
 
       return if entity.is_a?(Sketchup::SectionPlane)
+
       if Skalp.object?(entity)
-        if Skalp.active_model.active_context != @skpModel
-          parents = self.find_nodes_by_id(Skalp.active_model.active_context.entityID) if Skalp.active_model.active_context.class != Sketchup::Model
+        if Skalp.active_model.active_context == @skpModel
+          TreeNode.new(entity, @root, self)
+        else
+          if Skalp.active_model.active_context.class != Sketchup::Model
+            parents = find_nodes_by_id(Skalp.active_model.active_context.entityID)
+          end
 
           if parents
             for parent in parents
               TreeNode.new(entity, parent, self)
             end
           end
-        else
-          TreeNode.new(entity, @root, self)
         end
       elsif entity.is_a?(Sketchup::Face)
-        @root.value.section_results={} if entity.parent.class == Sketchup::Model
+        @root.value.section_results = {} if entity.parent.class == Sketchup::Model
       end
     end
 
