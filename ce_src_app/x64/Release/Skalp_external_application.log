@@ -1,0 +1,16 @@
+﻿  base64.cpp
+  create_layer_materials.cpp
+  get_exploded_entities.cpp
+  main.cpp
+  model_style.cpp
+  setup_hiddenline_style.cpp
+  setup_reversed_scene.cpp
+X:\Guy\SourceTree_repo\Skalp\Skalp_external_application\setup_reversed_scene.cpp(267,30): warning C4834: discarding return value of function with 'nodiscard' attribute
+  skalp_convert.cpp
+  sketchup.cpp
+  Generating code
+  0 of 1119 functions ( 0.0%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  Skalp_external_application.vcxproj -> X:\Guy\SourceTree_repo\Skalp\Skalp_external_application\Release_x64\Skalp_external_application.exe

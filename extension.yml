@@ -3,7 +3,7 @@ extension:
   name: "Skalp 2026"
 
   # Technical identifier (case sensitive, used for filenames and directory names)
-  id: "skalp"
+  id: "Skalp_Skalp2026"
 
   # Ruby module name (CamelCase version of id)
   module_name: "Skalp"

@@ -1,0 +1,56 @@
+# Build artifacts
+BUILDS/
+*.rbz
+coverage/
+
+# Temporary files
+tmp/
+.tmp/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Development licenses (keep in separate dir)
+dev_licenses/
+
+# License server (if running locally)
+skalp-license-server/
+
+# C/C++ build artifacts
+ce_src_app/build/
+ce_src_skalpc/build/
+*.o
+*.so
+*.bundle
+
+# Ruby gems vendor (if vendored)
+vendor/bundle/
+
+# RubyGems lockfile (optional, uncomment if you want to ignore)
+# Gemfile.lock
+
+# RuboCop cache
+.rubocop-*
+!.rubocop.yml
+!.rubocop_todo.yml
+
+# Test coverage reports
+coverage/
+
+# Documentation builds (if generated)
+doc/
+.yardoc/
+
+# Node modules (if any frontend tools)
+node_modules/
+
+# macOS rgloader
+rgloader/

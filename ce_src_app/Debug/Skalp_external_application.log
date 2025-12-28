@@ -1,0 +1,13 @@
+﻿Build started 5/02/2016 14:25:29.
+     1>Project "Z:\guy On My Mac\Dropbox\Guy\SourceTree_repo\Skalp\Skalp_external_application\Skalp_external_application.vcxproj" on node 2 (build target(s)).
+     1>InitializeBuildStatus:
+         Creating "Debug\Skalp_external_application.unsuccessfulbuild" because "AlwaysCreate" was specified.
+       ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /I"Z:\guy On My Mac\Dropbox\Guy\SourceTree_repo\Skalp\Skalp_external_application\../../../headers" /ZI /nologo /W3 /WX- /Od /Oy- /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vcWindows7.1SDK.pdb" /Gd /TP /analyze- /errorReport:prompt main.cpp
+         main.cpp
+     1>z:\guy on my mac\dropbox\guy\sourcetree_repo\skalp\skalp_external_application\main.cpp(8): fatal error C1083: Cannot open include file: 'LayOutAPI/layout.h': No such file or directory
+     1>Done Building Project "Z:\guy On My Mac\Dropbox\Guy\SourceTree_repo\Skalp\Skalp_external_application\Skalp_external_application.vcxproj" (build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:01.12

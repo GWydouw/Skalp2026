@@ -1,0 +1,46 @@
+# Configuration for rake embed
+# Maps output .data filenames (in ce_src_skalpc/src) to input .rb files (in SOURCE/skalp)
+
+# Group: Skalp_dialog (Combined files)
+Skalp_dialog.data:
+  - Skalp_style_settings.rb
+  - Skalp_webdialog.rb
+  - Skalp_section_dialog.rb
+  - Skalp_hatch_dialog.rb
+  - Skalp_tile_size.rb
+  - Skalp_style_rules.rb
+  - Skalp_rendering_options.rb
+  - Skalp_export_import_materials.rb
+  - Skalp_scenes2images.rb
+
+# Individual files (1:1 mapping)
+# Add new files here to have them embedded automatically
+Skalp_control_center.data: [Skalp_control_center.rb]
+Skalp_loader.data: [Skalp_loader.rb]
+Skalp_start.data: [Skalp_start.rb]
+Skalp_license.data: [Skalp_license.rb]
+Skalp_hatch_lib.data: [Skalp_hatch_lib.rb]
+Skalp_hatchtile.data: [Skalp_hatchtile.rb]
+Skalp_hatch_class.data: [Skalp_hatch_class.rb]
+Skalp_hatchdefinition_class.data: [Skalp_hatchdefinition_class.rb]
+Skalp_hatchline_class.data: [Skalp_hatchline_class.rb]
+Skalp_hatchpatterns_main.data: [Skalp_hatchpatterns_main.rb]
+Skalp_isolate.data: [Skalp_isolate.rb]
+Skalp_converter.data: [Skalp_converter.rb]
+Skalp_tree.data: [Skalp_tree.rb]
+Skalp_layer.data: [Skalp_layer.rb]
+Skalp_page.data: [Skalp_page.rb]
+Skalp_visibility.data: [Skalp_visibility.rb]
+Skalp_section2D.data: [Skalp_section2D.rb]
+Skalp_sectionplane.data: [Skalp_sectionplane.rb]
+Skalp_section.data: [Skalp_section.rb]
+Skalp_model.data: [Skalp_model.rb]
+Skalp_algorithm.data: [Skalp_algorithm.rb]
+Skalp_dxf.data: [Skalp_dxf.rb]
+Skalp_pages_undoredo.data: [Skalp_pages_undoredo.rb]
+Skalp_memory_attributes.data: [Skalp_memory_attributes.rb]
+Skalp_materials.data: [Skalp_materials.rb]
+Skalp_fog.data: [Skalp_fog.rb]
+Skalp_dashed_lines.data: [Skalp_dashed_lines.rb]
+Skalp_hiddenlines.data: [Skalp_hiddenlines.rb]
+Skalp_multipolygon.data: [Skalp_multipolygon.rb]

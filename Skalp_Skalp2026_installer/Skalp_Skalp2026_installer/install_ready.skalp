@@ -1,0 +1,4 @@
+# file to check if Skalp is already installed
+module Skalp
+  SKALP_INSTALLED = true
+end

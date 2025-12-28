@@ -155,6 +155,58 @@ def build_rbz(mode:)
   puts "== Done =="
 end
 
+# Build the outer "installer" RBZ that wraps the main extension RBZ
+def build_installer_rbz(inner_rbz_path)
+  version = extract_version
+  timestamp = Time.now.strftime("%Y%m%d_%H%M")
+  
+  puts "\n== BUILDING INSTALLER RBZ =="
+  puts "Inner RBZ: #{inner_rbz_path}"
+  
+  # Staging directory
+  installer_tmp = File.join(Config::BUILD_DIR, "tmp_installer_stage_#{Time.now.to_i}")
+  FileUtils.mkdir_p(installer_tmp)
+  
+  # Copy installer skeleton
+  installer_source = File.join(Config::PROJECT_ROOT, "Skalp_Skalp2026_installer")
+  unless File.directory?(installer_source)
+    abort("❌ Installer skeleton not found at: #{installer_source}")
+  end
+  
+  FileUtils.cp_r(Dir.glob("#{installer_source}/*"), installer_tmp)
+  FileUtils.cp(File.join(Config::PROJECT_ROOT, "Skalp_Skalp2026_installer.rb"), installer_tmp) if File.exist?(File.join(Config::PROJECT_ROOT, "Skalp_Skalp2026_installer.rb"))
+  
+  # Copy the inner RBZ to the installer folder
+  installer_rbz_dest = File.join(installer_tmp, "Skalp_Skalp2026_installer", "Skalp.rbz")
+  FileUtils.cp(inner_rbz_path, installer_rbz_dest)
+  puts ">> Embedded inner RBZ: #{File.basename(inner_rbz_path)}"
+  
+  # Create output RBZ
+  target_dir = File.join(Config::BUILD_DIR, "release")
+  FileUtils.mkdir_p(target_dir)
+  out_installer_rbz = File.join(target_dir, "Skalp_Skalp2026_installer_v#{version}.rbz")
+  FileUtils.rm_f(out_installer_rbz)
+  
+  puts ">> Packaging installer RBZ..."
+  Dir.chdir(installer_tmp) do
+    Zip::File.open(out_installer_rbz, create: true) do |zipfile|
+      Dir.glob("**/*").each do |file|
+        next if File.directory?(file)
+        zipfile.add(file, File.join(installer_tmp, file))
+      end
+    end
+  end
+  
+  # Cleanup
+  FileUtils.rm_rf(installer_tmp)
+  
+  puts "✅ Installer RBZ Created: #{File.basename(out_installer_rbz)}"
+  puts "== Done =="
+  
+  out_installer_rbz
+end
+
+
 desc "Build RBZ package (Defaults to Dev Snapshot)"
 task build: "build:dev"
 
@@ -167,6 +219,22 @@ namespace :build do
   desc "Build Release Artifact (Requires clean git state)"
   task :release do
     build_rbz(mode: :release)
+    
+    # Register version in database
+    puts "\n📤 Registering version in database..."
+    Rake::Task["version:register"].invoke("alpha")
+    
+    # Build the installer RBZ
+    puts "\n📦 Building installer package..."
+    release_dir = File.join(Config::BUILD_DIR, "release")
+    version = extract_version
+    inner_rbz = File.join(release_dir, "#{Config::EXTENSION_NAME}_v#{version}.rbz")
+    
+    if File.exist?(inner_rbz)
+      build_installer_rbz(inner_rbz)
+    else
+      puts "⚠️  Inner RBZ not found, skipping installer build"
+    end
   end
 
   desc "Build Release, open Signing Portal, and capture result"

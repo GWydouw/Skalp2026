@@ -6,8 +6,8 @@ require "rake/testtask"
 
 desc "Run headless unit tests (Minitest)"
 Rake::TestTask.new(:test) do |t|
-  t.libs << "tests"
-  t.pattern = "tests/unit/test_*.rb"
+  t.libs << "tests"; t.libs << "tests/unit"
+  t.pattern = "tests/unit/**/test_*.rb"
   t.verbose = true
 end
 
