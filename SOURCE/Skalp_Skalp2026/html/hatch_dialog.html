@@ -89,13 +89,19 @@
                 <!-- Pattern Fill Color -->
                 <div class="field-row">
                     <label id="translate_06">Fill Color:</label>
-                    <input type="text" class="basic1" id="fill_color">
+                    <div class="color-block" id="fill_color" style="background-color: #FFFFFF;"
+                        onclick="document.getElementById('fill_color_input').click()"></div>
+                    <input type="color" id="fill_color_input" class="basic1" style="display:none;"
+                        onchange="updateFillColor(this.value)" value="#FFFFFF">
                 </div>
 
                 <!-- Pattern Line Color -->
                 <div class="field-row">
                     <label id="translate_17">Line Color:</label>
-                    <input type="text" class="basic2" id="line_color">
+                    <div class="color-block" id="line_color" style="background-color: #000000;"
+                        onclick="document.getElementById('line_color_input').click()"></div>
+                    <input type="color" id="line_color_input" class="basic2" style="display:none;"
+                        onchange="updateLineColor(this.value)" value="#000000">
                 </div>
 
                 <!-- Pattern Line Width Paper -->
@@ -140,7 +146,10 @@
                 <!-- Section Line Color -->
                 <div class="field-row">
                     <label id="translate_18">Line Color:</label>
-                    <input type="text" class="basic3" id="section_line_color">
+                    <div class="color-block" id="section_line_color" style="background-color: #000000;"
+                        onclick="document.getElementById('section_line_color_input').click()"></div>
+                    <input type="color" id="section_line_color_input" class="basic3" style="display:none;"
+                        onchange="updateSectionLineColor(this.value)" value="#000000">
                 </div>
 
                 <!-- Section Line Width -->
