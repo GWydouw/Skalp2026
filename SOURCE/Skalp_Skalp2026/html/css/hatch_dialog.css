@@ -137,12 +137,14 @@ body {
 .section-header h3 {
     margin: 0;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
+    /* Slightly bolder as requested */
     color: #555;
 }
 
 .section-content {
-    padding: 6px 0;
+    padding: 6px 0 6px 16px;
+    /* Indent by 16px to align with title text (icon width + gap) */
     max-height: 500px;
     overflow: hidden;
     transition: max-height 0.25s ease, padding 0.25s ease;
