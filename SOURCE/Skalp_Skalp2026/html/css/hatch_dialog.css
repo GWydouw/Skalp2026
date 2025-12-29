@@ -101,27 +101,27 @@ body {
 }
 
 .slider {
-    width: 90px;
-    margin-left: auto;
-    flex-grow: 0;
+    width: 90px !important;
+    flex: 0 0 90px;
+    /* Fixed 90px, no grow, no shrink */
     font-size: 11px;
-    border: 1px solid #999;
-    padding: 1px 2px;
-    height: 18px;
+    border: 1px solid #CCC;
+    padding: 0;
+    height: 14px;
     border-radius: 4px;
-    /* Consistent rounding */
     -webkit-appearance: none;
-    /* Ensure consistent appearance on Mac */
     background: #DDD;
+    outline: none;
 }
 
 .slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     background: #3875d7;
     border-radius: 50%;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 /* SECTIONS - lighter, airier design */
@@ -254,15 +254,12 @@ body {
     /* rounding as requested */
 }
 
-/* Checkbox alignment */
-.checkbox-row {
-    justify-content: flex-start;
-    gap: 2px;
-}
-
-.checkbox-row input[type="checkbox"] {
-    margin-left: 0;
-    flex-grow: 0;
+/* Standard checkbox alignment - aligned with select boxes */
+input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    flex: 0 0 16px;
 }
 
 #tile_operator {
