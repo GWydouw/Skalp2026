@@ -16,20 +16,27 @@ select {
     user-select: text;
 }
 
-html,
+html {
+    height: auto;
+    margin: 0;
+    padding: 0;
+    /* No padding on html */
+    overflow: hidden;
+    background-color: rgb(235, 235, 235);
+}
+
 body {
     height: auto;
-    /* Allow auto height for measurement */
     margin: 0;
     padding: 8px 10px;
-    /* 10px horizontal padding as requested */
+    /* Only body has padding */
     overflow-x: hidden;
     overflow-y: hidden;
     background-color: rgb(235, 235, 235);
     font-family: "Arial", sans-serif;
     font-size: 11px;
-    width: 235px;
-    /* Fixed width to match Ruby dialog width */
+    width: 215px;
+    /* Content width without padding */
 }
 
 /* MATERIAL NAME - top */
