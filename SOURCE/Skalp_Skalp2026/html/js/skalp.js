@@ -497,15 +497,25 @@ function create_hatch() {
         var space = document.getElementById('units').value;
         var pen_paper = document.getElementById('lineweight_paper').value;
         var pen_model = document.getElementById('lineweight_model').value;
-        var fill_color = $("#fill_color").spectrum("get");
-        var line_color = $("#line_color").spectrum("get");
+        // Use native color inputs instead of Spectrum
+        var fill_color_input = document.getElementById('fill_color_input');
+        var line_color_input = document.getElementById('line_color_input');
+        var fill_color = fill_color_input ? hexToRgb(fill_color_input.value) : 'rgb(255,255,255)';
+        var line_color = line_color_input ? hexToRgb(line_color_input.value) : 'rgb(0,0,0)';
         var aligned = $("#align_pattern").prop('checked');
         var section_cut_width = document.getElementById('sectioncut_linewidth').value;
 
-        var params = utf8(acad_pat).concat(";", size_x, ";", space, ";", pen_paper, ";", pen_model, ";", line_color.toRgbString(), ";", fill_color.toRgbString(), ";", aligned, ';', section_cut_width, ";", utf8(name));
+        var params = utf8(acad_pat).concat(";", size_x, ";", space, ";", pen_paper, ";", pen_model, ";", line_color, ";", fill_color, ";", aligned, ';', section_cut_width, ";", utf8(name));
 
         window.location = 'skp:create_hatch@' + params;
     }
+}
+
+// Helper function to convert hex to rgb string
+function hexToRgb(hex) {
+    if (!hex) return 'rgb(0,0,0)';
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? 'rgb(' + parseInt(result[1], 16) + ',' + parseInt(result[2], 16) + ',' + parseInt(result[3], 16) + ')' : 'rgb(0,0,0)';
 }
 
 
@@ -524,11 +534,30 @@ function delete_hatch() {
 }
 
 function set_fill_color(rgb) {
-    $(".basic1").spectrum("set", rgb);
+    // Update both the hidden input and the visible color block
+    var input = document.getElementById('fill_color_input');
+    var block = document.getElementById('fill_color');
+    if (input) input.value = rgbToHex(rgb);
+    if (block) block.style.backgroundColor = rgb;
 }
 
 function set_line_color(rgb) {
-    $(".basic2").spectrum("set", rgb);
+    // Update both the hidden input and the visible color block
+    var input = document.getElementById('line_color_input');
+    var block = document.getElementById('line_color');
+    if (input) input.value = rgbToHex(rgb);
+    if (block) block.style.backgroundColor = rgb;
+}
+
+// Helper function to convert rgb string to hex
+function rgbToHex(rgb) {
+    if (rgb.startsWith('#')) return rgb;
+    var result = rgb.match(/\d+/g);
+    if (!result || result.length < 3) return '#000000';
+    return '#' + result.slice(0, 3).map(function (x) {
+        var hex = parseInt(x).toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+    }).join('');
 }
 
 function create_preview(status) {
@@ -539,12 +568,15 @@ function create_preview(status) {
     var space = document.getElementById('units').value;
     var pen_paper = document.getElementById('lineweight_paper').value;
     var pen_model = document.getElementById('lineweight_model').value;
-    var fill_color = $("#fill_color").spectrum("get");
-    var line_color = $("#line_color").spectrum("get");
+    // Use native color inputs instead of Spectrum
+    var fill_color_input = document.getElementById('fill_color_input');
+    var line_color_input = document.getElementById('line_color_input');
+    var fill_color = fill_color_input ? hexToRgb(fill_color_input.value) : 'rgb(255,255,255)';
+    var line_color = line_color_input ? hexToRgb(line_color_input.value) : 'rgb(0,0,0)';
     var aligned = $("#align_pattern").prop('checked');
     var section_cut_width = document.getElementById('sectioncut_linewidth').value;
     var materialname = document.getElementById('hatch_name').value;
-    var params = utf8(acad_pat).concat(";", size_x, ";", space, ";", pen_paper, ";", pen_model, ";", line_color.toRgbString(), ";", fill_color.toRgbString(), ";", slider, ";", status, ";", aligned, ";", section_cut_width, ";", utf8(materialname));
+    var params = utf8(acad_pat).concat(";", size_x, ";", space, ";", pen_paper, ";", pen_model, ";", line_color, ";", fill_color, ";", slider, ";", status, ";", aligned, ";", section_cut_width, ";", utf8(materialname));
     if (acad_pat != '') {
         window.location = 'skp:create_preview@' + params;
     }
