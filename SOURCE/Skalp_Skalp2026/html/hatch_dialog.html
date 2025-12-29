@@ -145,11 +145,11 @@
             <div id="section_section" class="section-content">
                 <!-- Section Line Color -->
                 <div class="field-row">
-                    <label id="translate_18">Line Color:</label>
-                    <div class="color-block" id="section_line_color" style="background-color: #000000;"
-                        onclick="document.getElementById('section_line_color_input').click()"></div>
+                    <label id="translate_18" title="Coming Soon...">Line Color:</label>
+                    <div class="color-block disabled" id="section_line_color"
+                        style="background-color: #000000; opacity: 0.5; cursor: default;" title="Coming Soon..."></div>
                     <input type="color" id="section_line_color_input" class="basic3" style="display:none;"
-                        onchange="updateSectionLineColor(this.value)" value="#000000">
+                        onchange="updateSectionLineColor(this.value)" value="#000000" disabled>
                 </div>
 
                 <!-- Section Line Width -->
@@ -265,6 +265,15 @@
             updateWindowHeight();
         };
 
+        // Convert hex color to rgb() string for Ruby compatibility
+        function hexToRgb(hex) {
+            var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            if (result) {
+                return 'rgb(' + parseInt(result[1], 16) + ', ' + parseInt(result[2], 16) + ', ' + parseInt(result[3], 16) + ')';
+            }
+            return hex; // Return as-is if not hex
+        }
+
         // Color picker functions
         function updateFillColor(color) {
             document.getElementById('fill_color').style.backgroundColor = color;
@@ -315,10 +324,10 @@
                 pattern,
                 tile_x,
                 tile_y,
-                lineColor,
-                fillColor,
-                lineColor,
-                fillColor,
+                hexToRgb(lineColor),
+                hexToRgb(fillColor),
+                hexToRgb(lineColor),
+                hexToRgb(fillColor),
                 slider,
                 isNew,
                 aligned,
