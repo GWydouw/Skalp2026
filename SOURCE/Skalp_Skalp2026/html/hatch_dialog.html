@@ -16,6 +16,10 @@
     <link rel="stylesheet" type="text/css" href="css/jscslider.css">
     <script type="text/javascript" src="js/jscslider.js"></script>
 
+    <!-- Spectrum Color Picker -->
+    <link rel="stylesheet" type="text/css" href="css/spectrum.css">
+    <script type="text/javascript" src="js/spectrum.js"></script>
+
     <title>Skalp Pattern Designer</title>
 
 </head>
@@ -24,8 +28,8 @@
 
     <!-- Material Name -->
     <div id="material_name_div">
-        <label for="material_name">Name:</label>
-        <input type='text' title='Material name' id='material_name'>
+        <label for="hatch_name">Name:</label>
+        <input type='text' title='Material name' id='hatch_name'>
     </div>
 
     <!-- Preview with inline zoom slider -->
@@ -85,22 +89,16 @@
                 <!-- Pattern Fill Color -->
                 <div class="field-row">
                     <label id="translate_06">Fill Color:</label>
-                    <div class="color-block" id="fill_color"
-                        onclick="document.getElementById('fill_color_input').click()"></div>
-                    <input type="color" id="fill_color_input" style="display:none;"
-                        onchange="updateFillColor(this.value)">
+                    <input type="text" class="basic1" id="fill_color">
                 </div>
 
                 <!-- Pattern Line Color -->
                 <div class="field-row">
                     <label id="translate_17">Line Color:</label>
-                    <div class="color-block" id="line_color"
-                        onclick="document.getElementById('line_color_input').click()"></div>
-                    <input type="color" id="line_color_input" style="display:none;"
-                        onchange="updateLineColor(this.value)">
+                    <input type="text" class="basic2" id="line_color">
                 </div>
 
-                <!-- Pattern Line Width -->
+                <!-- Pattern Line Width Paper -->
                 <div class="field-row">
                     <label id="translate_08">Line Width:</label>
                     <select id='lineweight_paper' onchange="$('#update_preview').show();create_preview(0);">
@@ -126,6 +124,8 @@
                         <option value='4.0 pt'>4.0 pt</option>
                         <option value='5.0 pt'>5.0 pt</option>
                     </select>
+                    <!-- Hidden lineweight_model for skalp.js compatibility -->
+                    <input type="hidden" id="lineweight_model" value="0.35 mm">
                 </div>
             </div>
         </div>
@@ -140,10 +140,7 @@
                 <!-- Section Line Color -->
                 <div class="field-row">
                     <label id="translate_18">Line Color:</label>
-                    <div class="color-block" id="section_line_color"
-                        onclick="document.getElementById('section_line_color_input').click()"></div>
-                    <input type="color" id="section_line_color_input" style="display:none;"
-                        onchange="updateSectionLineColor(this.value)">
+                    <input type="text" class="basic3" id="section_line_color">
                 </div>
 
                 <!-- Section Line Width -->
