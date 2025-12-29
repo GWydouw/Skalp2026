@@ -1001,7 +1001,7 @@ module Skalp
         @@interaction_overlay.active_mode_text = "Edit Inside Mode" if @@interaction_overlay
         model.active_view.invalidate
       rescue StandardError => e
-        puts "Skalp Debug: Error enter context: #{e.message}"
+        puts "Skalp Debug: Error enter context: #{e.message}" if defined?(DEBUG) && DEBUG
       end
 
       def self.on_exit_box_context(model)
@@ -1030,7 +1030,7 @@ module Skalp
         end
         model.active_view.invalidate
       rescue StandardError => e
-        puts "Skalp Debug: Error exit context: #{e.message}"
+        puts "Skalp Debug: Error exit context: #{e.message}" if defined?(DEBUG) && DEBUG
       end
 
       def self.toggle_folder(fid)

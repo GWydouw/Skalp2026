@@ -609,4 +609,13 @@ module Skalp
       Skalp.check_SU_material_library(material) if material.get_attribute("Skalp", "ID")
     end
   end
+
+  class SkalpSceneTransitionObserver
+    def frameChange(from_scene, to_scene, percent_done)
+      # trigger at start of transition
+      return unless percent_done < 0.01
+
+      Skalp.section.handle_scene_switch(to_scene) if Skalp.section.respond_to?(:handle_scene_switch)
+    end
+  end
 end

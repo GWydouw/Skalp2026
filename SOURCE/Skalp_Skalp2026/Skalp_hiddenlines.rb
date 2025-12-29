@@ -216,12 +216,9 @@ module Skalp
     end
 
     def add_lines_to_page(page = @skpModel, copy_to_active_view = false)
-      Skalp.debug_log "[DEBUG] add_lines_to_page for: #{page.is_a?(Sketchup::Page) ? page.name : 'Model'}"
       style_settings = Skalp.dialog.style_settings(page) # Better than direct memory access for inheritance
       rv_status = Skalp.dialog.rearview_status(page)
-      Skalp.debug_log "[DEBUG] rv_status: #{rv_status}"
       has_lines = rear_lines_result && rear_lines_result[page]
-      Skalp.debug_log "[DEBUG] has_lines: #{has_lines ? 'YES' : 'NO'}"
 
       if style_settings.class == Hash
         @linestyle = style_settings[:rearview_linestyle]
@@ -234,57 +231,32 @@ module Skalp
       end
 
       # We must call this to ensure existing rearview instances are cleared if status is OFF
-      add_rear_view_to_sectiongroup(nil, page) # nil definition forces clear
+      # With Group refactor: this will HIDE the group if status is off, or initiate cleanup
+      # Pass nil for lines to indicate checking status/hiding
+      add_rear_view_to_sectiongroup(page, nil)
 
       # Debug: trace why rearview group might not be created
-      page_name = page.is_a?(Sketchup::Page) ? page.name : "Model"
       has_rear_lines = rear_lines_result && rear_lines_result[page]
       rv_status_val = Skalp.dialog.rearview_status(page)
 
-      puts "[DEBUG add_lines_to_page] page=#{page_name}"
-      puts "  rear_lines_result exists?: #{!rear_lines_result.nil?}"
-      puts "  rear_lines_result[page] exists?: #{has_rear_lines ? 'YES' : 'NO'}"
-      puts "  rearview_status(page): #{rv_status_val}"
+      return unless has_rear_lines
+      return unless rv_status_val
 
-      unless has_rear_lines
-        puts "  => RETURNING EARLY: no rear_lines_result for this page"
-        return
-      end
-
-      unless rv_status_val
-        puts "  => RETURNING EARLY: rearview_status is OFF for this page"
-        return
-      end
-
-      if rear_view_definitions[page] && rear_view_definitions[page].valid?
-        rear_view_definition = rear_view_definitions[page]
-
-        rear_view_definition.instances.each do |instance|
-          instance.erase!
-        end
-        rear_view_definition.entities.clear!
-      else
-        definitions = Skalp.active_model.skpModel.definitions
-        new_name = definitions.unique_name "Skalp - #{Skalp.translate('rear view')}"
-        rear_view_definition = Skalp.active_model.skpModel.definitions.add(new_name)
-
-        rear_view_definition.set_attribute("dynamic_attributes", "_hideinbrowser", true)
-        UI.refresh_inspectors
-
-        # Ensure manager knows about the new definition
-        @rear_view[page].definition = rear_view_definition
-
-        # NOTE: we don't set rear_view_definitions[page] directly as it's a method
-        # The manager handles the association.
-        rear_view_definition.set_attribute("Skalp", "type", "rear_view")
-      end
-
-      add_lines_to_component(rear_view_definition, rear_lines_result[page])
-      add_rear_view_to_sectiongroup(rear_view_definition, page)
+      # We have lines and status is ON.
+      # Pass the lines to be added to the group.
+      lines = rear_lines_result[page]
+      add_rear_view_to_sectiongroup(page, lines)
 
       return unless copy_to_active_view
 
-      add_rear_view_to_sectiongroup(rear_view_definition)
+      # Copy to active view (Live Section)
+      # Note: 'add_rear_view_to_sectiongroup' handles the destination sectiongroup logic
+      # But copy_to_active_view implies adding to the "Live" sectiongroup too?
+      # The method takes (page, lines). If page is nil, it gets 'skalp_live_sectiongroup'.
+      # BUT 'add_lines_to_page' calls it with ONE argument in original code: add_rear_view_to_sectiongroup(rear_view_definition)
+      # So we should call it with (nil, lines) to target the live sectiongroup.
+
+      add_rear_view_to_sectiongroup(nil, lines)
     end
 
     def remove_rear_view_instance(page)
@@ -326,20 +298,37 @@ module Skalp
       sectiongroup.transform!(transformation)
     end
 
-    def add_rear_view_to_sectiongroup(rear_view_definition, page = @skpModel)
+    def add_rear_view_to_sectiongroup(page = @skpModel, lines = nil, sectiongroup_override = nil)
       return unless @model.active_sectionplane
 
-      sectiongroup = get_sectiongroup(page)
+      sectiongroup = sectiongroup_override || get_sectiongroup(page)
 
-      # If no definition is provided, we are just clearing
-      if rear_view_definition.nil?
-        remove_rear_view_instances(sectiongroup) if sectiongroup
-        return
+      # Implicit cleanup of old component structure
+      cleanup_legacy_rear_views(sectiongroup) if sectiongroup
+
+      # Create or Retrieve Group if we need to set lines or hide it
+      # If sectiongroup makes a new one, we might need to handle transformation?
+      # Original code calls create_sectiongroup_for_rearview(page) if not found.
+
+      if sectiongroup.nil? && lines
+        # Only create sectiongroup if we have content to add?
+        sectiongroup = create_sectiongroup_for_rearview(page)
       end
 
-      sectiongroup ||= create_sectiongroup_for_rearview(page)
-
       return unless sectiongroup && sectiongroup.valid?
+
+      # Find or Create "Skalp - rear view" Group
+      rear_view_group = sectiongroup.entities.grep(Sketchup::Group).find { |g| g.name == "Skalp - #{Skalp.translate('rear view')}" }
+
+      unless rear_view_group
+        # Don't create if we are just clearing/hiding and it doesn't exist
+        return if lines.nil?
+
+        rear_view_group = sectiongroup.entities.add_group
+        rear_view_group.name = "Skalp - #{Skalp.translate('rear view')}"
+        rear_view_group.set_attribute("Skalp", "type", "rear_view")
+        rear_view_group.set_attribute("dynamic_attributes", "_hideinbrowser", true)
+      end
 
       check_rear = if page
                      Skalp.dialog.rearview_status(page)
@@ -347,30 +336,43 @@ module Skalp
                      Skalp.dialog.rearview_status
                    end
 
-      # Always clear existing rearview instances first to handle visibility changes correctly
-      remove_rear_view_instances(sectiongroup)
+      # Logic:
+      # If lines provided -> Fill group. Unhide if check_rear is true.
+      # If lines nil -> Just update visibility (Hide if !check_rear, or Unhide?).
+      # Actually lines=nil usually means "init/clear". If we want to toggle, we might call this with nil?
+      # BUT if lines=nil and we strictly want to HIDE, we do that.
 
-      return unless check_rear
+      if lines
+        rear_view_group.entities.clear!
+        add_lines_to_group(rear_view_group, lines)
+      end
 
-      rear_view = sectiongroup.entities.add_instance(rear_view_definition, Geom::Transformation.new)
-      rear_view.name = "Skalp - #{Skalp.translate('rear view')}"
-      rear_view.set_attribute("Skalp", "type", "rear_view")
+      # Toggle Visibility
+      # If user turned it OFF -> Hide (don't delete)
+      # If user turned it ON -> Unhide
+      if check_rear && (lines || rear_view_group.entities.count > 0)
+        rear_view_group.hidden = false
+        rear_view_group.layer = nil # Ensure it uses default or override? Original used rearviewlayer on ENTS.
+      else
+        rear_view_group.hidden = true
+      end
 
-      # Fix for delayed visibility: Ensure the sectiongroup containing the rearview is visible on the page
+      # Ensure sectiongroup itself is visible on the page (or correctly managed)
       if page && page.is_a?(Sketchup::Page)
         Skalp.sectiongroup_visibility(sectiongroup, true, page)
       else
-        # Global visibility for "Live" group or active view
         Skalp.sectiongroup_visibility(sectiongroup, true, nil)
       end
     end
 
-    def remove_rear_view_instances(sectiongroup)
+    def cleanup_legacy_rear_views(sectiongroup)
+      # Removes old component-based rearviews
       sectiongroup.entities.grep(Sketchup::ComponentInstance).each do |instance|
-        if instance.valid? && (instance.get_attribute("Skalp",
-                                                      "type") == "rear_view" || instance.name =~ /^Skalp - .*rear view/i)
-          instance.erase!
-        end
+        next unless instance.valid? && (instance.get_attribute("Skalp",
+                                                               "type") == "rear_view" || instance.name =~ /^Skalp - .*rear view/i)
+
+        # Optional: maybe migrating definitions? For now, we just remove instances as we rebuild groups.
+        instance.erase!
       end
     end
 
@@ -586,25 +588,25 @@ module Skalp
       nil
     end
 
-    def add_lines_to_component(rear_view_definition, lines)
+    def add_lines_to_group(rear_view_group, lines)
       return unless lines
-      return if rear_view_definition.deleted?
+      return if rear_view_group.deleted?
 
       rear_view_lines = {}
       lines.each do |layer, polylines|
         rear_view_lines[layer.name] = polylines.lines
       end
 
-      rear_view_definition.set_attribute("Skalp", "rear_view_lines", rear_view_lines.inspect)
-      export_to_sketchup(rear_view_definition, @linestyle, lines)
+      rear_view_group.set_attribute("Skalp", "rear_view_lines", rear_view_lines.inspect)
+      export_to_sketchup(rear_view_group, @linestyle, lines)
     end
 
-    def export_to_sketchup(rear_view_definition, linestyle, hiddenlines_by_layer)
+    def export_to_sketchup(rear_view_group, linestyle, hiddenlines_by_layer)
       # wordt soms getest buiten Skalp om.
       Skalp.active_model.start("Skalp - add rearview lines to model") if Skalp.active_model
 
       if Sketchup.read_default("Skalp", "linestyles") == "Skalp"
-        mesh = Skalp::DashedMesh.new(rear_view_definition)
+        mesh = Skalp::DashedMesh.new(rear_view_group) # DashedMesh supports Group entities via initializer
 
         hiddenlines_by_layer.each_value do |lines|
           mesh.dashing_overflow_protection(lines.total_line_length)
@@ -613,17 +615,14 @@ module Skalp
 
         mesh.add_mesh
       else
-        component_entities = rear_view_definition.entities
-        component_entities.clear!
-
-        linestyle_group = component_entities.add_group
-        layer = Skalp.create_linestyle_layer(linestyle)
-        linestyle_group.layer = layer
+        component_entities = rear_view_group.entities
+        # component_entities.clear! # Already cleared in caller
 
         hiddenlines_by_layer.each do |layer, lines|
           rearviewlayer = Skalp.create_rearview_layer(layer.name)
           lines.all_curves.each do |curve|
-            lines = linestyle_group.entities.add_curve(curve)
+            # Add directly to group definition
+            lines = component_entities.add_curve(curve)
             next unless lines
 
             lines.each do |e|

@@ -418,14 +418,14 @@ module Skalp
     end
 
     def print(node, depth)
-      if node.value.skpEntity.class != Sketchup::Model && node.value.skpEntity.deleted?
-        puts "#{depth} #{node.name} Ent #{node.value.skpEntity} DELETED "
-      else
-        if node.value.skpEntity.class != Sketchup::Model
+      if defined?(DEBUG) && DEBUG
+        if node.value.skpEntity.class != Sketchup::Model && node.value.skpEntity.deleted?
+          puts "#{depth} #{node.name} Ent #{node.value.skpEntity} DELETED "
+        elsif node.value.skpEntity.class != Sketchup::Model
           puts "#{depth} #{node.name} Ent #{node.value.skpEntity} ID #{node.value.skpEntity.entityID} transf: #{node.value.transformation.to_a.inspect}  "
         end
-        result = node.value.section_results[0]
       end
+      result = node.value.section_results[0]
       depth += "--"
       for child in node.children
         self.print(child, depth)

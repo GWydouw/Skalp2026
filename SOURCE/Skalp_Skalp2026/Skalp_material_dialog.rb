@@ -102,6 +102,24 @@ module Skalp
         case action
         when "create_new"
           Skalp.edit_material_pattern("Skalp Pattern") if Skalp.respond_to?(:edit_material_pattern)
+        when "create_new_based_on"
+          # materialname = source material
+          source_data = Sketchup.active_model.get_attribute("Skalp_sectionmaterials", materialname)
+          if source_data
+            new_name = "#{materialname} (Copy)"
+            count = 1
+            # Check for name collision in Skalp attributes or Model materials
+            while Sketchup.active_model.get_attribute("Skalp_sectionmaterials",
+                                                      new_name) || Sketchup.active_model.materials[new_name]
+              count += 1
+              new_name = "#{materialname} (Copy #{count})"
+            end
+
+            Sketchup.active_model.set_attribute("Skalp_sectionmaterials", new_name, source_data)
+            Skalp.edit_material_pattern(new_name) if Skalp.respond_to?(:edit_material_pattern)
+          else
+            UI.messagebox("Error: Could not read source material data for '#{materialname}'")
+          end
         when "edit"
           Skalp.edit_material_pattern(materialname) if Skalp.respond_to?(:edit_material_pattern)
         when "remove"
@@ -111,6 +129,27 @@ module Skalp
             # Fallback
             delete_material_from_library(@active_library, materialname)
             create_thumbnails(@active_library)
+          end
+        when "move"
+          if Skalp.respond_to?(:save_pattern_to_library)
+            saved_path = Skalp.save_pattern_to_library(materialname)
+            if saved_path
+              # Switch to new library
+              new_lib_name = File.basename(saved_path, ".skp")
+
+              # Delete from old library
+              if ["Skalp materials in model", "SketchUp materials in model"].include?(@active_library)
+                Skalp.delete_skalp_material(materialname, @active_library) if Skalp.respond_to?(:delete_skalp_material)
+              else
+                delete_material_from_library(@active_library, materialname)
+              end
+
+              # Reload
+              load_libraries
+              @active_library = new_lib_name
+              @materialdialog.execute_script("library('#{new_lib_name}')")
+              create_thumbnails(@active_library)
+            end
           end
         when "copy"
           Skalp.save_pattern_to_library(materialname) if Skalp.respond_to?(:save_pattern_to_library)
@@ -313,6 +352,14 @@ module Skalp
     def self.load_dialog
       load_libraries
       create_thumbnails
+    end
+
+    def self.update_dialog
+      create_thumbnails(@active_library)
+    end
+
+    def self.close_dialog
+      @materialdialog.close if @materialdialog
     end
 
     def self.load_libraries

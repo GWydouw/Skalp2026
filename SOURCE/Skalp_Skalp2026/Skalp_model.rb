@@ -18,7 +18,6 @@ module Skalp
     attr_reader :active_section
 
     def initialize(skpModel)
-      puts ">>> [DEBUG] Model.initialize START (model object_id: #{skpModel.object_id})"
       load_multitags_materials
       @incontext = false
       @hide_rest_of_model = skpModel.rendering_options["InactiveHidden"]
@@ -94,7 +93,6 @@ module Skalp
       Skalp.fixTagFolderBug("Model initialize")
       Skalp.create_skalp_material_instance
       commit
-      puts ">>> [DEBUG] Model.initialize COMPLETED"
     end
 
     def inspect
@@ -808,7 +806,6 @@ module Skalp
     end
 
     def load_observers
-      puts ">>> [DEBUG] load_observers START"
       @entities_observer = SkalpEntitiesObserver.new
       @skpModel.entities.add_observer(@entities_observer) if @skpModel.entities
 
@@ -817,6 +814,9 @@ module Skalp
 
       @pages_observer = SkalpPagesObserver.new
       @skpModel.pages.add_observer(@pages_observer) if @skpModel.pages
+
+      @scope_observer = SkalpSceneTransitionObserver.new
+      @skpModel.pages.add_frame_change_observer(@scope_observer) if @skpModel.pages
 
       @layers_observer = SkalpLayersObserver.new
       @skpModel.layers.add_observer(@layers_observer) if @skpModel.layers
@@ -832,10 +832,7 @@ module Skalp
 
       @model_observer = SkalpModelObserver.new
       @skpModel.add_observer(@model_observer)
-      puts ">>> [DEBUG] load_observers COMPLETED"
     rescue StandardError => e
-      puts ">>> [DEBUG] ERROR in load_observers: #{e.class}: #{e.message}"
-      puts e.backtrace.first(10).join("\n")
       Skalp.errors(e)
     end
 
@@ -854,6 +851,7 @@ module Skalp
       @skpModel.layers.remove_observer(@layers_observer) if @skpModel.layers && @layers_observer
       @skpModel.materials.remove_observer(@materials_observer) if @skpModel.materials && @materials_observer
       @skpModel.pages.remove_observer(@pages_observer) if @skpModel.pages && @pages_observer
+      @skpModel.pages.remove_frame_change_observer(@scope_observer) if @skpModel.pages && @scope_observer
       if @skpModel.entities && @skpModel.selection && @selection_observer
         @skpModel.selection.remove_observer(@selection_observer)
       end

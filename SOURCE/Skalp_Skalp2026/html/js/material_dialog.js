@@ -49,6 +49,29 @@ var app = new Vue({
             menu.style.left = left + "px";
             menu.style.opacity = "1";
 
+            // Disable/Enable items based on library
+            const isSketchUp = (app.selected_library === "SketchUp materials in model");
+            const isSkalpInModel = (app.selected_library === "Skalp materials in model");
+
+            menu.querySelectorAll("li").forEach(li => {
+                if (li.classList.contains("separator")) return;
+
+                // Reset first
+                li.classList.remove("disabled");
+
+                if (isSketchUp) {
+                    li.classList.add("disabled");
+                } else {
+                    // Check data attributes
+                    if (li.hasAttribute("data-only-model")) {
+                        if (!isSkalpInModel) li.classList.add("disabled");
+                    }
+                    if (li.hasAttribute("data-only-library")) {
+                        if (isSkalpInModel) li.classList.add("disabled");
+                    }
+                }
+            });
+
             // Remove any old context-active classes
             document.querySelectorAll('.context-active').forEach(el => el.classList.remove('context-active'));
             event.currentTarget.classList.add('context-active');
@@ -139,8 +162,8 @@ function su_focus() {
 function load_libraries(libraries) {
     app.libraries = libraries;
     // Default select if needed, or let Ruby drive it
-    if (libraries.length > 1 && !app.selected_library) {
-        app.selected_library = libraries[1];
+    if (libraries.length > 0 && !app.selected_library) {
+        app.selected_library = libraries[0];
     }
 }
 

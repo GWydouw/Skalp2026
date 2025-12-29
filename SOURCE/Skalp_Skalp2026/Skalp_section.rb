@@ -382,12 +382,6 @@ module Skalp
     end
 
     def place_rear_view_lines_in_model(target_group = nil)
-      target_group ||= @sectiongroup
-      return unless target_group && target_group.valid?
-      return unless Skalp.models[@skpModel]
-
-      Skalp.debug_log "[DEBUG] place_rear_view_lines_in_model for: #{target_group}"
-
       observer_status = Skalp.models[@skpModel].observer_active
       Skalp.models[@skpModel].observer_active = false
 
@@ -397,17 +391,14 @@ module Skalp
       return unless @sectionplane && @sectionplane.respond_to?(:skalpID)
 
       id = @sectionplane.skalpID
-      Skalp.debug_log "[DEBUG] sectionplane id: #{id}"
 
       active_page = type
       selected_page = @skpModel.pages.selected_page
 
       if id == @model.hiddenlines.calculated[active_page]
-        Skalp.debug_log "[DEBUG] Exact match found for active_page: #{active_page.respond_to?(:name) ? active_page.name : active_page.to_s}"
         place_lines_or_definition_in_model(active_page, target_group)
       elsif id == @model.hiddenlines.calculated[@skpModel]
         # Fallback: check if calculated for model (live section)
-        Skalp.debug_log "[DEBUG] Match found for Model fallback"
         place_lines_or_definition_in_model(@skpModel, target_group)
       else
         found = false
@@ -420,32 +411,16 @@ module Skalp
           end
         end
         if found
-          Skalp.debug_log "[DEBUG] Match found for other page: #{type.is_a?(Sketchup::Page) ? type.name : 'Model'}"
           place_lines_or_definition_in_model(type, target_group, true)
-        elsif @model.hiddenlines.rear_view_definitions[active_page] &&
-              @model.hiddenlines.rear_view_definitions[active_page].valid? &&
-              @model.hiddenlines.rear_view_definitions[active_page].entities.size > 0
-          Skalp.debug_log "[DEBUG] NO match found in calculated hash, using saved definition for active_page"
+        elsif @model.hiddenlines.rear_lines_result[active_page]
           place_lines_or_definition_in_model(active_page, target_group)
-        elsif selected_page && @model.hiddenlines.rear_view_definitions[selected_page] &&
-              @model.hiddenlines.rear_view_definitions[selected_page].valid? &&
-              @model.hiddenlines.rear_view_definitions[selected_page].entities.size > 0
-          Skalp.debug_log "[DEBUG] Using saved rear_view_definition for selected_page: #{selected_page.name}"
+        elsif selected_page && @model.hiddenlines.rear_lines_result[selected_page]
           place_lines_or_definition_in_model(selected_page, target_group)
-        elsif @model.hiddenlines.rear_view_definitions[@skpModel] &&
-              @model.hiddenlines.rear_view_definitions[@skpModel].valid? &&
-              @model.hiddenlines.rear_view_definitions[@skpModel].entities.size > 0
-          # puts "[DEBUG] Using saved rear_view_definition for Model fallback"
+        elsif @model.hiddenlines.rear_lines_result[@skpModel]
+          # puts "[DEBUG] Using saved rear_lines_result for Model fallback"
           place_lines_or_definition_in_model(@skpModel, target_group)
         else
-          # No valid definition found for this page - don't use definitions from other pages!
-          # The lines will need to be recalculated for this page
-          # puts "[DEBUG] No rear_view_definition found for current page (#{selected_page&.name || 'Model'})"
-          # puts "[DEBUG] Available definitions are for: #{@model.hiddenlines.rear_view_definitions.keys.select do |k|
-          #   k.is_a?(Sketchup::Page)
-          # end.map(&:name).join(', ')}"
-          Skalp.debug_log "[DEBUG] Rearview lines will need to be recalculated for this page"
-
+          # No valid lines found
         end
       end
       Skalp.models[@skpModel].observer_active = observer_status
@@ -454,22 +429,41 @@ module Skalp
     def place_lines_or_definition_in_model(page, target_group, force = false)
       @model.section_result_group.locked = false
 
-      # Try to find an existing valid definition with entities
-      definition = nil
-      if @model.hiddenlines.rear_view_definitions[page] && @model.hiddenlines.rear_view_definitions[page].valid? && !force
-        def_check = @model.hiddenlines.rear_view_definitions[page]
-        definition = def_check if def_check.entities.size > 0
-      end
+      # With Group Refactor: We use rear_lines_result directly and target the group
+      lines = @model.hiddenlines.rear_lines_result[page]
 
-      if definition
-        # Check if instance already exists to prevent duplicates (and slow double-work)
-        existing = target_group.entities.grep(Sketchup::ComponentInstance).find { |i| i.definition == definition }
-        target_group.entities.add_instance(definition, Geom::Transformation.new) unless existing
-      elsif @model.hiddenlines.rear_lines_result[page]
+      if lines
+        @model.hiddenlines.add_rear_view_to_sectiongroup(page, lines, target_group)
+      elsif force
+        # Only if forced (calculated match but no lines cached? Shouldn't happen if calculated)
+        # Or if we want to call add_lines_to_page to recalculate?
         @model.hiddenlines.add_lines_to_page(page, true)
       end
 
       @model.section_result_group.locked = true
+    end
+
+    def handle_scene_switch(page)
+      return unless page
+
+      # 1. Get Source (Scene Group)
+      source_group = @model.hiddenlines.get_sectiongroup(page)
+      return unless source_group && source_group.valid?
+
+      # 2. Get Target (Live Group)
+      target_group = @model.live_sectiongroup
+      return unless target_group && target_group.valid?
+
+      # 3. Copy Scene Group -> Live Group
+      target_group.entities.clear!
+
+      # Copy geometry via instance explode
+      instance = target_group.entities.add_instance(source_group.definition, Geom::Transformation.new)
+      instance.explode
+
+      # 4. Swap Visibility
+      Skalp.sectiongroup_visibility(target_group, true)
+      Skalp.sectiongroup_visibility(source_group, false)
     end
 
     def manage_sections(skpPage_toset = nil, live = true)
@@ -524,16 +518,19 @@ module Skalp
           sectionplane.hidden = !(sectionplane.get_attribute("Skalp", "ID") == sectionplaneID)
         end
 
+        current_page = @skpModel.pages.selected_page
+        current_page_id = current_page ? @model.get_memory_attribute(current_page, "Skalp", "ID") : nil
+
         # set visiblity of the section_groups
         @model.section_result_group.entities.grep(Sketchup::Group).each do |section_group|
-          if section_group.get_attribute("Skalp", "ID")
-            if section_group.get_attribute("Skalp",
-                                           "ID") == "skalp_live_sectiongroup" && @model.live_sectiongroup.valid? && Skalp.sectionplane_active == true && @model.live_sectiongroup
-              live_sectiongroup = section_group
-              Skalp.sectiongroup_visibility(section_group, true)
-            else
-              Skalp.sectiongroup_visibility(section_group, false)
-            end
+          next unless section_group.get_attribute("Skalp", "ID")
+
+          sg_id = section_group.get_attribute("Skalp", "ID")
+          if sg_id == "skalp_live_sectiongroup" && @model.live_sectiongroup.valid? && Skalp.sectionplane_active == true && @model.live_sectiongroup
+            live_sectiongroup = section_group
+            Skalp.sectiongroup_visibility(section_group, true)
+          else
+            Skalp.sectiongroup_visibility(section_group, false)
           end
         end
       end

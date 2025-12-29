@@ -687,13 +687,10 @@ module Skalp
       require "open3"
       result = nil
       error = nil
-      puts "[DEBUG] Skalp External Command: #{cmd}"
-      Open3.popen3(cmd) do |stdin, stdout, stderr|
+      Open3.popen3(cmd) do |_stdin, stdout, stderr|
         result = stdout.read
         error = stderr.read
       end
-      puts "[DEBUG] Skalp External Stderr: #{error}" unless error.empty?
-      puts "[DEBUG] Skalp External Stdout snippet: #{result[0..500]}" if result
       return result
     end
 

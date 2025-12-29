@@ -31,6 +31,15 @@
                     <circle cx="16" cy="12" r="1" fill="#555" />
                 </svg>
             </div>
+            <!-- Plus Icon -->
+            <div id="plus_icon" class="menu-icon" onclick="create_new_material()"
+                title="Create new material: Open Pattern Designer">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="#555" stroke-width="1.5" />
+                    <line x1="12" y1="8" x2="12" y2="16" stroke="#555" stroke-width="1.5" stroke-linecap="round" />
+                    <line x1="8" y1="12" x2="16" y2="12" stroke="#555" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+            </div>
         </div>
 
         <div id="picker-banner"
@@ -70,13 +79,13 @@
             <ul style="list-style:none; margin:0; padding:5px;">
                 <li onclick="context_edit_material(event)" data-only-model>Edit</li>
                 <li onclick="context_rename_material(event)">Rename</li>
-                <li onclick="context_duplicate_material(event)">Duplicate</li>
-                <li class="separator"></li>
                 <li onclick="context_remove_material(event)">Delete</li>
+                <li class="separator"></li>
+                <li onclick="context_create_based_on(event)">Create new based on this</li>
+                <li onclick="context_merge_material(event)" data-only-model>Replace with...</li>
                 <li class="separator"></li>
                 <li onclick="context_copy_material(event)">Copy to Library</li>
                 <li onclick="context_move_material(event)" data-only-library>Move to Library</li>
-                <li onclick="context_merge_material(event)" data-only-model>Replace with...</li>
             </ul>
         </div>
 
@@ -97,6 +106,7 @@
                 <li class="separator"></li>
                 <li onclick="menu_save_all(event)">Save All to New Library</li>
                 <li class="separator"></li>
+                <li onclick="menu_create_new(event)">Create new material</li>
                 <li onclick="menu_export_layout(event)">Export Patterns to LayOut</li>
             </ul>
         </div>
@@ -146,6 +156,16 @@
                     saveAll.classList.remove('disabled');
                 } else {
                     saveAll.classList.add('disabled');
+                }
+            }
+
+            // Grey out Create new material if NOT Skalp materials in model
+            const createNew = menu.querySelector("[onclick*='create_new']");
+            if (createNew) {
+                if (currentLib === "Skalp materials in model") {
+                    createNew.classList.remove('disabled');
+                } else {
+                    createNew.classList.add('disabled');
                 }
             }
 
@@ -274,6 +294,17 @@
             if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
             sketchup.material_menu('create_new', '');
             hide_empty_context_menu();
+        }
+
+        function create_new_material() {
+            sketchup.material_menu('create_new', '');
+        }
+
+        function context_create_based_on(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
+            app.selectmaterial(current_context_material);
+            sketchup.material_menu('create_new_based_on', current_context_material);
+            hide_context_menu();
         }
 
         function start_picker_mode(target_material) {
@@ -427,6 +458,12 @@
             } else {
                 appEl.classList.remove('can-scroll-down');
             }
+        }
+
+        function menu_create_new(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
+            sketchup.material_menu('create_new', '');
+            hide_main_menu();
         }
     </script>
 </body>

@@ -134,6 +134,8 @@ function ready_hatch() {
         e.preventDefault()
     });
 
+    dialog_resize(); // Ensure layout is calculated on load
+
     var h = document.documentElement.clientHeight.toString();
     var w = document.documentElement.clientWidth.toString();
     var params = w.concat(";", h);

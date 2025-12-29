@@ -295,6 +295,7 @@ body {
 .disabled {
     color: #bbb !important;
     cursor: default !important;
+    pointer-events: none !important;
 }
 
 #context-menu ul li.disabled:hover,

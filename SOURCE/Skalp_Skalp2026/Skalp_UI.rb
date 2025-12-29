@@ -817,20 +817,14 @@ module Skalp
 
     Skalp.check_skalp_default_material
 
-    if @hatch_dialog # .class == Skalp::Hatch_dialog
-      if @hatch_dialog.visible?
-        patterndesignerbutton_off
-        @hatch_dialog.webdialog.close
-      else
-        patterndesignerbutton_on
-        @hatch_dialog.show
-        @hatch_dialog.select_last_pattern
-        # @hatch_dialog.clear_dialog(false)
-      end
+    # Refactored: Toggles Material Dialog instead of Pattern Designer
+    md = Skalp::Material_dialog.materialdialog
+    if md && md.visible?
+      patterndesignerbutton_off
+      md.close
     else
-      @hatch_dialog = Hatch_dialog.new
-      @hatch_dialog.show if OS == :WINDOWS
       patterndesignerbutton_on
+      Skalp::Material_dialog.show_dialog
     end
   end
 

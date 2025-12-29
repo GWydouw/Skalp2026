@@ -378,7 +378,6 @@ module Skalp
     end
 
     def set_fog_distance(distance)
-      puts "[DEBUG] set_fog_distance called with: #{distance.inspect}"
       save_fog_distance(distance)
       if save_settings_status && Sketchup.active_model.pages.selected_page
         save_fog_distance(distance,

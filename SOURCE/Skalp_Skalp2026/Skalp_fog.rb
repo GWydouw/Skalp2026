@@ -94,19 +94,6 @@ module Skalp
 
     # Debug: trace where fog_distance comes from
     raw_fog_dist = Skalp.dialog.fog_distance(object)
-    puts "=" * 60
-    puts "Skalp Fog Debug: Fog Distance Trace"
-    puts "  object: #{object.is_a?(Sketchup::Page) ? object.name : 'Model'}"
-    puts "  raw fog_distance value: #{raw_fog_dist.inspect}"
-    puts "  raw fog_distance class: #{raw_fog_dist.class}"
-
-    # Also check style_settings directly
-    if Skalp.dialog.respond_to?(:style_settings)
-      settings = Skalp.dialog.style_settings(object)
-      puts "  style_settings[:depth_clipping_distance]: #{settings[:depth_clipping_distance].inspect}"
-    end
-    puts "=" * 60
-
     fog_dist_val = if raw_fog_dist.nil?
                      0.0
                    elsif raw_fog_dist.respond_to?(:to_inch)
@@ -117,8 +104,6 @@ module Skalp
 
     rendering_options["FogStartDist"] = section_distance
     rendering_options["FogEndDist"] = section_distance + (tolerance * 2) + fog_dist_val
-
-    puts "Skalp Fog Debug: dist=#{section_distance}, fog_dist=#{fog_dist_val}, end=#{rendering_options['FogEndDist']}"
 
     # If it's a page, we need to update the page to save these rendering options
     return unless object.is_a?(Sketchup::Page) && object.use_rendering_options?
