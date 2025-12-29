@@ -108,9 +108,9 @@ body {
 }
 
 .slider {
-    width: 90px !important;
-    flex: 0 0 90px;
-    /* Fixed 90px, no grow, no shrink */
+    width: 135px !important;
+    flex: 0 0 135px;
+    /* Fixed 135px for correct jscslider positioning */
     font-size: 11px;
     border: 1px solid #CCC;
     padding: 0;
