@@ -157,9 +157,8 @@ body {
     margin: 0;
     font-size: 12px;
     font-weight: normal;
-    /* Same as labels */
     color: #666;
-    /* Dark gray */
+    /* Dark gray as requested */
 }
 
 .section-content {
@@ -246,7 +245,7 @@ body {
     height: 20px;
     text-align: center;
     border-radius: 4px;
-    /* Consistent rounding as requested */
+    /* rounding as requested */
 }
 
 /* Checkbox alignment */
