@@ -260,12 +260,14 @@ body {
     /* rounding as requested */
 }
 
-/* Standard checkbox alignment - aligned with select boxes */
+/* Standard checkbox alignment - positioned in 90px area like selects */
 input[type="checkbox"] {
     width: 16px;
     height: 16px;
     cursor: pointer;
-    flex: 0 0 16px;
+    flex: 0 0 90px;
+    /* Same width as select boxes */
+    margin: 0;
 }
 
 #tile_operator {
