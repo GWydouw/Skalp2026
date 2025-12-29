@@ -273,7 +273,7 @@ input[type="checkbox"] {
 }
 
 /* Greyed out disabled labels */
-label[title="Coming Soon"] {
+label[title="Coming Soon..."] {
     color: #999;
 }
 
