@@ -137,9 +137,18 @@
                 <h3>Section styling</h3>
             </div>
             <div id="section_section" class="section-content">
-                <!-- Section Cut Width -->
+                <!-- Section Line Color -->
                 <div class="field-row">
-                    <label id="translate_05">Cut Width:</label>
+                    <label id="translate_18">Line Color:</label>
+                    <div class="color-block" id="section_line_color"
+                        onclick="document.getElementById('section_line_color_input').click()"></div>
+                    <input type="color" id="section_line_color_input" style="display:none;"
+                        onchange="updateSectionLineColor(this.value)">
+                </div>
+
+                <!-- Section Line Width -->
+                <div class="field-row">
+                    <label id="translate_05">Line Width:</label>
                     <select id='sectioncut_linewidth' onchange="$('#update_preview').show();create_preview(0);">
                         <option value='0.00 mm'>none</option>
                         <option value='0.04 mm'>0.04 mm</option>
@@ -255,9 +264,15 @@
 
         function updateLineColor(color) {
             document.getElementById('line_color').style.backgroundColor = color;
+            $('#update_preview').show();
             create_preview(0);
         }
 
+        function updateSectionLineColor(color) {
+            document.getElementById('section_line_color').style.backgroundColor = color;
+            $('#update_preview').show();
+            create_preview(0);
+        }
         function save_material() {
             var materialName = document.getElementById('material_name').value;
             if (!materialName || materialName.trim() === '') {

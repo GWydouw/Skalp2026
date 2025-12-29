@@ -33,7 +33,8 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
-    max-width: 215px;
+    width: 215px;
+    /* Exact width to match preview */
 }
 
 #material_name_div label {
@@ -80,17 +81,22 @@ body {
     align-items: center;
     gap: 8px;
     margin-bottom: 4px;
+    width: 215px;
+    /* Ensure it stays flush with preview */
 }
 
 #preview_zoom_row h2 {
-    font-size: 12px;
+    font-size: 11px;
+    /* Slightly smaller to fit better */
     font-weight: normal;
     margin: 0;
     color: #000;
+    flex-shrink: 0;
 }
 
 .slider {
     flex: 1;
+    /* Stretch to fill right */
     font-size: 11px;
     border: 1px solid #999;
     padding: 1px 2px;
@@ -100,7 +106,8 @@ body {
 /* SECTIONS - lighter, airier design */
 .section {
     margin-bottom: 6px;
-    max-width: 215px;
+    width: 215px;
+    /* Force same width as preview */
 }
 
 .section-header {
@@ -171,39 +178,41 @@ body {
     /* Prevent wrapping */
 }
 
-/* Ensure inputs take remaining space and align right */
+/* Ensure inputs take remaining space and align right or fixed 90px */
 .field-row select,
 .field-row input[type="checkbox"],
 .field-row .color-block,
 .field-inputs {
     flex-grow: 1;
-    text-align: right;
     width: auto;
-    max-width: 130px;
-    /* Limit max width if needed */
     display: flex;
     justify-content: flex-end;
 }
 
-.field-row select {
-    width: 100%;
-    max-width: 140px;
-    /* Adjust as needed */
+/* Specific 90px width for styling fields as requested */
+#pattern_section .field-row select,
+#pattern_section .field-row .color-block,
+#section_section .field-row select,
+#section_section .field-row .color-block {
+    flex-grow: 0;
+    width: 90px;
 }
 
 /* FIELD INPUTS (for tile size with gauge) */
 .field-inputs {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    /* Align right */
+    justify-content: space-between;
+    /* Spread out to edges */
     gap: 4px;
-    max-width: 100%;
+    width: 130px;
+    /* Fixed width to allow enough room for larger inputs */
 }
 
 .drawing_scale {
-    width: 50px;
-    font-size: 12px;
+    width: 60px;
+    /* Slightly larger as requested */
+    font-size: 11px;
     font-weight: bold;
     border: 1px solid #999;
     padding: 2px 4px;
