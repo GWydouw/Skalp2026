@@ -21,10 +21,11 @@ body {
     height: 100%;
     margin: 0;
     padding: 8px 10px;
+    /* 10px horizontal padding as requested */
     overflow: hidden;
     background-color: rgb(235, 235, 235);
     font-family: "Arial", sans-serif;
-    font-size: 12px;
+    font-size: 11px;
 }
 
 /* MATERIAL NAME - top */
@@ -96,11 +97,15 @@ body {
 
 .slider {
     width: 90px;
+    margin-left: auto;
+    /* Force right alignment */
     flex-grow: 0;
     font-size: 11px;
     border: 1px solid #999;
     padding: 1px 2px;
     height: 18px;
+    border-radius: 4px;
+    /* Consistent rounding */
 }
 
 /* SECTIONS - lighter, airier design */
@@ -204,6 +209,13 @@ body {
     width: 90px;
 }
 
+/* Pattern and Type selects 142px wide */
+#hatch_list_select,
+#units_select {
+    width: 142px !important;
+    flex-grow: 0;
+}
+
 /* FIELD INPUTS (for tile size with gauge) */
 .field-inputs {
     display: flex;
@@ -217,11 +229,12 @@ body {
     width: 60px;
     font-size: 11px;
     font-weight: normal;
-    /* Normal weight as requested */
     border: 1px solid #999;
     padding: 2px 4px;
     height: 20px;
     text-align: center;
+    border-radius: 4px;
+    /* Consistent rounding as requested */
 }
 
 /* Checkbox alignment */
@@ -295,7 +308,18 @@ input[type="checkbox"] {
     gap: 8px;
     padding: 8px 0 0 0;
     border-top: 1px solid #CCC;
-    margin-top: 8px;
+    margin-top: 0;
+    /* Remove top margin to allow section border to touch it */
+}
+
+/* Remove bottom border of the last section to avoid double lines when collapsed */
+.section:last-of-type .section-header {
+    border-bottom-color: transparent;
+}
+
+/* If last section is open, still provide minor separation if needed, but for collapsed user wants alignment */
+.section:last-of-type {
+    margin-bottom: 0;
 }
 
 .btn-cancel,
