@@ -39,18 +39,18 @@ module Skalp
       @webdialog = UI::HtmlDialog.new(
         {
           dialog_title: "Edit Skalp material",
-          preferences_key: "Skalp_pattern_designer_v3",
+          preferences_key: "Skalp_pattern_designer_v4",
           scrollable: false,
-          resizable: false,
+          resizable: true,
           width: @dialog_w,
           height: @height[:material],
           left: @dialog_x,
           top: @dialog_y,
           min_width: @dialog_w,
-          min_height: @height[:material],
+          min_height: 100, # Allow small height for collapsed state
           max_width: @dialog_w,
-          max_height: @height[:material],
-          style: UI::HtmlDialog::STYLE_UTILITY
+          max_height: 1000,
+          style: UI::HtmlDialog::STYLE_DIALOG
         }
       )
 

@@ -246,8 +246,8 @@
 
         function updateWindowHeight() {
             var body = document.body;
-            var height = body.offsetHeight + 10; // extra padding
-            var width = 235; // Fixed width
+            var height = body.scrollHeight + 5; // Use scrollHeight + small buffer
+            var width = 235; // Target fixed width inclusive of 10px margins
             if (typeof sketchup !== 'undefined' && sketchup.resize_window) {
                 sketchup.resize_window(width, height);
             }

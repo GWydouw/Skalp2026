@@ -18,14 +18,18 @@ select {
 
 html,
 body {
-    height: 100%;
+    height: auto;
+    /* Allow auto height for measurement */
     margin: 0;
     padding: 8px 10px;
     /* 10px horizontal padding as requested */
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: hidden;
     background-color: rgb(235, 235, 235);
     font-family: "Arial", sans-serif;
     font-size: 11px;
+    width: 235px;
+    /* Fixed width to match Ruby dialog width */
 }
 
 /* MATERIAL NAME - top */
@@ -224,7 +228,9 @@ body {
 #acad_pattern_list,
 #units {
     width: 142px !important;
+    min-width: 142px !important;
     flex-grow: 0;
+    margin-right: 0;
 }
 
 /* FIELD INPUTS (for tile size with gauge) */
