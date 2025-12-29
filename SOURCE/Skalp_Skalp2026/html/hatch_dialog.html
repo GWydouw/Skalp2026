@@ -245,9 +245,12 @@
         }
 
         function updateWindowHeight() {
-            var height = document.body.scrollHeight;
-            var width = document.body.scrollWidth; // Should be around 235px
-            window.location = 'skp:resize_window@' + width + ',' + height;
+            var body = document.body;
+            var height = body.offsetHeight + 10; // extra padding
+            var width = 235; // Fixed width
+            if (typeof sketchup !== 'undefined' && sketchup.resize_window) {
+                sketchup.resize_window(width, height);
+            }
         }
 
         // Initialize height on load

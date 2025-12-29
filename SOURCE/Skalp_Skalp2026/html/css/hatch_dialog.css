@@ -210,8 +210,8 @@ body {
 }
 
 /* Pattern and Type selects 142px wide */
-#hatch_list_select,
-#units_select {
+#acad_pattern_list,
+#units {
     width: 142px !important;
     flex-grow: 0;
 }
@@ -261,7 +261,8 @@ body {
     cursor: pointer;
     background-color: #FFFFFF;
     display: inline-block;
-    /* Ensure it stays a block */
+    border-radius: 4px;
+    /* rounding as requested */
 }
 
 .color-block:hover {
