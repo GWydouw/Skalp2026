@@ -82,12 +82,12 @@ body {
     gap: 8px;
     margin-bottom: 4px;
     width: 215px;
-    /* Ensure it stays flush with preview */
+    justify-content: space-between;
+    /* Push slider to the right */
 }
 
 #preview_zoom_row h2 {
     font-size: 11px;
-    /* Slightly smaller to fit better */
     font-weight: normal;
     margin: 0;
     color: #000;
@@ -95,8 +95,9 @@ body {
 }
 
 .slider {
-    flex: 1;
-    /* Stretch to fill right */
+    width: 130px;
+    /* Match width of other right-aligned fields */
+    flex-grow: 0;
     font-size: 11px;
     border: 1px solid #999;
     padding: 1px 2px;
@@ -114,7 +115,8 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 6px;
+    padding: 4px 0;
+    /* Align icon with preview edge (padding-left 0) */
     cursor: pointer;
     background-color: transparent;
     border: none;
@@ -130,21 +132,23 @@ body {
     font-size: 9px;
     color: #999;
     width: 10px;
-    text-align: center;
+    text-align: left;
+    /* Align icon to left */
     transition: transform 0.2s ease;
 }
 
 .section-header h3 {
     margin: 0;
     font-size: 12px;
-    font-weight: 600;
-    /* Slightly bolder as requested */
-    color: #555;
+    font-weight: normal;
+    /* Same as labels */
+    color: #666;
+    /* Dark gray */
 }
 
 .section-content {
-    padding: 6px 0 6px 16px;
-    /* Indent by 16px to align with title text (icon width + gap) */
+    padding: 6px 0;
+    /* Align labels vertically with title */
     max-height: 500px;
     overflow: hidden;
     transition: max-height 0.25s ease, padding 0.25s ease;
@@ -177,13 +181,13 @@ body {
     font-weight: normal;
     color: #000;
     white-space: nowrap;
-    /* Prevent wrapping */
+    margin-left: 16px;
+    /* Indent labels to align with title text (icon width + gap) */
 }
 
 /* Ensure inputs take remaining space and align right or fixed 90px */
 .field-row select,
 .field-row input[type="checkbox"],
-.field-row .color-block,
 .field-inputs {
     flex-grow: 1;
     width: auto;
@@ -195,7 +199,8 @@ body {
 #pattern_section .field-row select,
 #pattern_section .field-row .color-block,
 #section_section .field-row select,
-#section_section .field-row .color-block {
+#section_section .field-row .color-block,
+#options_section .field-row select {
     flex-grow: 0;
     width: 90px;
 }
@@ -205,21 +210,30 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    /* Spread out to edges */
     gap: 4px;
     width: 130px;
-    /* Fixed width to allow enough room for larger inputs */
 }
 
 .drawing_scale {
     width: 60px;
-    /* Slightly larger as requested */
     font-size: 11px;
-    font-weight: bold;
+    font-weight: normal;
+    /* Normal weight as requested */
     border: 1px solid #999;
     padding: 2px 4px;
     height: 20px;
     text-align: center;
+}
+
+/* Checkbox alignment */
+.checkbox-row {
+    justify-content: flex-start;
+    gap: 2px;
+}
+
+.checkbox-row input[type="checkbox"] {
+    margin-left: 0;
+    flex-grow: 0;
 }
 
 #tile_operator {
@@ -230,11 +244,12 @@ body {
 
 /* COLOR BLOCKS */
 .color-block {
-    flex: 1;
     height: 22px;
     border: 1px solid #999;
     cursor: pointer;
     background-color: #FFFFFF;
+    display: inline-block;
+    /* Ensure it stays a block */
 }
 
 .color-block:hover {
