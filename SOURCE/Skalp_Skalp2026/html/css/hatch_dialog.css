@@ -265,9 +265,9 @@ input[type="checkbox"] {
     width: 16px;
     height: 16px;
     cursor: pointer;
-    flex: 0 0 16px;
-    margin-left: 74px;
-    /* 90px - 16px = 74px to left-align with select start */
+    flex: 0 0 90px;
+    /* Same 90px space as select boxes, checkbox at left edge */
+    margin: 0;
 }
 
 /* Greyed out disabled labels */
