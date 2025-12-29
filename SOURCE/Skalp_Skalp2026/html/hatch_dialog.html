@@ -22,152 +22,192 @@
 
 <body onload="ready_hatch()" onfocus="onfocus_hatch()" onblur="create_hatch()" scroll="no" style="OVERFLOW: hidden">
 
-    <!-- Material Name Input with label -->
+    <!-- Material Name -->
     <div id="material_name_div">
         <label for="material_name">Name:</label>
         <input type='text' title='Material name' id='material_name'>
     </div>
 
-    <div id="pattern_settings" class="text">
-        <!-- Type - horizontal layout -->
-        <div id="units_div">
-            <label for="units">Type:</label>
-            <select id="units" onchange="units(this.value)">
-                <option value='paperspace'>Drawing Scale Dependent</option>
-                <option value='modelspace'>Absolute Size</option>
-            </select>
-        </div>
-
-        <!-- Pattern - horizontal layout -->
-        <div id="pattern_list_div">
-            <label for="acad_pattern_list">Pattern:</label>
-            <select id="acad_pattern_list" onchange="select_pattern(this.value)"></select>
-        </div>
-
-        <!-- Preview Image -->
+    <!-- Preview with inline zoom slider -->
+    <div id="preview_container">
         <img class="preview" id="hatch_preview" src='icons/skalp_empty.png'>
-
-        <!-- Slider -->
-        <div id="slider_div">
+        <div id="preview_zoom_row">
+            <h2 id="translate_03">Preview Zoom:</h2>
             <input type="number" min="5" max="100" value="60" class="slider" id="slider" onchange="create_preview(0)">
         </div>
+    </div>
 
-        <!-- Preview Zoom Label -->
-        <div id="zoom_scale">
-            <h2 id="translate_03">Preview Zoom:</h2>
-        </div>
+    <div id="pattern_settings">
 
-        <!-- Tile Size with gauge -->
-        <div id="gauge_scale">
-            <h2 id="translate_04">Tile Size:</h2>
-            <input type='text' class="drawing_scale" title='Define Pattern Height' id='tile_y' style="color: #CC0000;">
-            <input id="gauge_ratio" type="hidden">
-            <img src='icons/gauge.png' id="tile_operator">
-            <input type='text' class="drawing_scale" title='Define Pattern Width' id='tile_x' style="color: #00AA00;">
-        </div>
-
-        <!-- Section Cut Width -->
-        <div id="sectioncut">
-            <h2 id="translate_05">Section Cut Width:</h2>
-
-            <select id='sectioncut_linewidth' onchange="$('#update_preview').show();create_preview(0);">
-                <option value='0.00 mm'>none</option>
-                <option value='0.04 mm'>0.04 mm</option>
-                <option value='0.07 mm'>0.07 mm</option>
-                <option value='0.13 mm'>0.13 mm</option>
-                <option value='0.18 mm'>0.18 mm</option>
-                <option value='0.25 mm'>0.25 mm</option>
-                <option value='0.35 mm'>0.35 mm</option>
-                <option value='0.50 mm'>0.50 mm</option>
-                <option value='0.70 mm'>0.70 mm</option>
-                <option value='1.00 mm'>1.00 mm</option>
-                <option value='2.00 mm'>2.00 mm</option>
-                <option value='0.1 pt'>0.1 pt</option>
-                <option value='0.2 pt'>0.2 pt</option>
-                <option value='0.4 pt'>0.4 pt</option>
-                <option value='0.6 pt'>0.6 pt</option>
-                <option value='0.8 pt'>0.8 pt</option>
-                <option value='1.0 pt'>1.0 pt</option>
-                <option value='1.5 pt'>1.5 pt</option>
-                <option value='2.0 pt'>2.0 pt</option>
-                <option value='3.0 pt'>3.0 pt</option>
-                <option value='4.0 pt'>4.0 pt</option>
-                <option value='5.0 pt'>5.0 pt</option>
-            </select>
-        </div>
-
-        <!-- Pattern Fill Color - clickable color block -->
-        <div id="pattern_fillcolor">
-            <h2 id="translate_06">Pattern Fill Color:</h2>
-            <div id="fill_color" class='color-block' onclick="document.getElementById('fill_color_input').click()">
+        <!-- Pattern definition Section -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection('autocad_section')">
+                <span class="toggle-icon">▼</span>
+                <h3>Pattern definition</h3>
             </div>
-            <input type="color" id="fill_color_input" style="display:none;" onchange="updateFillColor(this.value)">
-        </div>
+            <div id="autocad_section" class="section-content">
+                <!-- Tile Size -->
+                <div class="field-row">
+                    <label>Tile Size:</label>
+                    <div class="field-inputs">
+                        <input type='text' class="drawing_scale tile-input" title='Define Pattern Height' id='tile_y'
+                            style="color: #CC0000;">
+                        <img src='icons/gauge.png' id="tile_operator">
+                        <input type='text' class="drawing_scale tile-input" title='Define Pattern Width' id='tile_x'
+                            style="color: #00AA00;">
+                    </div>
+                </div>
 
-        <!-- Pattern Line Color - clickable color block -->
-        <div id="pattern_linecolor">
-            <h2 id="translate_17">Pattern Line Color:</h2>
-            <div id="line_color" class='color-block' onclick="document.getElementById('line_color_input').click()">
+                <!--Pattern -->
+                <div class="field-row">
+                    <label for="acad_pattern_list">Pattern:</label>
+                    <select id="acad_pattern_list" onchange="select_pattern(this.value)"></select>
+                </div>
+
+                <!-- Type -->
+                <div class="field-row">
+                    <label for="units">Type:</label>
+                    <select id="units" onchange="units(this.value)">
+                        <option value='paperspace'>Drawing Scale Dependent</option>
+                        <option value='modelspace'>Absolute Size</option>
+                    </select>
+                </div>
             </div>
-            <input type="color" id="line_color_input" style="display:none;" onchange="updateLineColor(this.value)">
         </div>
 
-        <!-- Pattern Line Width -->
-        <div id="pattern_linewidth">
-            <h2 id="translate_08">Pattern Line Width:</h2>
-            <select id='lineweight_paper' onchange="$('#update_preview').show();create_preview(0);">
-                <option value='0.04 mm'>0.04 mm</option>
-                <option value='0.07 mm'>0.07 mm</option>
-                <option value='0.13 mm'>0.13 mm</option>
-                <option value='0.18 mm'>0.18 mm</option>
-                <option value='0.25 mm'>0.25 mm</option>
-                <option value='0.35 mm'>0.35 mm</option>
-                <option value='0.50 mm'>0.50 mm</option>
-                <option value='0.70 mm'>0.70 mm</option>
-                <option value='1.00 mm'>1.00 mm</option>
-                <option value='2.00 mm'>2.00 mm</option>
-                <option value='0.1 pt'>0.1 pt</option>
-                <option value='0.2 pt'>0.2 pt</option>
-                <option value='0.4 pt'>0.4 pt</option>
-                <option value='0.6 pt'>0.6 pt</option>
-                <option value='0.8 pt'>0.8 pt</option>
-                <option value='1.0 pt'>1.0 pt</option>
-                <option value='1.5 pt'>1.5 pt</option>
-                <option value='2.0 pt'>2.0 pt</option>
-                <option value='3.0 pt'>3.0 pt</option>
-                <option value='4.0 pt'>4.0 pt</option>
-                <option value='5.0 pt'>5.0 pt</option>
-            </select>
+        <!-- Pattern styling Section -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection('pattern_section')">
+                <span class="toggle-icon">▼</span>
+                <h3>Pattern styling</h3>
+            </div>
+            <div id="pattern_section" class="section-content">
+                <!-- Pattern Fill Color -->
+                <div class="field-row">
+                    <label id="translate_06">Fill Color:</label>
+                    <div class="color-block" id="fill_color"
+                        onclick="document.getElementById('fill_color_input').click()"></div>
+                    <input type="color" id="fill_color_input" style="display:none;"
+                        onchange="updateFillColor(this.value)">
+                </div>
+
+                <!-- Pattern Line Color -->
+                <div class="field-row">
+                    <label id="translate_17">Line Color:</label>
+                    <div class="color-block" id="line_color"
+                        onclick="document.getElementById('line_color_input').click()"></div>
+                    <input type="color" id="line_color_input" style="display:none;"
+                        onchange="updateLineColor(this.value)">
+                </div>
+
+                <!-- Pattern Line Width -->
+                <div class="field-row">
+                    <label id="translate_08">Line Width:</label>
+                    <select id='lineweight_paper' onchange="$('#update_preview').show();create_preview(0);">
+                        <option value='0.04 mm'>0.04 mm</option>
+                        <option value='0.07 mm'>0.07 mm</option>
+                        <option value='0.13 mm'>0.13 mm</option>
+                        <option value='0.18 mm'>0.18 mm</option>
+                        <option value='0.25 mm'>0.25 mm</option>
+                        <option value='0.35 mm'>0.35 mm</option>
+                        <option value='0.50 mm'>0.50 mm</option>
+                        <option value='0.70 mm'>0.70 mm</option>
+                        <option value='1.00 mm'>1.00 mm</option>
+                        <option value='2.00 mm'>2.00 mm</option>
+                        <option value='0.1 pt'>0.1 pt</option>
+                        <option value='0.2 pt'>0.2 pt</option>
+                        <option value='0.4 pt'>0.4 pt</option>
+                        <option value='0.6 pt'>0.6 pt</option>
+                        <option value='0.8 pt'>0.8 pt</option>
+                        <option value='1.0 pt'>1.0 pt</option>
+                        <option value='1.5 pt'>1.5 pt</option>
+                        <option value='2.0 pt'>2.0 pt</option>
+                        <option value='3.0 pt'>3.0 pt</option>
+                        <option value='4.0 pt'>4.0 pt</option>
+                        <option value='5.0 pt'>5.0 pt</option>
+                    </select>
+                </div>
+            </div>
         </div>
 
-        <!-- Align with Objects -->
-        <div id="pattern_alignment" class="text">
-            <h2 id='translate_18' title="Align red X-axis with the longest Edge in an Objects section result">Align with
-                Objects:</h2>
-            <input type="checkbox" name="align with object"
-                title="Align red X-axis with the longest Edge in an Objects section result" value="align"
-                id="align_pattern" onchange="$('#update_preview').show();">
+        <!-- Section styling Section -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection('section_section')">
+                <span class="toggle-icon">▼</span>
+                <h3>Section styling</h3>
+            </div>
+            <div id="section_section" class="section-content">
+                <!-- Section Cut Width -->
+                <div class="field-row">
+                    <label id="translate_05">Cut Width:</label>
+                    <select id='sectioncut_linewidth' onchange="$('#update_preview').show();create_preview(0);">
+                        <option value='0.00 mm'>none</option>
+                        <option value='0.04 mm'>0.04 mm</option>
+                        <option value='0.07 mm'>0.07 mm</option>
+                        <option value='0.13 mm'>0.13 mm</option>
+                        <option value='0.18 mm'>0.18 mm</option>
+                        <option value='0.25 mm'>0.25 mm</option>
+                        <option value='0.35 mm'>0.35 mm</option>
+                        <option value='0.50 mm'>0.50 mm</option>
+                        <option value='0.70 mm'>0.70 mm</option>
+                        <option value='1.00 mm'>1.00 mm</option>
+                        <option value='2.00 mm'>2.00 mm</option>
+                        <option value='0.1 pt'>0.1 pt</option>
+                        <option value='0.2 pt'>0.2 pt</option>
+                        <option value='0.4 pt'>0.4 pt</option>
+                        <option value='0.6 pt'>0.6 pt</option>
+                        <option value='0.8 pt'>0.8 pt</option>
+                        <option value='1.0 pt'>1.0 pt</option>
+                        <option value='1.5 pt'>1.5 pt</option>
+                        <option value='2.0 pt'>2.0 pt</option>
+                        <option value='3.0 pt'>3.0 pt</option>
+                        <option value='4.0 pt'>4.0 pt</option>
+                        <option value='5.0 pt'>5.0 pt</option>
+                    </select>
+                </div>
+
+                <!-- Unify Material -->
+                <div class="field-row">
+                    <label title="Coming Soon">Unify Material:</label>
+                    <input type="checkbox" name="unify material" value="unify" id="unify_material" disabled
+                        title="Coming Soon">
+                </div>
+            </div>
         </div>
 
-        <!-- Unify Material -->
-        <div id="unify_material_div">
-            <h2 title="Coming Soon">Unify Material:</h2>
-            <input type="checkbox" name="unify material" value="unify" id="unify_material" disabled title="Coming Soon">
+        <!-- Options Section -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection('options_section')">
+                <span class="toggle-icon">▼</span>
+                <h3>Options</h3>
+            </div>
+            <div id="options_section" class="section-content">
+                <!-- Align with Objects -->
+                <div class="field-row">
+                    <label id='translate_18'
+                        title="Align red X-axis with the longest Edge in an Objects section result">Align with
+                        Objects:</label>
+                    <input type="checkbox" name="align with object" value="align" id="align_pattern"
+                        title="Align red X-axis with the longest Edge in an Objects section result"
+                        onchange="$('#update_preview').show();">
+                </div>
+
+                <!-- Z-Index -->
+                <div class="field-row">
+                    <label title="Coming Soon">Z-Index:</label>
+                    <select id="zindex" disabled title="Coming Soon">
+                        <option value="-3">-3</option>
+                        <option value="-2">-2</option>
+                        <option value="-1">-1</option>
+                        <option value="0" selected>0</option>
+                        <option value="+1">+1</option>
+                        <option value="+2">+2</option>
+                        <option value="+3">+3</option>
+                    </select>
+                </div>
+            </div>
         </div>
 
-        <!-- Z-Index -->
-        <div id="zindex_div">
-            <h2 title="Coming Soon">Z-Index:</h2>
-            <select id="zindex" disabled title="Coming Soon">
-                <option value="-3">-3</option>
-                <option value="-2">-2</option>
-                <option value="-1">-1</option>
-                <option value="0" selected>0</option>
-                <option value="+1">+1</option>
-                <option value="+2">+2</option>
-                <option value="+3">+3</option>
-            </select>
-        </div>
     </div>
 
     <!-- Footer with CANCEL and SAVE buttons -->
@@ -177,6 +217,36 @@
     </div>
 
     <script>
+        // Toggle section expand/collapse
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const header = section.previousElementSibling;
+            const icon = header.querySelector('.toggle-icon');
+
+            if (section.classList.contains('collapsed')) {
+                section.classList.remove('collapsed');
+                icon.textContent = '▼';
+            } else {
+                section.classList.add('collapsed');
+                icon.textContent = '▶';
+            }
+
+            // Adjust window height after transition
+            setTimeout(updateWindowHeight, 350);
+        }
+
+        function updateWindowHeight() {
+            var height = document.body.scrollHeight;
+            var width = document.body.scrollWidth; // Should be around 235px
+            window.location = 'skp:resize_window@' + width + ',' + height;
+        }
+
+        // Initialize height on load
+        window.onload = function () {
+            ready_hatch();
+            updateWindowHeight();
+        };
+
         // Color picker functions
         function updateFillColor(color) {
             document.getElementById('fill_color').style.backgroundColor = color;
@@ -187,9 +257,7 @@
             document.getElementById('line_color').style.backgroundColor = color;
             create_preview(0);
         }
-    </script>
 
-    <script>
         function save_material() {
             var materialName = document.getElementById('material_name').value;
             if (!materialName || materialName.trim() === '') {
@@ -240,7 +308,7 @@
 
     <!-- RUBY BRIDGE -->
     <input id="RUBY_BRIDGE" type="hidden">
-
+    <input id="gauge_ratio" type="hidden">
     <input id="max_height" type="hidden" value=800>
     <input id="min_height" type="hidden" value=500>
     <input id="min_width" type="hidden" value=300>

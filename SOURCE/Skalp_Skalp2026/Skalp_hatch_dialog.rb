@@ -24,8 +24,8 @@ module Skalp
       @html_path = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/html/"
 
       @height = {}
-      @w_size = @dialog_w = 300
-      @height[:material] = 500
+      @w_size = @dialog_w = 235  # 215px content + 10px padding each side
+      @height[:material] = 600   # Height for collapsible sections
 
       @dialog_x = 200
       @dialog_y = 200
@@ -193,6 +193,13 @@ module Skalp
       # CANCEL EDIT ###############################
       @webdialog.add_action_callback("cancel_edit") do |action_context|
         @webdialog.close
+      end
+
+      # Add callback to handle window resizing
+      @webdialog.add_action_callback("resize_window") do |action_context, params|
+        width, height = params.split(",").map(&:to_i)
+        # Add some padding for window borders if needed, or trust JS
+        @webdialog.set_size(width + 20, height + 40)
       end
 
       # SIZE ###############################

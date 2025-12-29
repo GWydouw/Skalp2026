@@ -1,4 +1,4 @@
-/* Skalp Pattern Designer CSS - Refined Alignment */
+/* Skalp Pattern Designer CSS - Collapsible Sections */
 
 /* BASE */
 * {
@@ -20,33 +20,31 @@ html,
 body {
     height: 100%;
     margin: 0;
-    padding: 8px;
+    padding: 8px 10px;
     overflow: hidden;
     background-color: rgb(235, 235, 235);
     font-family: "Arial", sans-serif;
     font-size: 12px;
 }
 
-/* MATERIAL NAME - labels left-aligned at 13px, inputs start at 75px */
+/* MATERIAL NAME - top */
 #material_name_div {
-    position: absolute;
-    left: 13px;
-    top: 8px;
-    width: 215px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 215px;
 }
 
 #material_name_div label {
-    position: absolute;
-    left: 0;
     font-size: 12px;
     font-weight: normal;
     color: #000;
+    flex-shrink: 0;
 }
 
 #material_name {
-    position: absolute;
-    left: 62px;
-    width: 153px;
+    flex: 1;
     font-size: 12px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: #FFFFFF;
@@ -61,50 +59,178 @@ body {
     border-color: #3875d7;
 }
 
-/* TYPE - right-aligned with Name/Pattern */
-#units_div {
-    position: absolute;
-    left: 13px;
-    top: 35px;
-    width: 215px;
+/* PREVIEW CONTAINER */
+#preview_container {
+    margin-bottom: 10px;
+    max-width: 215px;
 }
 
-#units_div label {
-    position: absolute;
-    left: 0;
+.preview {
+    display: block;
+    width: 215px;
+    height: 100px;
+    border: 1px solid #000;
+    background-color: #FFF;
+    margin-bottom: 6px;
+}
+
+/* PREVIEW ZOOM ROW - inline */
+#preview_zoom_row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+#preview_zoom_row h2 {
     font-size: 12px;
     font-weight: normal;
+    margin: 0;
     color: #000;
 }
 
-#units {
-    position: absolute;
-    left: 62px;
-    width: 153px;
+.slider {
+    flex: 1;
+    font-size: 11px;
+    border: 1px solid #999;
+    padding: 1px 2px;
+    height: 18px;
 }
 
-/* PATTERN - right-aligned with Name/Type */
-#pattern_list_div {
-    position: absolute;
-    left: 13px;
-    top: 62px;
-    width: 215px;
+/* SECTIONS - lighter, airier design */
+.section {
+    margin-bottom: 6px;
+    max-width: 215px;
 }
 
-#pattern_list_div label {
-    position: absolute;
-    left: 0;
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px solid #DDD;
+    user-select: none;
+}
+
+.section-header:hover {
+    background-color: #F9F9F9;
+}
+
+.toggle-icon {
+    font-size: 9px;
+    color: #999;
+    width: 10px;
+    text-align: center;
+    transition: transform 0.2s ease;
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: #555;
+}
+
+.section-content {
+    padding: 6px 0;
+    max-height: 500px;
+    overflow: hidden;
+    transition: max-height 0.25s ease, padding 0.25s ease;
+    background-color: transparent;
+}
+
+.section-content.collapsed {
+    max-height: 0;
+    padding: 0;
+}
+
+/* FIELD ROWS - vertically centered */
+.field-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* Push items to edges */
+    gap: 8px;
+    margin-bottom: 6px;
+    min-height: 24px;
+    width: 100%;
+}
+
+.field-row:last-child {
+    margin-bottom: 0;
+}
+
+.field-row label {
     font-size: 12px;
     font-weight: normal;
     color: #000;
+    white-space: nowrap;
+    /* Prevent wrapping */
 }
 
-#acad_pattern_list {
-    position: absolute;
-    left: 62px;
-    width: 153px;
+/* Ensure inputs take remaining space and align right */
+.field-row select,
+.field-row input[type="checkbox"],
+.field-row .color-block,
+.field-inputs {
+    flex-grow: 1;
+    text-align: right;
+    width: auto;
+    max-width: 130px;
+    /* Limit max width if needed */
+    display: flex;
+    justify-content: flex-end;
 }
 
+.field-row select {
+    width: 100%;
+    max-width: 140px;
+    /* Adjust as needed */
+}
+
+/* FIELD INPUTS (for tile size with gauge) */
+.field-inputs {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    /* Align right */
+    gap: 4px;
+    max-width: 100%;
+}
+
+.drawing_scale {
+    width: 50px;
+    font-size: 12px;
+    font-weight: bold;
+    border: 1px solid #999;
+    padding: 2px 4px;
+    height: 20px;
+    text-align: center;
+}
+
+#tile_operator {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+}
+
+/* COLOR BLOCKS */
+.color-block {
+    flex: 1;
+    height: 22px;
+    border: 1px solid #999;
+    cursor: pointer;
+    background-color: #FFFFFF;
+}
+
+.color-block:hover {
+    border-color: #666;
+}
+
+/* SELECT STYLING */
 select {
     font-size: 12px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -130,288 +256,21 @@ select:focus {
     border-color: #3875d7;
 }
 
-/* PREVIEW IMAGE */
-#hatch_preview {
-    position: absolute;
-    left: 13px;
-    top: 89px;
-    width: 215px;
-    height: 100px;
-    z-index: 0;
-    border: 1px solid #000;
-    background-color: #FFF;
-}
-
-/* PREVIEW ZOOM & SLIDER - inline layout */
-#zoom_scale {
-    position: absolute;
-    left: 13px;
-    top: 195px;
-    width: auto;
-}
-
-#zoom_scale h2 {
-    display: inline;
-    font-size: 12px;
-    font-weight: normal;
-    margin: 0;
-    color: #000;
-}
-
-#slider_div {
-    position: absolute;
-    left: 110px;
-    top: 195px;
-    width: 118px;
-}
-
-.slider {
-    width: 100%;
-    font-size: 11px;
-    border: 1px solid #999;
-    padding: 1px 2px;
-    height: 18px;
-}
-
-/* TILE SIZE - right-aligned with preview */
-#gauge_scale {
-    position: absolute;
-    left: 13px;
-    top: 218px;
-    width: 215px;
-}
-
-#gauge_scale h2 {
-    position: absolute;
-    left: 0;
-    font-size: 12px;
-    font-weight: normal;
-    margin: 0;
-    color: #000;
-}
-
-.drawing_scale {
-    width: 55px;
-    font-size: 12px;
-    font-weight: bold;
-    border: 1px solid #999;
-    padding: 2px 4px;
-    height: 20px;
-    text-align: center;
-}
-
-#tile_y {
-    position: absolute;
-    left: 62px;
-}
-
-#tile_operator {
-    position: absolute;
-    left: 122px;
-    top: 4px;
-    width: 12px;
-    height: 12px;
-}
-
-#tile_x {
-    position: absolute;
-    left: 138px;
-}
-
-/* PATTERN PROPERTIES GROUP - more spacing */
-/* PATTERN FILL COLOR */
-#pattern_fillcolor {
-    position: absolute;
-    left: 13px;
-    top: 254px;
-    width: 215px;
-}
-
-#pattern_fillcolor h2 {
-    position: absolute;
-    left: 0;
-    font-size: 12px;
-    font-weight: normal;
-    margin: 0;
-    color: #000;
-}
-
-#fill_color {
-    position: absolute;
-    left: 130px;
-    width: 85px;
-    height: 22px;
-    border: 1px solid #999;
-    cursor: pointer;
-    background-color: #FFFFFF;
-}
-
-#fill_color:hover {
-    border-color: #666;
-}
-
-/* PATTERN LINE COLOR */
-#pattern_linecolor {
-    position: absolute;
-    left: 13px;
-    top: 280px;
-    width: 215px;
-}
-
-#pattern_linecolor h2 {
-    position: absolute;
-    left: 0;
-    font-size: 12px;
-    font-weight: normal;
-    margin: 0;
-    color: #000;
-}
-
-#line_color {
-    position: absolute;
-    left: 130px;
-    width: 85px;
-    height: 22px;
-    border: 1px solid #999;
-    cursor: pointer;
-    background-color: #FFFFFF;
-}
-
-#line_color:hover {
-    border-color: #666;
-}
-
-/* PATTERN LINE WIDTH */
-#pattern_linewidth {
-    position: absolute;
-    left: 13px;
-    top: 308px;
-    width: 215px;
-}
-
-#pattern_linewidth h2 {
-    position: absolute;
-    left: 0;
-    font-size: 12px;
-    font-weight: normal;
-    margin: 0;
-    color: #000;
-}
-
-#lineweight_paper {
-    position: absolute;
-    left: 130px;
-    width: 85px;
-}
-
-/* SECTION PROPERTIES GROUP - visual separation */
-/* SECTION CUT WIDTH */
-#sectioncut {
-    position: absolute;
-    left: 13px;
-    top: 350px;
-    width: 215px;
-}
-
-#sectioncut h2 {
-    position: absolute;
-    left: 0;
-    font-size: 12px;
-    font-weight: normal;
-    margin: 0;
-    color: #000;
-}
-
-#sectioncut_linewidth {
-    position: absolute;
-    left: 130px;
-    width: 85px;
-}
-
-/* ALIGN WITH OBJECTS */
-#pattern_alignment {
-    position: absolute;
-    left: 13px;
-    top: 378px;
-    width: 215px;
-}
-
-#pattern_alignment h2 {
-    position: absolute;
-    left: 0;
-    font-size: 12px;
-    font-weight: normal;
-    margin: 0;
-    color: #000;
-}
-
-#align_pattern {
-    position: absolute;
-    left: 130px;
+/* CHECKBOXES */
+input[type="checkbox"] {
     width: 16px;
     height: 16px;
     cursor: pointer;
-}
-
-/* UNIFY MATERIAL */
-#unify_material_div {
-    position: absolute;
-    left: 13px;
-    top: 406px;
-    width: 215px;
-}
-
-#unify_material_div h2 {
-    position: absolute;
-    left: 0;
-    font-size: 12px;
-    font-weight: normal;
-    margin: 0;
-    color: #000;
-}
-
-#unify_material {
-    position: absolute;
-    left: 130px;
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-}
-
-/* Z-INDEX */
-#zindex_div {
-    position: absolute;
-    left: 13px;
-    top: 434px;
-    width: 215px;
-}
-
-#zindex_div h2 {
-    position: absolute;
-    left: 0;
-    font-size: 12px;
-    font-weight: normal;
-    margin: 0;
-    color: #000;
-}
-
-#zindex {
-    position: absolute;
-    left: 130px;
-    width: 85px;
 }
 
 /* FOOTER BUTTONS */
 .dialog-footer {
-    position: absolute;
-    left: 13px;
-    bottom: 8px;
-    width: 215px;
     display: flex;
     justify-content: flex-end;
     gap: 8px;
     padding: 8px 0 0 0;
     border-top: 1px solid #CCC;
+    margin-top: 8px;
 }
 
 .btn-cancel,
@@ -479,7 +338,7 @@ select:disabled {
     background-color: #F0F0F0;
 }
 
-h2[title="Coming Soon"] {
+label[title="Coming Soon"] {
     opacity: 0.5;
     cursor: help;
 }

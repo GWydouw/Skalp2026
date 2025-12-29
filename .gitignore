@@ -54,3 +54,7 @@ node_modules/
 
 # macOS rgloader
 rgloader/
+
+# Visual Studio cache
+.vs/
+*.ipch
