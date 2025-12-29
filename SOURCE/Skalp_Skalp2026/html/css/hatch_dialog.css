@@ -64,7 +64,8 @@ body {
 /* PREVIEW CONTAINER */
 #preview_container {
     margin-bottom: 10px;
-    max-width: 215px;
+    width: 215px;
+    /* Fixed width to ensure 10px body padding works */
 }
 
 .preview {
@@ -98,7 +99,6 @@ body {
 .slider {
     width: 90px;
     margin-left: auto;
-    /* Force right alignment */
     flex-grow: 0;
     font-size: 11px;
     border: 1px solid #999;
@@ -106,6 +106,18 @@ body {
     height: 18px;
     border-radius: 4px;
     /* Consistent rounding */
+    -webkit-appearance: none;
+    /* Ensure consistent appearance on Mac */
+    background: #DDD;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #3875d7;
+    border-radius: 50%;
+    cursor: pointer;
 }
 
 /* SECTIONS - lighter, airier design */
@@ -321,6 +333,10 @@ input[type="checkbox"] {
 /* If last section is open, still provide minor separation if needed, but for collapsed user wants alignment */
 .section:last-of-type {
     margin-bottom: 0;
+}
+
+.section:last-of-type .section-content {
+    padding-bottom: 0;
 }
 
 .btn-cancel,

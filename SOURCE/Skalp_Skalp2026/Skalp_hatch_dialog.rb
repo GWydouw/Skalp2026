@@ -39,7 +39,7 @@ module Skalp
       @webdialog = UI::HtmlDialog.new(
         {
           dialog_title: "Edit Skalp material",
-          preferences_key: "Skalp_pattern_designer",
+          preferences_key: "Skalp_pattern_designer_v3",
           scrollable: false,
           resizable: false,
           width: @dialog_w,
