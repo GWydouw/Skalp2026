@@ -1,0 +1,182 @@
+[
+  {
+    "name": "NEN Baksteen (Normal)",
+    "pattern": [
+      "*NEN-BAKSTEEN\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 180, 140)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX/tIx9Ra2AAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NEN Beton (Normal)",
+    "pattern": [
+      "*NEN-BETON\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(190, 190, 190)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGPaRyPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgDrBUGH+ECGkAAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NEN Isolatie (Normal)",
+    "pattern": [
+      "*NEN-ISOLATIE\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(240, 240, 180)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXw8LTKDtgiAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NEN Hout (Normal)",
+    "pattern": [
+      "*NEN-HOUT\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(210, 180, 140)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXStIxN0HgzAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NEN Zand (Normal)",
+    "pattern": [
+      "*NEN-ZAND\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 240, 200)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX/8MiY4aIIAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NEN Baksteen (Detail)",
+    "pattern": [
+      "*NEN-BAKSTEEN\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 180, 140)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX/tIx9Ra2AAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NEN Beton (Detail)",
+    "pattern": [
+      "*NEN-BETON\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(190, 190, 190)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGPaRyPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgDrBUGH+ECGkAAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NEN Isolatie (Detail)",
+    "pattern": [
+      "*NEN-ISOLATIE\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(240, 240, 180)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXw8LTKDtgiAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NEN Hout (Detail)",
+    "pattern": [
+      "*NEN-HOUT\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(210, 180, 140)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXStIxN0HgzAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NEN Zand (Detail)",
+    "pattern": [
+      "*NEN-ZAND\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 240, 200)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX/8MiY4aIIAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  }
+]

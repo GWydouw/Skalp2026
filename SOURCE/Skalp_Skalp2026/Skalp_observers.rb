@@ -179,7 +179,7 @@ module Skalp
       ps_changed = parallel_state_changed?(view)
       current_page = @model.pages ? @model.pages.selected_page : @model
 
-      if Skalp.dialog.fog_status(current_page)
+      if Skalp.dialog && Skalp.dialog.fog_status(current_page)
         if @parallel_current_state == :parallel
           # Update fog distance if camera eye has moved significantly
           if @last_camera_eye.nil? || @last_camera_eye.distance(view.camera.eye) > 0.001

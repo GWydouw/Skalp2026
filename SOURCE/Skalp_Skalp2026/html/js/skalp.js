@@ -478,6 +478,13 @@ function solid_color(value) {
 }
 
 function select_pattern(value) {
+    if (value === "Import AutoCAD pattern...") {
+        sketchup.import_pat_file();
+        return;
+    }
+    if (value === "----------------------") {
+        return;
+    }
     create_preview(1);
 }
 
@@ -498,10 +505,8 @@ function create_hatch() {
         var pen_paper = document.getElementById('lineweight_paper').value;
         var pen_model = document.getElementById('lineweight_model').value;
         // Use native color inputs instead of Spectrum
-        var fill_color_input = document.getElementById('fill_color_input');
-        var line_color_input = document.getElementById('line_color_input');
-        var fill_color = fill_color_input ? hexToRgb(fill_color_input.value) : 'rgb(255,255,255)';
-        var line_color = line_color_input ? hexToRgb(line_color_input.value) : 'rgb(0,0,0)';
+        var fill_color = $("#fill_color_input").spectrum("get").toRgbString();
+        var line_color = $("#line_color_input").spectrum("get").toRgbString();
         var aligned = $("#align_pattern").prop('checked');
         var section_cut_width = document.getElementById('sectioncut_linewidth').value;
 
@@ -511,11 +516,10 @@ function create_hatch() {
     }
 }
 
-// Helper function to convert hex to rgb string
-function hexToRgb(hex) {
-    if (!hex) return 'rgb(0,0,0)';
-    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? 'rgb(' + parseInt(result[1], 16) + ',' + parseInt(result[2], 16) + ',' + parseInt(result[3], 16) + ')' : 'rgb(0,0,0)';
+// Helper function to return color string as-is (handling rgba)
+function getColorString(val) {
+    if (!val) return 'rgb(255,255,255)';
+    return val;
 }
 
 
@@ -534,19 +538,11 @@ function delete_hatch() {
 }
 
 function set_fill_color(rgb) {
-    // Update both the hidden input and the visible color block
-    var input = document.getElementById('fill_color_input');
-    var block = document.getElementById('fill_color');
-    if (input) input.value = rgbToHex(rgb);
-    if (block) block.style.backgroundColor = rgb;
+    $("#fill_color_input").spectrum("set", rgb);
 }
 
 function set_line_color(rgb) {
-    // Update both the hidden input and the visible color block
-    var input = document.getElementById('line_color_input');
-    var block = document.getElementById('line_color');
-    if (input) input.value = rgbToHex(rgb);
-    if (block) block.style.backgroundColor = rgb;
+    $("#line_color_input").spectrum("set", rgb);
 }
 
 // Helper function to convert rgb string to hex
@@ -1509,4 +1505,98 @@ function save_style(blur) {
 function update_sudata() {
     window.location = 'skp::update_dialog_lists@';
 }
+
+/* CUSTOM PATTERN DROPDOWN LOGIC */
+
+function toggle_dropdown() {
+    $('.custom-select-wrapper').toggleClass('open');
+}
+
+$(document).click(function (event) {
+    if (!$(event.target).closest('.custom-select-wrapper').length) {
+        $('.custom-select-wrapper').removeClass('open');
+    }
+});
+
+function get_thumb_url(name) {
+    if (!name || name === "----------------------" || name === "Import AutoCAD pattern..." || name === "SOLID_COLOR, solid color without hatching") {
+        return "";
+    }
+    var safeName = name.replace(/[^a-zA-Z0-9]/g, "_");
+    return "icons/thumbs/" + safeName + ".png";
+}
+
+function refresh_custom_dropdown() {
+    var select = document.getElementById('acad_pattern_list');
+    var optionsContainer = document.getElementById('custom_pattern_options');
+    var selectedText = document.getElementById('selected_pattern_text');
+    var selectedThumb = document.getElementById('selected_pattern_thumb');
+
+    if (!select || !optionsContainer) return;
+
+    optionsContainer.innerHTML = '';
+
+    for (var i = 0; i < select.options.length; i++) {
+        var opt = select.options[i];
+        var val = opt.value;
+        var text = opt.text;
+
+        if (val === "----------------------" || val === "----------------------") {
+            var sep = document.createElement('div');
+            sep.className = 'custom-option separator';
+            optionsContainer.appendChild(sep);
+        } else {
+            var div = document.createElement('div');
+            div.className = 'custom-option';
+            if (val === select.value) {
+                div.classList.add('selected');
+                selectedText.innerText = text;
+                var thumbUrl = get_thumb_url(val);
+                if (thumbUrl) {
+                    selectedThumb.src = thumbUrl;
+                    selectedThumb.style.display = 'block';
+                } else {
+                    selectedThumb.style.display = 'none';
+                }
+            }
+
+            var thumbUrl = get_thumb_url(val);
+            if (thumbUrl) {
+                var img = document.createElement('img');
+                img.src = thumbUrl;
+                img.onerror = function () { this.style.display = 'none'; };
+                div.appendChild(img);
+            }
+
+            var span = document.createElement('span');
+            span.innerText = text;
+            div.appendChild(span);
+
+            div.onclick = (function (v, t) {
+                return function () {
+                    select_custom_option(v, t);
+                };
+            })(val, text);
+
+            optionsContainer.appendChild(div);
+        }
+    }
+}
+
+function select_custom_option(value, text) {
+    var select = document.getElementById('acad_pattern_list');
+    select.value = value;
+
+    // Trigger the original change event logic
+    select_pattern(value);
+
+    // Update UI
+    refresh_custom_dropdown();
+    $('.custom-select-wrapper').removeClass('open');
+}
+
+function thumbnails_ready() {
+    refresh_custom_dropdown();
+}
+
 

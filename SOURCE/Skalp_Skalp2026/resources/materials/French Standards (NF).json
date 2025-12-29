@@ -1,0 +1,182 @@
+[
+  {
+    "name": "NF Brique (Normal)",
+    "pattern": [
+      "*NF-BRIQUE\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 160, 120)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX/oHjpO0zQAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NF Béton (Normal)",
+    "pattern": [
+      "*NF-BETON\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(192, 192, 192)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGM6QCPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgBA5kI3gmr6aAAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NF Isolation (Normal)",
+    "pattern": [
+      "*NF-ISOLATION\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 255, 128)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX//4BnfndlAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NF Bois (Normal)",
+    "pattern": [
+      "*NF-BOIS\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(222, 184, 135)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXeuId/rRfTAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NF Terre (Normal)",
+    "pattern": [
+      "*NF-TERRE\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(160, 120, 80)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEWgeFDyj8KwAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NF Brique (Detail)",
+    "pattern": [
+      "*NF-BRIQUE\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 160, 120)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX/oHjpO0zQAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NF Béton (Detail)",
+    "pattern": [
+      "*NF-BETON\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(192, 192, 192)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGM6QCPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgBA5kI3gmr6aAAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NF Isolation (Detail)",
+    "pattern": [
+      "*NF-ISOLATION\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 255, 128)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX//4BnfndlAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NF Bois (Detail)",
+    "pattern": [
+      "*NF-BOIS\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(222, 184, 135)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXeuId/rRfTAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "NF Terre (Detail)",
+    "pattern": [
+      "*NF-TERRE\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(160, 120, 80)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEWgeFDyj8KwAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  }
+]

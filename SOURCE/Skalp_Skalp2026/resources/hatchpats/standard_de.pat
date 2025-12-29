@@ -1,0 +1,20 @@
+; PATTERN FILES - German Standards (DIN)
+
+*DIN-MAUERWERK
+45, 0,0, 0,2.0
+
+*DIN-BETON
+45, 0,0, 0,1.0
+135, 0,0, 0,1.0
+
+*DIN-STAHLBETON
+45, 0,0, 0,2.0
+135, 0,0, 0,2.0
+
+*DIN-HOLZ
+45, 0,0, 10,10, 5,-5
+
+*DIN-DAEMMUNG
+0, 0,0, 5,5, 2.5,-2.5
+90, 0,0, 5,5, 2.5,-2.5
+

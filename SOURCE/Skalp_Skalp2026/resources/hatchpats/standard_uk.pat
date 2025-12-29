@@ -1,0 +1,18 @@
+; PATTERN FILES - UK Standards (BS)
+
+*BS-BRICK
+45, 0,0, 0,2.5
+
+*BS-BLOCK
+45, 0,0, 0,5.0
+
+*BS-CONCRETE
+45, 0,0, 0,1.0
+135, 0,0, 0,1.0
+
+*BS-INSULATION
+45, 0.5,0.5, 5,5, 2.5,-2.5
+
+*BS-TIMBER
+0, 0,0, 0,10
+

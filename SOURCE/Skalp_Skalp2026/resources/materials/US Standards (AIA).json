@@ -1,0 +1,182 @@
+[
+  {
+    "name": "AIA Brick (Normal)",
+    "pattern": [
+      "*AIA-BRICK\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(200, 120, 100)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXIeGSV/6ydAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "AIA Concrete (Normal)",
+    "pattern": [
+      "*AIA-CONCRETE\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(180, 180, 180)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGPaQiPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgA93D4XzLdLKAAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "AIA Steel (Normal)",
+    "pattern": [
+      "*AIA-STEEL\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(150, 150, 200)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEWWlsjsQJ6GAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "AIA Wood (Normal)",
+    "pattern": [
+      "*AIA-WOOD\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(210, 180, 140)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXStIxN0HgzAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "AIA Sand (Normal)",
+    "pattern": [
+      "*AIA-SAND\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 255, 200)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX//8gfeb7HAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "AIA Brick (Detail)",
+    "pattern": [
+      "*AIA-BRICK\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(200, 120, 100)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXIeGSV/6ydAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "AIA Concrete (Detail)",
+    "pattern": [
+      "*AIA-CONCRETE\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(180, 180, 180)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGPaQiPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgA93D4XzLdLKAAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "AIA Steel (Detail)",
+    "pattern": [
+      "*AIA-STEEL\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(150, 150, 200)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEWWlsjsQJ6GAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "AIA Wood (Detail)",
+    "pattern": [
+      "*AIA-WOOD\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(210, 180, 140)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXStIxN0HgzAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "AIA Sand (Detail)",
+    "pattern": [
+      "*AIA-SAND\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 255, 200)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX//8gfeb7HAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  }
+]

@@ -1,0 +1,18 @@
+; PATTERN FILES - US Standards (AIA)
+
+*AIA-BRICK
+45, 0,0, 0,2.5
+
+*AIA-CONCRETE
+45, 0,0, 0,1.0
+135, 0,0, 0,1.0
+
+*AIA-STEEL
+45, 0,0, 0,0.5
+
+*AIA-WOOD
+0, 0,0, 0,8
+
+*AIA-SAND
+0, 0,0, 1,1, 0.05,-0.95
+

@@ -1,0 +1,182 @@
+[
+  {
+    "name": "DIN Mauerwerk (Normal)",
+    "pattern": [
+      "*DIN-MAUERWERK\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 150, 150)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX/lpYnlRLaAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "DIN Beton (Normal)",
+    "pattern": [
+      "*DIN-BETON\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(200, 200, 200)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGM6QSPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgCYPUT3G5pECgAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "DIN Stahlbeton (Normal)",
+    "pattern": [
+      "*DIN-STAHLBETON\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(150, 150, 150)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGOaRiPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgA2QzPHk5a6PQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "DIN Holz (Normal)",
+    "pattern": [
+      "*DIN-HOLZ\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(222, 184, 135)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXeuId/rRfTAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "DIN Dämmung (Normal)",
+    "pattern": [
+      "*DIN-DAEMMUNG\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 255, 100)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX//2TAGVEEAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "DIN Mauerwerk (Detail)",
+    "pattern": [
+      "*DIN-MAUERWERK\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 150, 150)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX/lpYnlRLaAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "DIN Beton (Detail)",
+    "pattern": [
+      "*DIN-BETON\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(200, 200, 200)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGM6QSPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgCYPUT3G5pECgAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "DIN Stahlbeton (Detail)",
+    "pattern": [
+      "*DIN-STAHLBETON\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(150, 150, 150)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGOaRiPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgA2QzPHk5a6PQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "DIN Holz (Detail)",
+    "pattern": [
+      "*DIN-HOLZ\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(222, 184, 135)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXeuId/rRfTAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "DIN Dämmung (Detail)",
+    "pattern": [
+      "*DIN-DAEMMUNG\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 255, 100)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX//2TAGVEEAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  }
+]

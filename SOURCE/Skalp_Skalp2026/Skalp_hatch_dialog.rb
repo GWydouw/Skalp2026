@@ -22,6 +22,8 @@ module Skalp
       @hatchname = hatchname
       @active_skpModel = Sketchup.active_model
       @html_path = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/html/"
+      @thumb_path = @html_path + "icons/thumbs/"
+      Dir.mkdir(@thumb_path) unless File.exist?(@thumb_path)
 
       @height = {}
       @w_size = @dialog_w = 235  # 215px content + 10px padding each side
@@ -181,6 +183,12 @@ module Skalp
       end
 
       # SAVE MATERIAL ###############################
+      @webdialog.add_action_callback("get_thumbnails") do |action_context, params|
+        generate_thumbnails
+        script("thumbnails_ready();")
+      end
+
+      # SAVE MATERIAL ###############################
       @webdialog.add_action_callback("save_material") do |action_context, params|
         # params format: "material_name"
         material_name = Skalp.utf8(params)
@@ -304,6 +312,7 @@ module Skalp
 
     def select_last_pattern
       @hatchname ? script("select_material('#{@hatchname}');") : script("select_material('Skalp default')")
+      script("refresh_custom_dropdown();")
     end
 
     def new_material_name
@@ -326,21 +335,18 @@ module Skalp
 
       return unless result
 
-      script("set_fill_color('rgb(255,255,255)')")
-      script("set_line_color('rgb(0,0,0)')")
+      # Set color values using Spectrum's set method
+      script("$('#fill_color_input').spectrum('set', 'rgb(255,255,255)');")
+      script("$('#line_color_input').spectrum('set', 'rgb(0,0,0)');")
+
       set_value("units", "paperspace")
       set_value("lineweight_model", "1.0cm")
       set_value("lineweight_paper", "0.18 mm")
       set_value("sectioncut_linewidth", "0.35 mm")
       set_value("tile_x", @tile.x_string)
       set_value("tile_y", @tile.y_string)
-      script("$('#line_color').css('background-color','rgb(0,0,0)')")
-      set_value("line_color", "rgb(0,0,0)")
-      script("$('#fill_color').css('background-color','rgb(255,255,255)')")
-      set_value("fill_color", "rgb(255,255,255)")
       set_value("acad_pattern_list", "ANSI31, ANSI IRON, BRICK, STONE MASONRY")
       script("create_preview(1)") if name
-      # script("create_hatch()") if name
     end
 
     def set_dialog_translation
@@ -399,6 +405,13 @@ module Skalp
       pat_names.each do |pat|
         add("acad_pattern_list", pat) unless pat.nil? || pat == ""
       end
+
+      # Add Import footer
+      add("acad_pattern_list", "----------------------")
+      add("acad_pattern_list", "Import AutoCAD pattern...")
+
+      generate_thumbnails
+      script("thumbnails_ready();")
     end
 
     def load_materials
@@ -496,8 +509,11 @@ module Skalp
         script("$('#tile_x').val('#{@tile.x_string}');")
         script("$('#tile_y').val('#{@tile.y_string}');")
 
-        set_value("line_color", pattern_string[:line_color].to_s)
-        set_value("fill_color", pattern_string[:fill_color].to_s)
+        # Set color values using Spectrum's set method
+        line_color = pattern_string[:line_color].to_s
+        fill_color = pattern_string[:fill_color].to_s
+        script("$('#line_color_input').spectrum('set', '#{line_color}');")
+        script("$('#fill_color_input').spectrum('set', '#{fill_color}');")
         set_value("units", pattern_string[:space])
 
         # lineweight_model
@@ -537,7 +553,8 @@ module Skalp
         solidcolor = vars[0] == "SOLID_COLOR, solid color without hatching"
         script("solid_color(#{solidcolor});")
 
-        zoom_factor = 1.0 / ((105 - vars[7].to_i) * 5.0 / 100.0)
+        zoom_divisor = (105 - vars[7].to_i) * 5.0 / 100.0
+        zoom_factor = zoom_divisor == 0 ? 1.0 : 1.0 / zoom_divisor
 
         pen_width = if vars[2].to_sym == :modelspace
                       Skalp::PenWidth.new(vars[4], vars[2],
@@ -575,6 +592,22 @@ module Skalp
       end
 
       set_preview("hatch_preview", "icons/preview.png")
+    end
+
+    def set_preview(element_id, image_path)
+      # HtmlDialog version: we need to force a refresh by adding a timestamp
+      # and the path should be relative to the html folder or absolute
+      # Since we are in DevMode, we might need to handle paths carefully
+      full_path = @html_path + image_path
+      # Check if file exists to avoid broken images during dev
+      if File.exist?(full_path)
+        timestamp = Time.now.to_i
+        script("document.getElementById('#{element_id}').src = '#{image_path}?t=#{timestamp}';")
+      else
+        puts "Skalp Error: Preview file not found at #{full_path}"
+        # Fallback to empty image to avoid broken icon
+        script("document.getElementById('#{element_id}').src = 'icons/skalp_empty.png';")
+      end
     end
 
     def delete_hatch(name)
@@ -689,7 +722,12 @@ module Skalp
       Sketchup.active_model.materials[name] || hatch_material = Sketchup.active_model.materials.add(name)
 
       hatch_material.texture = Skalp::IMAGE_PATH + "tile.png"
-      hatch_material.texture.size = @hatch.tile_width / PRINT_DPI # TODO: alle schalen van hetzelfde materiaal aanpassen!`
+      # Guard against NaN/Infinity in texture size to prevent FloatDomainError
+      tile_size = @hatch.tile_width / PRINT_DPI
+      if tile_size.nil? || (tile_size.respond_to?(:nan?) && tile_size.nan?) || (tile_size.respond_to?(:infinite?) && tile_size.infinite?) || tile_size.abs < 0.0001
+        tile_size = 0.001
+      end
+      hatch_material.texture.size = tile_size
       hatch_material.metalness_enabled = false
       hatch_material.normal_enabled = false
 
@@ -767,6 +805,29 @@ module Skalp
 
       layer_name = "\uFEFF".encode("utf-8") + "Skalp Pattern Layer - " + hatch_material.name
       Skalp.create_Color_by_Layer_layers([hatch_material], true) if Sketchup.active_model.layers[layer_name]
+    end
+
+    def generate_thumbnails
+      patterns = SkalpHatch.hatchdefs
+      patterns.each do |hatchdef|
+        name = hatchdef.name.to_s.strip.gsub(/[^a-zA-Z0-9]/, "_")
+        filepath = File.join(@thumb_path, "#{name}.png")
+        next if File.exist?(filepath)
+
+        begin
+          hatch = Skalp::SkalpHatch::Hatch.new
+          hatch.add_hatchdefinition(hatchdef)
+          hatch.create_png({
+                             solid_color: false,
+                             type: :thumbnail,
+                             width: 50,
+                             height: 50,
+                             output_path: filepath
+                           })
+        rescue StandardError => e
+          # Skip patterns that fail to render
+        end
+      end
     end
   end
 end

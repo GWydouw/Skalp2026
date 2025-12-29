@@ -1,0 +1,287 @@
+[
+  {
+    "name": "RAL 1000 Green beige",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(205, 186, 136)",
+    "fill_color": "rgb(205, 186, 136)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXNuojDRHXpAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 1001 Beige",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(208, 176, 132)",
+    "fill_color": "rgb(208, 176, 132)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXQsIQk4+FrAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 1013 Oyster white",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(227, 217, 198)",
+    "fill_color": "rgb(227, 217, 198)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXj2cYuI0rwAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 1015 Light ivory",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(230, 210, 181)",
+    "fill_color": "rgb(230, 210, 181)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXm0rUCEHFWAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 3000 Flame red",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(167, 41, 32)",
+    "fill_color": "rgb(167, 41, 32)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEWnKSAEZckcAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 3003 Ruby red",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(134, 26, 34)",
+    "fill_color": "rgb(134, 26, 34)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEWGGiInj+HXAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 5002 Ultramarine blue",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 56, 123)",
+    "fill_color": "rgb(0, 56, 123)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEUAOHt3MimVAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 5005 Signal blue",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 83, 135)",
+    "fill_color": "rgb(0, 83, 135)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEUAU4dFMCXOAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 6005 Moss green",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(40, 60, 40)",
+    "fill_color": "rgb(40, 60, 40)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEUoPCjXYvuHAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 7016 Anthracite grey",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(48, 56, 65)",
+    "fill_color": "rgb(48, 56, 65)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEUwOEGVVRW3AAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 7035 Light grey",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(210, 210, 210)",
+    "fill_color": "rgb(210, 210, 210)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGO6RCPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgBFdUhn9m49GAAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 8017 Chocolate brown",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(69, 50, 46)",
+    "fill_color": "rgb(69, 50, 46)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEVFMi7gjStPAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 9005 Jet black",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(14, 14, 16)",
+    "fill_color": "rgb(14, 14, 16)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEUODhAu0C06AAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 9010 Pure white",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(240, 240, 230)",
+    "fill_color": "rgb(240, 240, 230)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXw8OZPa+j6AAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "RAL 9016 Traffic white",
+    "pattern": [
+      "*SOLID_COLOR, solid color without hatching",
+      "45, 0,0, 0,.125\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(241, 240, 234)",
+    "fill_color": "rgb(241, 240, 234)",
+    "gauge_ratio": "0.9999999999999999",
+    "pat_scale": 0.668131055407545,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXx8OpHH87mAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  }
+]

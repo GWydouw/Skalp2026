@@ -1,0 +1,19 @@
+; PATTERN FILES - Dutch Standards (NEN)
+
+*NEN-BAKSTEEN
+45, 0,0, 0,3.0
+
+*NEN-BETON
+45, 0,0, 0,1.5
+45, 0.75,0, 0,1.5
+
+*NEN-ISOLATIE
+0, 0,0, 0,2
+45, 0,0, 2,2, 1,-1
+
+*NEN-HOUT
+45, 0,0, 5,5, 2.5,-2.5
+
+*NEN-ZAND
+0, 0,0, 1,1, 0.1,-0.9
+

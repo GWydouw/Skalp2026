@@ -1,0 +1,182 @@
+[
+  {
+    "name": "BS Brickwork (Normal)",
+    "pattern": [
+      "*BS-BRICK\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(220, 140, 120)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXcjHjqAd/HAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "BS Blockwork (Normal)",
+    "pattern": [
+      "*BS-BLOCK\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(200, 200, 200)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGM6QSPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgCYPUT3G5pECgAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "BS Concrete (Normal)",
+    "pattern": [
+      "*BS-CONCRETE\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(170, 170, 170)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGNaRSPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgCQpDqn8EX8EAAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "BS Insulation (Normal)",
+    "pattern": [
+      "*BS-INSULATION\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 255, 150)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX//5aTqsI0AAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "BS Timber (Normal)",
+    "pattern": [
+      "*BS-TIMBER\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(205, 170, 125)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 1.0,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXNqn1EUWErAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "BS Brickwork (Detail)",
+    "pattern": [
+      "*BS-BRICK\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(220, 140, 120)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXcjHjqAd/HAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "BS Blockwork (Detail)",
+    "pattern": [
+      "*BS-BLOCK\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(200, 200, 200)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGM6QSPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgCYPUT3G5pECgAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "BS Concrete (Detail)",
+    "pattern": [
+      "*BS-CONCRETE\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(170, 170, 170)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbCAAAAADdMhcqAAAAJUlEQVR4nGNaRSPAxEAjMGrwqMGjBo8aPGrwqMGjBo8aPOgNBgCQpDqn8EX8EAAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "BS Insulation (Detail)",
+    "pattern": [
+      "*BS-INSULATION\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(255, 255, 150)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEX//5aTqsI0AAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  },
+  {
+    "name": "BS Timber (Detail)",
+    "pattern": [
+      "*BS-TIMBER\n"
+    ],
+    "print_scale": 1,
+    "resolution": 600,
+    "user_x": "3.0",
+    "space": "paperspace",
+    "pen": "0.18 mm",
+    "section_cut_width": 0.007086614173228346,
+    "line_color": "rgb(0, 0, 0)",
+    "fill_color": "rgb(205, 170, 125)",
+    "gauge_ratio": "1.0",
+    "pat_scale": 0.2,
+    "alignment": "false",
+    "png_blob": "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAbAQMAAADCl9q1AAAAA1BMVEXNqn1EUWErAAAAEElEQVR4nGNiQACmUTZZbAAktAA3WShvhQAAAABJRU5ErkJggg=="
+  }
+]

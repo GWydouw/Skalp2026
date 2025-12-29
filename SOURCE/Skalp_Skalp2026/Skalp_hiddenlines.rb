@@ -288,7 +288,7 @@ module Skalp
       remove_rear_view_instances(sectiongroup) if sectiongroup
     end
 
-    private
+    # private - moved down to expose add_rear_view_to_sectiongroup
 
     def create_sectiongroup_for_rearview(page)
       return unless page.valid? && Skalp.active_model.pages[page] && Skalp.active_model.pages[page].sectionplane
@@ -364,6 +364,8 @@ module Skalp
         Skalp.sectiongroup_visibility(sectiongroup, true, nil)
       end
     end
+
+    private
 
     def cleanup_legacy_rear_views(sectiongroup)
       # Removes old component-based rearviews

@@ -753,10 +753,20 @@ module Skalp
     def self.stop_skalp(close_dialog = true)
       Sketchup.active_model.select_tool(nil) if Sketchup.active_model
       @status = 0
-      @materialSelector.close if @materialSelector
-      @dialog.close if @dialog && @dialog.visible? && close_dialog
+      @status = 0
+      begin
+        @materialSelector.close if @materialSelector
+      rescue StandardError
+      end
+      begin
+        @dialog.close if @dialog && @dialog.visible? && close_dialog
+      rescue StandardError
+      end
       @dialog = nil unless close_dialog
-      @hatch_dialog.close if @hatch_dialog
+      begin
+        @hatch_dialog.close if @hatch_dialog
+      rescue StandardError
+      end
       @hatch_dialog = nil
       @clipper = nil
       @clipperOffset = nil
