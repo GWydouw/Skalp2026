@@ -6,18 +6,12 @@
     <meta http-equiv="MSThemeCompatible" content="Yes" />
     <meta charset="utf-8" />
 
-
     <script src='js/jquery.js'> </script>
-
-    <!--   <script src='js/skalp.js'> </script>  -->
     <script src='js/skalp.js'> </script>
     <link rel='stylesheet' href='css/hatch_dialog.css' />
 
     <link href="css/jquery-ui-1.10.4.custom.min.css" rel="stylesheet" />
     <script type="text/javascript" src="js/jquery-ui.min.js"></script>
-
-    <script src='js/spectrum.js'></script>
-    <link rel='stylesheet' href='css/spectrum.css' />
 
     <link rel="stylesheet" type="text/css" href="css/jscslider.css">
     <script type="text/javascript" src="js/jscslider.js"></script>
@@ -26,65 +20,53 @@
 
 </head>
 
-<body onload="ready_hatch()" onfocus="onfocus_hatch()" onblur="create_hatch()" onresize="dialog_resize()" scroll="no"
-    style="OVERFLOW: hidden">
+<body onload="ready_hatch()" onfocus="onfocus_hatch()" onblur="create_hatch()" scroll="no" style="OVERFLOW: hidden">
 
-    <img src='icons/add.png' title='Create new Skalp material' class='image_button' id='hatch_add'
-        onclick='create_new_hatch()' onmousedown="src='icons/add_pushed.png'" onmouseup="src='icons/add.png'">
-    <img src='icons/delete.png' title='Delete Skalp material' class='image_button' id='hatch_delete'
-        onmousedown="src='icons/delete_pushed.png'" onmouseup="src='icons/delete.png'" onclick='delete_hatch()'>
-
-    <img src='icons/menu.png' title='Menu' class='image_button' id='hatch_menu' onmousedown='hatch_menu()'
-        onmouseup="hatch_menu_up()">
-
-    <select title='Menu' class='image_button' id='hatch_menu_list' onchange='hatchmenu(this.selectedIndex)'
-        onfocus="this.selectedIndex = -1;">
-        <optgroup label="Import">
-            <option value='Import AutoCad pattern file'>Import acad pattern file</option>
-        </optgroup>
-    </select>
-
-    <img src='icons/hatch_icon_12x12.png' id="hatch_icon_pattern" title="Apply material to selected Object"
-        onmousedown='hatch_down_pattern()' onmouseup='hatch_up_pattern()' onclick='attach_material()'>
-    <input type='text' title='Hatch name' class='textbox' id='hatch_name'>
-
-    <select id="material_list" onchange="select_material(this.value)"></select>
-    <img src="icons/arrow2.png" title="Select pattern" class="image_button" id="material_arrow">
+    <!-- Material Name Input with label -->
+    <div id="material_name_div">
+        <label for="material_name">Name:</label>
+        <input type='text' title='Material name' id='material_name'>
+    </div>
 
     <div id="pattern_settings" class="text">
+        <!-- Type - horizontal layout -->
         <div id="units_div">
-            <h2 id="translate_01">Type:</h2>
+            <label for="units">Type:</label>
             <select id="units" onchange="units(this.value)">
                 <option value='paperspace'>Drawing Scale Dependent</option>
                 <option value='modelspace'>Absolute Size</option>
             </select>
         </div>
 
+        <!-- Pattern - horizontal layout -->
         <div id="pattern_list_div">
-            <h2 id="translate_02">Pattern:</h2>
+            <label for="acad_pattern_list">Pattern:</label>
             <select id="acad_pattern_list" onchange="select_pattern(this.value)"></select>
         </div>
 
+        <!-- Preview Image -->
         <img class="preview" id="hatch_preview" src='icons/skalp_empty.png'>
-        <img src='icons/update_preview.png' id="update_preview" onmousedown="src='icons/update_preview_pushed.png'"
-            onmouseup="src='icons/update_preview.png'" onclick="create_hatch()">
 
+        <!-- Slider -->
         <div id="slider_div">
             <input type="number" min="5" max="100" value="60" class="slider" id="slider" onchange="create_preview(0)">
         </div>
 
+        <!-- Preview Zoom Label -->
         <div id="zoom_scale">
             <h2 id="translate_03">Preview Zoom:</h2>
         </div>
 
+        <!-- Tile Size with gauge -->
         <div id="gauge_scale">
             <h2 id="translate_04">Tile Size:</h2>
-            <input type='text' class="drawing_scale" title='Define Pattern Height' class='textbox' id='tile_y'>
+            <input type='text' class="drawing_scale" title='Define Pattern Height' id='tile_y' style="color: #CC0000;">
             <input id="gauge_ratio" type="hidden">
             <img src='icons/gauge.png' id="tile_operator">
-            <input type='text' class="drawing_scale" title='Define Pattern Width' class='textbox' id='tile_x'>
+            <input type='text' class="drawing_scale" title='Define Pattern Width' id='tile_x' style="color: #00AA00;">
         </div>
 
+        <!-- Section Cut Width -->
         <div id="sectioncut">
             <h2 id="translate_05">Section Cut Width:</h2>
 
@@ -114,21 +96,25 @@
             </select>
         </div>
 
+        <!-- Pattern Fill Color - clickable color block -->
         <div id="pattern_fillcolor">
             <h2 id="translate_06">Pattern Fill Color:</h2>
-            <div id="fill_color" class='basic1'> </div>
+            <div id="fill_color" class='color-block' onclick="document.getElementById('fill_color_input').click()">
+            </div>
+            <input type="color" id="fill_color_input" style="display:none;" onchange="updateFillColor(this.value)">
         </div>
 
+        <!-- Pattern Line Color - clickable color block -->
         <div id="pattern_linecolor">
             <h2 id="translate_17">Pattern Line Color:</h2>
-            <div id="line_color" class='basic2'> </div>
+            <div id="line_color" class='color-block' onclick="document.getElementById('line_color_input').click()">
+            </div>
+            <input type="color" id="line_color_input" style="display:none;" onchange="updateLineColor(this.value)">
         </div>
 
+        <!-- Pattern Line Width -->
         <div id="pattern_linewidth">
             <h2 id="translate_08">Pattern Line Width:</h2>
-            <input type='text' title='lineweight' id='lineweight_model' value='1.0cm' class="drawing_scale"
-                onchange="$('#update_preview').show();create_preview(0);">
-
             <select id='lineweight_paper' onchange="$('#update_preview').show();create_preview(0);">
                 <option value='0.04 mm'>0.04 mm</option>
                 <option value='0.07 mm'>0.07 mm</option>
@@ -154,43 +140,103 @@
             </select>
         </div>
 
+        <!-- Align with Objects -->
         <div id="pattern_alignment" class="text">
-            <!--  ATTENTION: content fully overriden by translation, see :set_dialog_translation in Skalp_hatch_dialog.rb -->
             <h2 id='translate_18' title="Align red X-axis with the longest Edge in an Objects section result">Align with
                 Objects:</h2>
             <input type="checkbox" name="align with object"
                 title="Align red X-axis with the longest Edge in an Objects section result" value="align"
                 id="align_pattern" onchange="$('#update_preview').show();">
         </div>
+
+        <!-- Unify Material -->
+        <div id="unify_material_div">
+            <h2 title="Coming Soon">Unify Material:</h2>
+            <input type="checkbox" name="unify material" value="unify" id="unify_material" disabled title="Coming Soon">
+        </div>
+
+        <!-- Z-Index -->
+        <div id="zindex_div">
+            <h2 title="Coming Soon">Z-Index:</h2>
+            <select id="zindex" disabled title="Coming Soon">
+                <option value="-3">-3</option>
+                <option value="-2">-2</option>
+                <option value="-1">-1</option>
+                <option value="0" selected>0</option>
+                <option value="+1">+1</option>
+                <option value="+2">+2</option>
+                <option value="+3">+3</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Footer with CANCEL and SAVE buttons -->
+    <div class="dialog-footer">
+        <button class="btn-cancel" onclick="cancel_edit()">CANCEL</button>
+        <button class="btn-save" onclick="save_material()">SAVE</button>
     </div>
 
     <script>
-        $(".basic1").spectrum({
-            showInput: true,
-            preferredFormat: "rgb",
-            showAlpha: true,
-            color: "rgb(255,255,255)",
-            change: function (color) {
-                $("#fill_color").css("background-color", color.toHexString());
-                $('#update_preview').show();
-                create_preview(0);
-            }
-        });
+        // Color picker functions
+        function updateFillColor(color) {
+            document.getElementById('fill_color').style.backgroundColor = color;
+            create_preview(0);
+        }
 
-        $(".basic2").spectrum({
-            showInput: true,
-            preferredFormat: "rgb",
-            showAlpha: false,
-            color: "rgb(0,0,0)",
-            change: function (color) {
-                $("#line_color").css("background-color", color.toHexString());
-                $('#update_preview').show();
-                create_preview(0);
-            }
-        });
-
+        function updateLineColor(color) {
+            document.getElementById('line_color').style.backgroundColor = color;
+            create_preview(0);
+        }
     </script>
 
+    <script>
+        function save_material() {
+            var materialName = document.getElementById('material_name').value;
+            if (!materialName || materialName.trim() === '') {
+                alert('Please enter a material name');
+                return;
+            }
+            sketchup.save_material(materialName);
+        }
+
+        function cancel_edit() {
+            sketchup.cancel_edit();
+        }
+
+        function create_preview(force) {
+            var pattern = document.getElementById('acad_pattern_list') ? document.getElementById('acad_pattern_list').value : '';
+            var tile_x = document.getElementById('tile_x') ? document.getElementById('tile_x').value : '';
+            var tile_y = document.getElementById('tile_y') ? document.getElementById('tile_y').value : '';
+            var lineColorInput = document.getElementById('line_color_input');
+            var fillColorInput = document.getElementById('fill_color_input');
+            var lineColor = lineColorInput ? lineColorInput.value : '#000000';
+            var fillColor = fillColorInput ? fillColorInput.value : '#ffffff';
+            var units = document.getElementById('units') ? document.getElementById('units').value : '';
+            var lineweight = document.getElementById('lineweight_paper') ? document.getElementById('lineweight_paper').value : '';
+            var slider = document.getElementById('slider') ? document.getElementById('slider').value : '60';
+            var isNew = force == 1 ? '1' : '0';
+            var aligned = document.getElementById('align_pattern') && document.getElementById('align_pattern').checked ? 'true' : 'false';
+            var sectionCutWidth = document.getElementById('sectioncut_linewidth') ? document.getElementById('sectioncut_linewidth').value : '';
+            var materialName = document.getElementById('material_name') ? document.getElementById('material_name').value : '';
+
+            var params = [
+                pattern,
+                tile_x,
+                tile_y,
+                lineColor,
+                fillColor,
+                lineColor,
+                fillColor,
+                slider,
+                isNew,
+                aligned,
+                sectionCutWidth,
+                materialName
+            ].join(';');
+
+            sketchup.create_preview(params);
+        }
+    </script>
 
     <!-- RUBY BRIDGE -->
     <input id="RUBY_BRIDGE" type="hidden">

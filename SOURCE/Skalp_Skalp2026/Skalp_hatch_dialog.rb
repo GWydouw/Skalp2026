@@ -1,13 +1,15 @@
 module Skalp
-  class Hatch_dialog < Webdialog
+  class Hatch_dialog
     attr_accessor :webdialog, :selected_material, :hatchname
 
+    SKALP_MATERIALS = ["Skalp default", "Skalp linecolor", "Skalp transparant"]
+
+    # Original WebDialog preview dimensions
     PREVIEW_X_SIZE = 215
     PREVIEW_Y_SIZE = 100
-    PRINT_DPI = 600 # TODO: dit is tijdelijk verbeteren resolutie ipv QUALITY
+    PRINT_DPI = 600
     SCREEN_DPI = 72
-    QUALITY = 1 # hoe hoger hoe betere kwaliteit 1= printkwaliteit
-    SKALP_MATERIALS = ["Skalp default", "Skalp linecolor", "Skalp transparant"]
+    QUALITY = 1
 
     def initialize(hatchname = "Skalp default")
       @selected_material = {}
@@ -15,7 +17,6 @@ module Skalp
       @selected_material[:pattern] = "ANSI31, ANSI IRON, BRICK, STONE MASONRY"
       @showmore_dialog = false
       @startup = true
-      read_border_size
       @tile = Skalp::Tile_size.new
       SkalpHatch.load_hatch
       @hatchname = hatchname
@@ -23,31 +24,39 @@ module Skalp
       @html_path = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/html/"
 
       @height = {}
-      @w_size = @dialog_w = 255
-      @height[:material] = 400 # 280
+      @w_size = @dialog_w = 300
+      @height[:material] = 500
 
       @dialog_x = 200
       @dialog_y = 200
       @resize = false
 
-      @webdialog = if Skalp::OS == :WINDOWS
-                     UI::WebDialog.new("Skalp #{Skalp.translate('Pattern Designer')}", false, "Skalp_pattern_designer",
-                                       @dialog_w + @w_border, @height[:material] + @h_border, 0, 0, true)
-                   else
-                     UI::WebDialog.new("Skalp #{Skalp.translate('Pattern Designer')}", false, "Skalp_pattern_designer",
-                                       @dialog_w + @w_border, @height[:material] + @h_border, 0, 0, false)
-                   end
+      # Set min/max dimensions for resize callback
+      @min_w = 300
+      @min_h = 500
+      @max_h = 800
+
+      @webdialog = UI::HtmlDialog.new(
+        {
+          dialog_title: "Edit Skalp material",
+          preferences_key: "Skalp_pattern_designer",
+          scrollable: false,
+          resizable: false,
+          width: @dialog_w,
+          height: @height[:material],
+          left: @dialog_x,
+          top: @dialog_y,
+          min_width: @dialog_w,
+          min_height: @height[:material],
+          max_width: @dialog_w,
+          max_height: @height[:material],
+          style: UI::HtmlDialog::STYLE_UTILITY
+        }
+      )
 
       @webdialog.set_file(@html_path + "hatch_dialog.html")
 
-      @webdialog.set_position(@dialog_x, @dialog_y)
-      self.min_height = @height[:material]
-      self.max_height = @height[:material]
-      self.min_width = @dialog_w
-      self.max_width = @dialog_w
-      # set_size(@dialog_w, @height[:material])
-
-      # DIALOG ####################
+      # CALLBACKS
       @webdialog.add_action_callback("dialog_focus") do
         if Sketchup.active_model
           load_patterns_and_materials
@@ -121,7 +130,6 @@ module Skalp
       # SHOW ###############################
       @webdialog.add_action_callback("dialog_ready") do
         clear_dialog(false)
-        write_border_size(:material)
         load_patterns_and_materials
         set_dialog_translation
         show
@@ -170,6 +178,21 @@ module Skalp
       @webdialog.add_action_callback("delete_hatch") do |webdialog, params|
         delete_hatch(Skalp.utf8(params))
         Skalp::Material_dialog.update_dialog if Skalp::Material_dialog.materialdialog
+      end
+
+      # SAVE MATERIAL ###############################
+      @webdialog.add_action_callback("save_material") do |action_context, params|
+        # params format: "material_name"
+        material_name = Skalp.utf8(params)
+        @hatchname = material_name if material_name && !material_name.empty?
+        # Save happens via create_hatch on blur or explicit save
+        @webdialog.close
+        Skalp::Material_dialog.update_dialog if Skalp::Material_dialog.materialdialog
+      end
+
+      # CANCEL EDIT ###############################
+      @webdialog.add_action_callback("cancel_edit") do |action_context|
+        @webdialog.close
       end
 
       # SIZE ###############################
@@ -223,33 +246,54 @@ module Skalp
         set_value("lineweight_paper", "0.18 mm")
       end
 
-      @webdialog.set_on_close do
-        if @webdialog.get_element_value("RUBY_BRIDGE") == "ESC"
-          if OS == :MAC
-            UI.start_timer(0, false) do
-              @webdialog.show_modal
-            end
-          end
-        else
-          Skalp.patterndesignerbutton_off
-          # Refresh layers dialog to restore previews only if not already updated by create_hatch
-          Skalp.update_layers_dialog unless @updated_layers
-          @updated_layers = false
+      @webdialog.set_on_closed do
+        # HtmlDialog doesn't support get_element_value or show_modal
+        # Simply handle close event
+        Skalp.patterndesignerbutton_off
+        # Refresh layers dialog to restore previews only if not already updated by create_hatch
+        Skalp.update_layers_dialog unless @updated_layers
+        @updated_layers = false
 
-          if @recalc_section_needed
-            # Prevent observers from triggering a second dialog update during calculation
-            Skalp.observers_disabled = true if defined?(Skalp.observers_disabled)
-            begin
-              if Skalp.active_model && Skalp.active_model.active_sectionplane
-                Skalp.active_model.active_sectionplane.calculate_section
-              end
-            ensure
-              Skalp.observers_disabled = false if defined?(Skalp.observers_disabled)
+        if @recalc_section_needed
+          # Prevent observers from triggering a second dialog update during calculation
+          Skalp.observers_disabled = true if defined?(Skalp.observers_disabled)
+          begin
+            if Skalp.active_model && Skalp.active_model.active_sectionplane
+              Skalp.active_model.active_sectionplane.calculate_section
             end
-            @recalc_section_needed = false
+          ensure
+            Skalp.observers_disabled = false if defined?(Skalp.observers_disabled)
           end
+          @recalc_section_needed = false
         end
       end
+    end
+
+    def show
+      @webdialog.show
+    end
+
+    def script(js_code)
+      @webdialog.execute_script(js_code)
+    end
+
+    def set_value(element_id, value)
+      escaped_value = value.to_s.gsub("'", "\\\\'")
+      script("document.getElementById('#{element_id}').value = '#{escaped_value}';")
+    end
+
+    def visibility(element_id, visible)
+      display = visible ? "block" : "none"
+      script("document.getElementById('#{element_id}').style.display = '#{display}';")
+    end
+
+    def clear(element_id)
+      script("document.getElementById('#{element_id}').innerHTML = '';")
+    end
+
+    def add(element_id, option_text)
+      escaped_text = option_text.to_s.gsub("'", "\\\\'")
+      script("var opt = document.createElement('option'); opt.text = '#{escaped_text}'; opt.value = '#{escaped_text}'; document.getElementById('#{element_id}').add(opt);")
     end
 
     def select_last_pattern
@@ -263,7 +307,7 @@ module Skalp
       input = UI.inputbox(["Materialname:"], [""], "Create new Skalp material")
 
       if input && input[0].gsub(" ", "") != ""
-        set_value("hatch_name", input[0])
+        set_value("material_name", input[0])
         true
       else
         false
@@ -449,12 +493,6 @@ module Skalp
         set_value("line_color", pattern_string[:line_color].to_s)
         set_value("fill_color", pattern_string[:fill_color].to_s)
         set_value("units", pattern_string[:space])
-
-        script("$('#line_color').css('background-color','#{pattern_string[:line_color]}')")
-        script("$('#fill_color').css('background-color','#{pattern_string[:fill_color]}')")
-
-        script("$('.basic1').spectrum('set', '#{pattern_string[:fill_color]}');")
-        script("$('.basic2').spectrum('set', '#{pattern_string[:line_color]}');")
 
         # lineweight_model
         set_value("lineweight_model", penwidth.to_s)
