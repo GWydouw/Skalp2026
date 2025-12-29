@@ -84,7 +84,7 @@ body {
     height: 100px;
     border: 1px solid #000;
     background-color: #FFF;
-    margin-bottom: 6px;
+    margin-bottom: 10px;
 }
 
 /* PREVIEW ZOOM ROW - inline */
@@ -260,14 +260,19 @@ body {
     /* rounding as requested */
 }
 
-/* Standard checkbox alignment - positioned in 90px area like selects */
+/* Standard checkbox alignment - left edge aligns with 90px select boxes */
 input[type="checkbox"] {
     width: 16px;
     height: 16px;
     cursor: pointer;
-    flex: 0 0 90px;
-    /* Same width as select boxes */
-    margin: 0;
+    flex: 0 0 16px;
+    margin-left: 74px;
+    /* 90px - 16px = 74px to left-align with select start */
+}
+
+/* Greyed out disabled labels */
+label[title="Coming Soon"] {
+    color: #999;
 }
 
 #tile_operator {
