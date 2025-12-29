@@ -95,8 +95,7 @@ body {
 }
 
 .slider {
-    width: 130px;
-    /* Match width of other right-aligned fields */
+    width: 90px;
     flex-grow: 0;
     font-size: 11px;
     border: 1px solid #999;
