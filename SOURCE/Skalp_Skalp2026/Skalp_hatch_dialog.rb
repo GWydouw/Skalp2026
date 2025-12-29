@@ -196,10 +196,9 @@ module Skalp
       end
 
       # Add callback to handle window resizing
-      @webdialog.add_action_callback("resize_window") do |action_context, params|
-        width, height = params.split(",").map(&:to_i)
+      @webdialog.add_action_callback("resize_window") do |action_context, width, height|
         # Add some padding for window borders if needed, or trust JS
-        @webdialog.set_size(width + 20, height + 40)
+        @webdialog.set_size(width.to_i, height.to_i)
       end
 
       # SIZE ###############################
