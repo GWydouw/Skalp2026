@@ -21,7 +21,7 @@ html {
     margin: 0;
     padding: 0;
     /* No padding on html */
-    overflow: hidden;
+    overflow: visible;
     background-color: rgb(235, 235, 235);
 }
 
@@ -30,13 +30,12 @@ body {
     margin: 0;
     padding: 8px 10px;
     /* Only body has padding */
-    overflow-x: hidden;
-    overflow-y: hidden;
+    overflow: visible;
     background-color: rgb(235, 235, 235);
     font-family: "Arial", sans-serif;
     font-size: 11px;
-    width: 215px;
-    /* Content width without padding */
+    width: 235px;
+    /* Total width including padding */
 }
 
 /* MATERIAL NAME - top */
