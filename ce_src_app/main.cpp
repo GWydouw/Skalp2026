@@ -1,131 +1,210 @@
-#include <vector>
-#include <iostream>
-#include <fstream>
-#include <string>
 #include <cstdio>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <vector>
 
+// Internal project headers
+#include "base64/base64.h"
 #include "skalp_convert.h"
 #include "sketchup.h"
 
-#include "base64/base64.h"
-
+// Define platform-specific flags
 #ifdef _WIN32
-bool OS_WIN = true;
+const bool OS_WIN = true;
 #else
-bool OS_WIN = false;
+const bool OS_WIN = false;
 #endif
 
+// Global error string for reporting failures
 std::string error_string;
 
-/*
-void debug_time(std::string text);
-auto start = std::chrono::system_clock::now();
-auto end = std::chrono::system_clock::now();
-std::chrono::duration<double> elapsed_seconds;
-
-void debug_time(std::string debug_text){
-
-    end = std::chrono::system_clock::now();
-    elapsed_seconds = end-start;
-    std::cout << "*D*" << debug_text << " - " << elapsed_seconds.count()  << std::endl;
-    start = end;
-};
-*/
-
-void debug_info(std::string debug_text){
-    std::cout << "*D*" << debug_text << std::endl;
+/**
+ * debug_info
+ * Prints debug information to stdout with a prefix *D*.
+ * This allows the calling Ruby application to filter debug messages.
+ *
+ * @param debug_text: The string to print.
+ */
+void debug_info(std::string debug_text) {
+  std::cout << "*D*" << debug_text << std::endl;
 };
 
-
+// Forward declarations of command functions
 SUEntitiesRef get_sectiongroups(SUEntitiesRef entities);
 bool remove_materials(SUModelRef model);
-bool create_layer_materials(std::string path, std::vector<std::string> layer_names);
+bool create_layer_materials(std::string path,
+                            std::vector<std::string> layer_names);
 bool setup_hiddenline_style(std::string path);
 bool modifyStyle(std::string path, std::string new_path);
-bool create_white_model(std::string path, std::string fase, SUMaterialRef color_material);
-bool setup_reversed_scene(std::string path, std::string new_path, std::vector<int> page_index_array,  std::vector<SUPoint3D> eye_array, std::vector<SUPoint3D> target_array, std::vector<SUTransformation> transformation_array, std::vector<std::string> id_array, std::vector<SUVector3D> up_vector_array,  double  bounds);
-std::vector<hiddenlines> get_exploded_entities(std::string path, double height, std::vector<int> page_index_array, std::vector<double> scale_array, std::vector<bool> perspective_array, std::vector<SUPoint3D> target_array, double reflected);
+bool create_white_model(std::string path, std::string fase,
+                        SUMaterialRef color_material);
+bool setup_reversed_scene(std::string path, std::string new_path,
+                          std::vector<int> page_index_array,
+                          std::vector<SUPoint3D> eye_array,
+                          std::vector<SUPoint3D> target_array,
+                          std::vector<SUTransformation> transformation_array,
+                          std::vector<std::string> id_array,
+                          std::vector<SUVector3D> up_vector_array,
+                          double bounds);
+std::vector<hiddenlines> get_exploded_entities(
+    std::string path, double height, std::vector<int> page_index_array,
+    std::vector<double> scale_array, std::vector<bool> perspective_array,
+    std::vector<SUPoint3D> target_array, double reflected);
 
+/**
+ * Main Application Entry Point
+ *
+ * Defines a CLI interface for Skalp's external processing tasks.
+ * The application expects the first argument to be the command name,
+ * followed by command-specific arguments.
+ *
+ * Usage: Skalp <command> <path> [extra_args...]
+ */
+int main(int argc, const char *argv[]) {
 
-int main(int argc, const char* argv[]) {
-    
-    if (argc < 3){
-        std::cout << "Skalp External Application" << std::endl;
-        std::cout << "Usage: Skalp <command> <path> [extra_args]" << std::endl;
-        return -1;
+  // 1. Basic Argument Validation
+  if (argc < 3) {
+    std::cout << "Skalp External Application" << std::endl;
+    std::cout << "Usage: Skalp <command> <path> [extra_args]" << std::endl;
+    return -1;
+  }
+
+  // 2. Parse common arguments
+  std::string command = argv[1];
+  std::string path = argv[2];
+  std::string file_dir = argv[2];
+
+  // Determine directory from path (handling both separators)
+  size_t path_end = path.find_last_of("\\/");
+  if (path_end != std::string::npos) {
+    file_dir = path.substr(0, path_end + 1);
+  }
+
+  // 3. Windows-specific Output Redirection
+  // On Windows, redirect stdout to a file to avoid console window issues or
+  // buffer limits? Or perhaps to capture output persistently.
+  if (OS_WIN) {
+    std::string temp_file = file_dir + "skalp_output.txt";
+    std::freopen(temp_file.c_str(), "w", stdout);
+  }
+
+  // 4. Command Dispatching
+
+  // --- Command: create_layer_materials ---
+  // Decodes base64 encoded layer names and creates corresponding materials.
+  // expected args: command, path, encoded_layer_names
+  if (command == "create_layer_materials") {
+    if (argc > 3) {
+      std::string layer_names_encoded = argv[3];
+      std::string layer_names_decoded = base64_decode(layer_names_encoded);
+
+      bool result = create_layer_materials(
+          path, convert_string_array(layer_names_decoded));
+
+      if (result) {
+        std::cout << "true";
+      } else {
+        std::cout << "false";
+      }
     }
-    
-    std::string path = argv[2];
-    std::string file_path = argv[2];
+  }
 
-	size_t path_end = path.find_last_of("\\/");
-    if (path_end != std::string::npos){
-         file_path = path.substr(0, path_end + 1);
+  // --- Command: setup_hiddenline_style ---
+  // Sets up specific style settings for hidden line rendering.
+  if (command == "setup_hiddenline_style") {
+    setup_hiddenline_style(path);
+  }
+
+  // --- Command: modifyStyle ---
+  // Modifies an existing style file.
+  if (command == "modifyStyle") {
+    if (argc > 3) {
+      modifyStyle(path, argv[3]);
     }
+  }
 
-    if (OS_WIN){
-        std::string temp_file = file_path + "skalp_output.txt";
-        std::freopen(temp_file.c_str(), "w", stdout);
+  // --- Command: create_white_model ---
+  // Creates a "white model" version (all materials removed/whitened).
+  if (command == "create_white_model") {
+    SUMaterialRef material =
+        SU_INVALID; // Default invalid material implies default/white
+    create_white_model(path, "", material);
+  }
+
+  // --- Command: color_fase ---
+  // Creates a white model but with a specific color override for a "phase"
+  // (fase). args: cmd, path, fase_name, r, g, b
+  if (command == "color_fase") {
+    if (argc > 6) {
+      double alpha = 1.0;
+      int r = convert_integer(argv[4]);
+      int g = convert_integer(argv[5]);
+      int b = convert_integer(argv[6]);
+
+      create_white_model(path, argv[3],
+                         create_color_material("Fase Color", alpha, r, g, b));
     }
+  }
 
-    //temp_dir, layer_names
-    if (std::string(argv[1]) == "create_layer_materials"){
+  // --- Command: setup_reversed_scene ---
+  // Sets up a "Reversed Scene" (Rear View mechanism).
+  // args: cmd, temp_dir, index_array, reversed_eye_array,
+  // reversed_target_array, transformation_array, group_id_array,
+  // up_vector_array, modelbounds
+  if (command == "setup_reversed_scene") {
+    if (argc > 10) {
+      bool result = setup_reversed_scene(
+          path,
+          argv[3], // output path?
+          convert_integer_array(argv[4]), convert_point3D_array(argv[5]),
+          convert_point3D_array(argv[6]), convert_transformation_array(argv[7]),
+          convert_string_array(argv[8]), convert_vector_array(argv[9]),
+          convert_double(argv[10]));
 
-		std::string layer_names = base64_decode(argv[3]);
-        bool result = create_layer_materials(argv[2], convert_string_array(layer_names));
-        
-        if (result){
-            std::cout << "true";
-        }else{
-            std::cout << "false";
+      if (result) {
+        std::cout << "true";
+      } else {
+        std::cout << error_string;
+      }
+    }
+  }
+
+  // --- Command: get_exploded_entities ---
+  // Core Hidden Line calculation. Explodes entities and calculates hidden
+  // lines. args: cmd, temp_model, height, index_array, scale_array,
+  // perspective_array, target_array, rear_view_flag
+  if (command == "get_exploded_entities") {
+    if (argc > 8) {
+      std::vector<hiddenlines> results;
+      results = get_exploded_entities(
+          path, convert_double(argv[3]), convert_integer_array(argv[4]),
+          convert_double_array(argv[5]), convert_boolean_array(argv[6]),
+          convert_point3D_array(argv[7]), convert_double(argv[8]));
+
+      // Output results in a structured text format for Ruby to parse
+      // Format:
+      // *I*<index>
+      // *T*<target_point>
+      // *L*R<r>G<g>B<b><line_coords>
+      // *E* (End of entry)
+      for (size_t j = 0; j < results.size(); ++j) {
+        std::cout << "*I*" + std::to_string(
+                                 static_cast<long long>(results[j].index))
+                  << std::endl;
+        std::cout << "*T*" + point_to_string(results[j].target_point)
+                  << std::endl;
+        for (size_t i = 0; i < results[j].lines.size(); ++i) {
+          std::cout << "*L*R"
+                    << std::to_string(results[j].lines[i].layer_index_R) << "G"
+                    << std::to_string(results[j].lines[i].layer_index_G) << "B"
+                    << std::to_string(results[j].lines[i].layer_index_B)
+                    << line_to_string(results[j].lines[i]) << std::endl;
         }
+        std::cout << "*E*" << std::endl;
+      }
     }
+  }
 
-    if (std::string(argv[1]) == "setup_hiddenline_style"){
-        setup_hiddenline_style(argv[2]);
-    }
-
-        if (std::string(argv[1]) == "modifyStyle"){
-            modifyStyle(argv[2], argv[3]);
-        }
-    
-    if (std::string(argv[1]) == "create_white_model"){
-		SUMaterialRef material = SU_INVALID;
-        create_white_model(argv[2], "", material);
-    }
-    if (std::string(argv[1]) == "color_fase"){
-      
-        create_white_model(argv[2], argv[3], create_color_material("Fase Color", 1.0, convert_integer(argv[4]), convert_integer(argv[5]), convert_integer(argv[6])));
-    }
-
-    //temp_dir, index_array, reversed_eye_array, reversed_target_array, transformation_array, group_id_array, up_vector_array, modelbounds
-    if (std::string(argv[1]) == "setup_reversed_scene"){
-        bool result = setup_reversed_scene(argv[2], argv[3], convert_integer_array(argv[4]), convert_point3D_array(argv[5]), convert_point3D_array(argv[6]), convert_transformation_array(argv[7]),
-                             convert_string_array(argv[8]), convert_vector_array(argv[9]), convert_double(argv[10]));
-        
-        if (result){
-            std::cout << "true";
-        }else{
-            std::cout << error_string;
-        }
-    }
-    
-    //temp_model, height, index_array, scale_array, perspective_array, target_array, rear_view)
-    if (std::string(argv[1]) == "get_exploded_entities"){
-        //debug_time("start get exploded entities");
-        std::vector<hiddenlines> hiddenlines;
-        hiddenlines = get_exploded_entities(argv[2], convert_double(argv[3]), convert_integer_array(argv[4]), convert_double_array(argv[5]), convert_boolean_array(argv[6]),
-                              convert_point3D_array(argv[7]), convert_double(argv[8]));
-        
-        for (size_t j = 0; j < hiddenlines.size(); ++j) {
-            std::cout << "*I*" + std::to_string(static_cast<long long> (hiddenlines[j].index)) << std::endl;
-            std::cout << "*T*" + point_to_string(hiddenlines[j].target_point) << std::endl;
-            for (size_t i = 0 ; i < hiddenlines[j].lines.size(); ++i){
-                std::cout << "*L*R" + std::to_string(hiddenlines[j].lines[i].layer_index_R) + "G" + std::to_string(hiddenlines[j].lines[i].layer_index_G) + "B" + std::to_string(hiddenlines[j].lines[i].layer_index_B) + line_to_string(hiddenlines[j].lines[i]) << std::endl;
-            }
-            std::cout << "*E*" << std::endl;
-        }
-    }
- 
-    return(0);
+  return 0;
 }

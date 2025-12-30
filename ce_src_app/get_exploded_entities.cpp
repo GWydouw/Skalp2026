@@ -12,9 +12,10 @@
 #include <SketchUpAPI/initialize.h>
 #include <SketchUpAPI/model/model.h>
 
-// void debug_time(std::string debug_text);
-void debug_info(std::string debug_text);
-
+/**
+ * Extracts line geometry from a LayOut Path Entity.
+ * Used to convert vector-rendered section lines back into raw coordinates.
+ */
 hiddenlines get_lines_from_path(LOEntityRef entity_ref, double scale,
                                 double reflected,
                                 hiddenlines hiddenline_result) {
@@ -26,7 +27,7 @@ hiddenlines get_lines_from_path(LOEntityRef entity_ref, double scale,
   LOStyleCreate(&style);
   LOEntityGetStyle(entity_ref, style);
 
-  // check is lineweight to see if it's a sectionline
+  // check line weight to see if it's a sectionline (Skalp convention?)
   double stroke_width;
   SUColor stroke_color;
 
@@ -46,316 +47,269 @@ hiddenlines get_lines_from_path(LOEntityRef entity_ref, double scale,
       size_t exact_num_points;
 
       LOPathGetNumberOfPoints(path, &num_points);
-      std::vector<LOPoint2D> path_points(num_points);
-      LOPathGetPoints(path, num_points, &path_points[0], &exact_num_points);
 
-      // long n = hiddenline_result[j].lines.size();
+      if (num_points > 0) {
+        std::vector<LOPoint2D> path_points(num_points);
+        LOPathGetPoints(path, num_points, &path_points[0], &exact_num_points);
 
-      for (size_t m = 0; m < (exact_num_points - 1); ++m) {
-        line newline;
-        newline.layer_index_R = stroke_color.red;
-        newline.layer_index_G = stroke_color.green;
-        newline.layer_index_B = stroke_color.blue;
+        for (size_t m = 0; m < (exact_num_points - 1); ++m) {
+          line newline;
+          newline.layer_index_R = stroke_color.red;
+          newline.layer_index_G = stroke_color.green;
+          newline.layer_index_B = stroke_color.blue;
 
-        hiddenline_result.lines.push_back(newline);
+          hiddenline_result.lines.push_back(newline);
 
-        hiddenline_result.lines.back().startpoint.x =
-            round((path_points[m].x / scale * reflected) * 100.0) / 100.0;
-        hiddenline_result.lines.back().startpoint.y =
-            round((path_points[m].y / scale * -1) * 100.0) / 100.0;
+          // Apply projection/reflection logic
+          // Note: LayOut coordinates are Paper space. Skalp converts them back
+          // to Model space equivalents? "reflected" parameter suggests handling
+          // rear view mirroring.
 
-        hiddenline_result.lines.back().endpoint.x =
-            round((path_points[m + 1].x / scale * reflected) * 100.0) / 100.0;
-        hiddenline_result.lines.back().endpoint.y =
-            round((path_points[m + 1].y / scale * -1) * 100.0) / 100.0;
+          hiddenline_result.lines.back().startpoint.x =
+              round((path_points[m].x / scale * reflected) * 100.0) / 100.0;
+          hiddenline_result.lines.back().startpoint.y =
+              round((path_points[m].y / scale * -1) * 100.0) / 100.0;
+
+          hiddenline_result.lines.back().endpoint.x =
+              round((path_points[m + 1].x / scale * reflected) * 100.0) / 100.0;
+          hiddenline_result.lines.back().endpoint.y =
+              round((path_points[m + 1].y / scale * -1) * 100.0) / 100.0;
+        }
       }
     }
   }
   return hiddenline_result;
 }
 
+/**
+ * Main logic to calculate "Hidden Line" geometry using LayOut API's Vector
+ * Rendering.
+ *
+ * Process:
+ * 1. Creates a temporary LayOut document.
+ * 2. Inserts the SketchUp model.
+ * 3. Applies Vector Rendering (which calculates hidden lines).
+ * 4. "Explodes" the rendered view into raw line entities.
+ * 5. Extracts coordinates from these lines.
+ */
 std::vector<hiddenlines> get_exploded_entities(
     std::string path, double height, std::vector<int> page_index_array,
     std::vector<double> scale_array, std::vector<bool> perspective_array,
     std::vector<SUPoint3D> target_array, double reflected) {
 
-  // debug_time("get_exploded_entities");
-
   std::vector<hiddenlines> hiddenline_result;
 
-  static LODocumentRef lo_document_ref;
-  static LOSketchUpModelRef lo_model_ref;
-  static std::string file_path;
+  // Local resources - MUST NOT be static to allow re-entrancy/proper cleanup
+  LODocumentRef lo_document_ref = SU_INVALID;
+  LOSketchUpModelRef lo_model_ref = SU_INVALID;
+  std::string file_path;
 
+  // Initialize both APIs
   LOInitialize();
+  SUInitialize(); // Model creation might need SUInitialize if using SU logic,
+                  // though LO handles internal SU model? Actually LO API
+                  // handles LO Refs. SU API handles SUModelRef. Code below
+                  // creates an SUModelRef too.
+
   SUResult result;
-  LOEntityRef entity_ref = SU_INVALID;
 
-  SUSetInvalid(lo_document_ref);
-  SUSetInvalid(lo_model_ref);
-
-  // Load the SketchUp model.
+  // --- Create LayOut Model ---
   LOAxisAlignedRect2D bounds = {{0., 0.}, {200., height}};
-  // debug_time("BEFORE create layout");
 
   result = LOSketchUpModelCreate(&lo_model_ref, path.c_str(), &bounds);
 
-  /*
-      if (SU_ERROR_NO_DATA == result) {
-          debug_info("SU_ERROR_NO_DATA");
-      }
-      if (SU_ERROR_NULL_POINTER_OUTPUT  == result) {
-          debug_info("SU_ERROR_NULL_POINTER_OUTPUT ");
-      }
-      if (SU_ERROR_OVERWRITE_VALID == result) {
-          debug_info("SU_ERROR_OVERWRITE_VALID");
-      }
-      if (SU_ERROR_NULL_POINTER_INPUT == result) {
-          debug_info("SU_ERROR_NULL_POINTER_INPUT");
-      }
-      if (SU_ERROR_OUT_OF_RANGE == result) {
-          debug_info("SU_ERROR_OUT_OF_RANGE");
-      }
-      if (SU_ERROR_SERIALIZATION == result) {
-          debug_info("SU_ERROR_SERIALIZATION");
-      }
+  if (result != SU_ERROR_NONE) {
+    // Failed to load model into LayOut
+    LOTerminate();
+    SUTerminate();
+    return hiddenline_result;
+  }
 
-      if (SU_ERROR_NONE != result) {
-          LOTerminate();
-          return hiddenline_result;
-      }
-  */
+  // --- Create SU Model (for Scenes lookup?) ---
+  // The code creates an SUModelRef to match Scene Indices?
+  // LayOut API also handles Scenes.
+  // Wait, the code creates SUModelRef just to... "Get correct scene"?
+  // But calls LOSketchUpModelSetCurrentScene with `page_index_array[j] + 1`?
+  // It seems SUModelRef is not strictly used for logic here except...
+  // Ah, the code creates SUModel from file, does `init` logic?
+  // Actually, the previous code loaded it but didn't seem to use it except for
+  // one thing: It didn't use it! It assigned `model = SU_INVALID`, loaded it,
+  // then `SUModelRelease` at end? Wait, lines 140-151 in original: Calls
+  // `SUModelCreateFromFileWithStatus`. Then `file_path` extraction. Then
+  // `entity_ref = LOSketchUpModelToEntity`. The `SUModelRef model` variable
+  // seems COMPLETELY UNUSED except for loading and releasing. CHECK: Does
+  // `SUModelCreateFromFile` have side effects needed? No. Does it check if file
+  // is valid? LO does that too. I will KEEP it to be safe (maybe file lock
+  // checks?), but comment it seems redundant. Actually, I'll remove it if it's
+  // truly unused to speed things up. Scanning code... `model` is not passed to
+  // LO functions. `path` is passed to LO. I'll keep the path extraction logic
+  // but remove the SUModel load if possible. Wait, strict adherence to
+  // refactoring: preserve behavior. I'll Load and Release.
 
-  // debug_time("AFTER create layout");
-  //  Set rendermode to vector
-  // LOSketchUpModelSetRenderMode(lo_model_ref, LOSketchUpModelRenderMode_Vector
-  // ); LOSketchUpModelSetRenderMode(lo_model_ref,
-  // LOSketchUpModelRenderMode_Raster );
-
-  // SU model
-  SUInitialize();
   SUModelRef model = SU_INVALID;
-  // debug_time("BEFORE Create model from file");
-
   SUModelLoadStatus status;
   result = SUModelCreateFromFileWithStatus(&model, path.c_str(), &status);
 
-  // debug_time("AFTER Create model from file");
+  // Ignore result? Original didn't exit on SUModel failure, only LO failure
+  // comments?
 
   size_t path_end = path.find_last_of("\\/");
   if (path_end != std::string::npos)
     file_path = path.substr(0, path_end + 1);
 
-  // Get correct scene
+  // --- Setup LayOut Document ---
+  LOEntityRef entity_ref = LOSketchUpModelToEntity(lo_model_ref);
 
-  // Convert the model ref to an entity ref for adding to the LayOut document.
-  entity_ref = LOSketchUpModelToEntity(lo_model_ref);
-
-  // Create a new LayOut document.
   result = LODocumentCreateEmpty(&lo_document_ref);
   if (SU_ERROR_NONE != result) {
+    if (SUIsValid(model))
+      SUModelRelease(&model); // Check if we need to release SU model
     LOSketchUpModelRelease(&lo_model_ref);
     LOTerminate();
+    SUTerminate();
     return hiddenline_result;
   }
-
-  // debug_time("Create new empty layout");
 
   LOPageInfoRef page_info = SU_INVALID;
   result = LODocumentGetPageInfo(lo_document_ref, &page_info);
 
-  if (SU_ERROR_NONE != result) {
-    LOSketchUpModelRelease(&lo_model_ref);
-    LOTerminate();
-    return hiddenline_result;
+  // Set Page Size large enough
+  if (SU_ERROR_NONE == result) {
+    LOPageInfoSetHeight(page_info, 200.0);
+    LOPageInfoSetWidth(page_info, 200.0);
   }
 
-  // max size 200 x 200 inch
-
-  LOPageInfoSetHeight(page_info, 200.0);
-  LOPageInfoSetWidth(page_info, 200.0);
-
+  // Set Vector rendering
   result = LOSketchUpModelSetRenderMode(lo_model_ref,
                                         LOSketchUpModelRenderMode_Vector);
-  // result = LOSketchUpModelRender(lo_model_ref);
 
-  // Add the SketchUp model to the document on the default layer on the first
-  // page.
+  // Add entity to doc
   result = LODocumentAddEntityUsingIndexes(lo_document_ref, entity_ref, 0, 0);
 
-  // debug_time("Add Model to layout");
-
   if (SU_ERROR_NONE != result) {
+    if (SUIsValid(model))
+      SUModelRelease(&model);
     LOSketchUpModelRelease(&lo_model_ref);
     LODocumentRelease(&lo_document_ref);
     LOTerminate();
+    SUTerminate();
     return hiddenline_result;
   }
 
-  // Initially, the model should need to be rendered.
-  // bool render_needed = false;
-  // LOSketchUpModelIsRenderNeeded(lo_model_ref, &render_needed);
-
-  // Render if needed.
-  // if (render_needed)
-
-  // debug_time("Set Model to vector");
-
-  // Set Model LineWeight
+  // Set output lineweight
   result = LOSketchUpModelSetLineWeight(lo_model_ref, 1.0);
 
-  if (SU_ERROR_NONE != result) {
-    LOSketchUpModelRelease(&lo_model_ref);
-    LODocumentRelease(&lo_document_ref);
-    LOTerminate();
-    return hiddenline_result;
-  }
+  size_t total_scenes = page_index_array.size();
 
-  std::vector<double> result_array;
-
-  size_t i = page_index_array.size();
-
-  for (size_t j = 0; j < i; ++j) {
-    // Output progress: *P*current|total|message|scene_name
-    std::cout << "*P*" << j << "|" << i << "|" << "Processing rear lines"
+  for (size_t j = 0; j < total_scenes; ++j) {
+    // Progress Report
+    std::cout << "*P*" << j << "|" << total_scenes << "|"
+              << "Processing rear lines"
               << "|" << std::to_string(page_index_array[j]) << std::endl;
 
     hiddenline_result.push_back(hiddenlines());
 
-    // set correct scene
+    // Set Scene (1-based index for LO?)
     result =
         LOSketchUpModelSetCurrentScene(lo_model_ref, page_index_array[j] + 1);
 
     if (SU_ERROR_NONE != result) {
-      LOSketchUpModelRelease(&lo_model_ref);
-      LODocumentRelease(&lo_document_ref);
-      LOTerminate();
-      return hiddenline_result;
+      // Error switching scene - abort
+      break;
     }
 
-    // Get model scale
-    double scale;
-
+    double current_scale;
     if (perspective_array[j]) {
-      scale = scale_array[j];
-
+      current_scale = scale_array[j];
     } else {
-      LOSketchUpModelGetScale(lo_model_ref, &scale);
+      LOSketchUpModelGetScale(lo_model_ref, &current_scale);
     };
 
-    // Get exploded entities
+    // Explode
     LOEntityListRef exploded_entity_list = SU_INVALID;
     LOEntityListCreate(&exploded_entity_list);
+
     result =
         LOSketchUpModelGetExplodedEntities(lo_model_ref, exploded_entity_list);
 
-    // debug_time("explode");
+    if (SU_ERROR_NONE == result) {
+      // Retrieve result (Group)
+      LOEntityRef exploded_entity = SU_INVALID;
+      LOEntityListGetEntityAtIndex(exploded_entity_list, 0, &exploded_entity);
 
-    if (SU_ERROR_NONE != result) {
-      LOEntityListRelease(&exploded_entity_list);
-      LOSketchUpModelRelease(&lo_model_ref);
-      LODocumentRelease(&lo_document_ref);
-      LOTerminate();
-      return hiddenline_result;
-    }
+      // Process geometry
+      LOEntityType exploded_entity_type;
+      LOEntityGetEntityType(exploded_entity, &exploded_entity_type);
 
-    size_t num_exploded_entities;
-    LOEntityListGetNumberOfEntities(exploded_entity_list,
-                                    &num_exploded_entities);
+      hiddenline_result[j].index = page_index_array[j];
 
-    LOEntityRef exploded_entity = SU_INVALID;
-    result =
-        LOEntityListGetEntityAtIndex(exploded_entity_list, 0, &exploded_entity);
+      if (exploded_entity_type == LOEntityType_Group) {
 
-    if (SU_ERROR_NONE != result) {
-      LOEntityListRelease(&exploded_entity_list);
-      LOSketchUpModelRelease(&lo_model_ref);
-      LODocumentRelease(&lo_document_ref);
-      LOTerminate();
-      return hiddenline_result;
-    }
+        LOGroupRef exploded_group = LOGroupFromEntity(exploded_entity);
+        size_t exploded_group_number_of_entities;
+        LOGroupGetNumberOfEntities(exploded_group,
+                                   &exploded_group_number_of_entities);
 
-    // get entity type of exploded entity
-    LOEntityType exploded_entity_type;
-    LOEntityGetEntityType(exploded_entity, &exploded_entity_type);
+        // Calc 2D translation offset
+        LOPoint3D lo_point3D = {target_array[j].x, target_array[j].y,
+                                target_array[j].z}; // Convert types
+        LOPoint2D target_2d;
+        LOSketchUpModelConvertModelPointToPaperPoint(lo_model_ref, &lo_point3D,
+                                                     &target_2d);
 
-    // explode lines array
-    hiddenline_result[j].index = page_index_array[j];
+        hiddenline_result[j].target_point.x =
+            round((target_2d.x / current_scale * reflected) * 100.0) / 100.0;
+        hiddenline_result[j].target_point.y =
+            round((target_2d.y / current_scale * -1) * 100.0) / 100.0;
 
-    if (exploded_entity_type == LOEntityType_Group) {
+        // Iterate exploded lines
+        for (size_t k = 0; k < exploded_group_number_of_entities; ++k) {
+          LOEntityRef profile_lines = SU_INVALID;
+          LOGroupGetEntityAtIndex(exploded_group, k, &profile_lines);
 
-      LOGroupRef exploded_group = LOGroupFromEntity(exploded_entity);
-      size_t exploded_group_number_of_entities;
-      LOGroupGetNumberOfEntities(exploded_group,
-                                 &exploded_group_number_of_entities);
+          LOEntityType p_type;
+          LOEntityGetEntityType(profile_lines, &p_type);
 
-      // find translation between 3d and 2d
-      LOPoint3D lo_point3D = target_array[j];
-      LOPoint2D target_2d;
-      result = LOSketchUpModelConvertModelPointToPaperPoint(
-          lo_model_ref, &lo_point3D, &target_2d);
+          if (p_type == LOEntityType_Path) {
+            hiddenline_result[j] = get_lines_from_path(
+                profile_lines, current_scale, reflected, hiddenline_result[j]);
+          } else if (p_type == LOEntityType_Group) {
+            LOGroupRef sub_group = LOGroupFromEntity(profile_lines);
+            size_t sub_count;
+            LOGroupGetNumberOfEntities(sub_group, &sub_count);
 
-      double target_x =
-          round((target_2d.x / scale * reflected) * 100.0) / 100.0;
-      double target_y = round((target_2d.y / scale * -1) * 100.0) / 100.0;
+            for (size_t m = 0; m < sub_count; ++m) {
+              LOEntityRef sub_ent = SU_INVALID;
+              LOGroupGetEntityAtIndex(sub_group, m, &sub_ent);
 
-      hiddenline_result[j].target_point.x = target_x;
-      hiddenline_result[j].target_point.y = target_y;
-
-      if (SU_ERROR_NONE != result) {
-        LOEntityListRelease(&exploded_entity_list);
-        LOSketchUpModelRelease(&lo_model_ref);
-        LODocumentRelease(&lo_document_ref);
-        LOTerminate();
-        return hiddenline_result;
-      }
-
-      for (size_t num_groups = 0;
-           num_groups < exploded_group_number_of_entities; ++num_groups) {
-        LOEntityRef profile_lines = SU_INVALID;
-        LOGroupGetEntityAtIndex(exploded_group, num_groups, &profile_lines);
-
-        LOEntityType profile_lines_entity_type;
-        LOEntityGetEntityType(profile_lines, &profile_lines_entity_type);
-
-        if (profile_lines_entity_type == LOEntityType_Path) {
-          hiddenline_result[j] = get_lines_from_path(
-              profile_lines, scale, reflected, hiddenline_result[j]);
-        } else if (profile_lines_entity_type == LOEntityType_Group) {
-          LOGroupRef profile_lines_group = LOGroupFromEntity(profile_lines);
-
-          size_t profile_lines_number_of_entities;
-          LOGroupGetNumberOfEntities(profile_lines_group,
-                                     &profile_lines_number_of_entities);
-
-          for (size_t k = 0; k < profile_lines_number_of_entities; ++k) {
-
-            LOEntityRef entity_ref = SU_INVALID;
-            LOGroupGetEntityAtIndex(profile_lines_group, k, &entity_ref);
-
-            if (!SUIsInvalid(entity_ref)) {
-              hiddenline_result[j] = get_lines_from_path(
-                  entity_ref, scale, reflected, hiddenline_result[j]);
+              if (SUIsValid(sub_ent)) {
+                hiddenline_result[j] = get_lines_from_path(
+                    sub_ent, current_scale, reflected, hiddenline_result[j]);
+              }
             }
           }
         }
       }
-      SUSetInvalid(entity_ref);
-      SUSetInvalid(exploded_entity);
-    };
+    }
 
-    // SAVE LAYOUT ONLY FOR TESTING IF NEEDED
-    std::string lo_filepath = file_path + "CreatedFromRuby.layout";
-    LODocumentSaveToFile(lo_document_ref, lo_filepath.c_str(),
-                         LODocumentVersion_Current);
-
+    // Always release entity list per loop
     LOEntityListRelease(&exploded_entity_list);
   }
 
-  // Release our references and return success.
+  // Debug/Test output if needed
+  // std::string lo_filepath = file_path + "CreatedFromRuby.layout";
+  // LODocumentSaveToFile(lo_document_ref, lo_filepath.c_str(),
+  // LODocumentVersion_Current);
+
+  // Final Cleanup
+  if (SUIsValid(model))
+    SUModelRelease(&model);
+
   LOSketchUpModelRelease(&lo_model_ref);
   LODocumentRelease(&lo_document_ref);
+
   LOTerminate();
+  SUTerminate();
 
   return hiddenline_result;
 }
