@@ -145,8 +145,10 @@ module Skalp
 
     def update_rear_lines(scenes = :active, save_temp = true, progress_weight = 1.0, prep_weight = 0.0)
       # Show progress dialog if updating all scenes and not already showing one
-      if scenes == :all && Skalp.progress_dialog.nil?
-        Skalp::ProgressDialog.show(Skalp.translate("Update Rearlines"), @skpModel.pages.size) do |progress|
+      # Show progress dialog if not already showing one
+      if Skalp.progress_dialog.nil?
+        count = scenes == :all ? @skpModel.pages.size : 1
+        Skalp::ProgressDialog.show(Skalp.translate("Update Rearlines"), count) do |progress|
           @rear_lines_result = get_lines(scenes, true, save_temp, progress_weight, prep_weight)
         end
       else
@@ -350,68 +352,10 @@ module Skalp
         Skalp.record_timing("save_temp_model_setup", Time.now - t_start_setup)
 
         t_start_loop = Time.now
-        pages.each_with_index do |page, i|
+        pages.each_with_index do |page, _i|
           next unless page
 
-          page_name = page.is_a?(Sketchup::Model) ? "Model" : page.name
-          # puts "[DEBUG] Processing page: #{page_name} (#{i + 1}/#{pages.size})"
-
-          # Progress update removed to prevent flicker
-          # if Skalp.progress_dialog && i.even?
-          #   scaled_i = (i.to_f / pages.size) * (prep_weight * 0.4)
-          #   Skalp.progress_dialog.update(scaled_i, Skalp.translate("Preparing model copy"), page_name)
-          # end
-
-          unless page == @skpModel
-            page_settings[page] = { use_rendering_options: page.use_rendering_options?, use_camera: page.use_camera? }
-            page.use_rendering_options = true
-            page.use_camera = true
-          end
-
-          style_settings = {}
-          begin
-            style_settings[:edgeDisplayMode] = page.rendering_options["EdgeDisplayMode"]
-            style_settings[:drawSilhouettes] = page.rendering_options["DrawSilhouettes"]
-            style_settings[:drawDepthQue] = page.rendering_options["DrawDepthQue"]
-            style_settings[:drawLineEnds] = page.rendering_options["DrawLineEnds"]
-            style_settings[:jitterEdges] = page.rendering_options["JitterEdges"]
-            style_settings[:extendLines] = page.rendering_options["ExtendLines"]
-            style_settings[:silhouetteWidth] = page.rendering_options["SilhouetteWidth"]
-            style_settings[:depthQueWidth] = page.rendering_options["DepthQueWidth"]
-            style_settings[:lineExtension] = page.rendering_options["LineExtension"]
-            style_settings[:lineEndWidth] = page.rendering_options["LineEndWidth"]
-            style_settings[:displayText] = page.rendering_options["DisplayText"]
-            style_settings[:sectionCutWidth] = page.rendering_options["SectionCutWidth"]
-            style_settings[:renderMode] = page.rendering_options["RenderMode"]
-            style_settings[:texture] = page.rendering_options["Texture"]
-            style_settings[:displayColorByLayer] = page.rendering_options["DisplayColorByLayer"]
-            style_settings[:EdgeColorMode] = page.rendering_options["EdgeColorMode"]
-          rescue StandardError => e
-            puts "[DEBUG] Error reading rendering options for #{page_name}: #{e.message}"
-          end
-
-          settings_saved[page] = style_settings
-
-          begin
-            page.rendering_options["EdgeDisplayMode"] = true
-            page.rendering_options["DrawSilhouettes"] = true
-            page.rendering_options["DrawDepthQue"] = false
-            page.rendering_options["DrawLineEnds"] = false
-            page.rendering_options["JitterEdges"] = false
-            page.rendering_options["ExtendLines"] = false
-            page.rendering_options["SilhouetteWidth"] = 5
-            page.rendering_options["DepthQueWidth"] = 1
-            page.rendering_options["LineExtension"] = 1
-            page.rendering_options["LineEndWidth"] = 1
-            page.rendering_options["DisplayText"] = false
-            page.rendering_options["SectionCutWidth"] = 10
-            page.rendering_options["RenderMode"] = 1
-            page.rendering_options["Texture"] = true
-            page.rendering_options["DisplayColorByLayer"] = true
-            page.rendering_options["EdgeColorMode"] = 0
-          rescue StandardError => e
-            puts "[DEBUG] Error writing rendering options for #{page_name}: #{e.message}"
-          end
+          settings_saved[page] = prepare_page_for_temp_save(page, page_settings)
         end
         Skalp.record_timing("save_temp_model_loop", Time.now - t_start_loop)
 
@@ -456,42 +400,223 @@ module Skalp
       end
     end
 
+    def create_derived_style(source_style)
+      return nil unless source_style
+
+      # Unique name for the temp style based on source
+      style_name = "Skalp Temp #{source_style.name} #{source_style.object_id}"
+
+      # Check if already exists in model (unlikely if unique, but safety)
+      existing = @skpModel.styles[style_name]
+      return existing if existing
+
+      # 1. Capture Source Settings
+      saved_active_style = @skpModel.styles.selected_style
+
+      @skpModel.styles.selected_style = source_style
+      source_ro = {}
+      @skpModel.rendering_options.each { |k, v| source_ro[k] = v }
+
+      # 2. Create New Base Style (from default.style)
+      base_dir = File.dirname(__FILE__)
+      style_path = File.join(base_dir, "resources", "SUstyles", "default.style")
+
+      unless File.exist?(style_path)
+        puts "[ERROR] Skalp default.style not found at #{style_path}"
+        @skpModel.styles.selected_style = saved_active_style
+        return source_style # Fallback
+      end
+
+      @skpModel.styles.add_style(style_path, true) # Load and Activate
+      new_style = @skpModel.styles.selected_style
+      new_style.name = style_name
+      new_style.description = "Skalp Temp Clone of #{source_style.name}"
+
+      # 3. Apply Source Settings (Cloning)
+      ro = @skpModel.rendering_options
+      source_ro.each { |k, v| ro[k] = v }
+
+      # 4. Apply Skalp Overrides
+      ro["EdgeDisplayMode"] = true
+      ro["DrawSilhouettes"] = true
+      ro["DrawDepthQue"] = false
+      ro["DrawLineEnds"] = false
+      ro["JitterEdges"] = false
+      ro["ExtendLines"] = false
+      ro["SilhouetteWidth"] = 5
+      ro["DepthQueWidth"] = 1
+      ro["LineExtension"] = 1
+      ro["LineEndWidth"] = 1
+      ro["DisplayText"] = false
+      ro["SectionCutWidth"] = 10
+      ro["RenderMode"] = 1
+      ro["Texture"] = true
+      ro["DisplayColorByLayer"] = true
+      ro["EdgeColorMode"] = 0
+
+      # 5. Persist changes
+      @skpModel.styles.update_selected_style
+
+      # 6. Restore original active style
+      @skpModel.styles.selected_style = saved_active_style
+
+      new_style
+    end
+
+    def prepare_page_for_temp_save(page, page_settings)
+      page_name = page.is_a?(Sketchup::Model) ? "Model" : page.name
+      page_settings[page] = {}
+
+      # Use a shared hash in page_settings to track modified styles across pages
+      # We assume page_settings is the same object passed in the loop
+      page_settings[:modified_styles] ||= {}
+
+      # Active View (Active Model): Keep original behavior (Direct Modify)
+      if page == @skpModel
+        style_settings = {}
+        begin
+          # Save current settings
+          style_settings[:edgeDisplayMode] = page.rendering_options["EdgeDisplayMode"]
+          style_settings[:drawSilhouettes] = page.rendering_options["DrawSilhouettes"]
+          style_settings[:drawDepthQue] = page.rendering_options["DrawDepthQue"]
+          style_settings[:drawLineEnds] = page.rendering_options["DrawLineEnds"]
+          style_settings[:jitterEdges] = page.rendering_options["JitterEdges"]
+          style_settings[:extendLines] = page.rendering_options["ExtendLines"]
+          style_settings[:silhouetteWidth] = page.rendering_options["SilhouetteWidth"]
+          style_settings[:depthQueWidth] = page.rendering_options["DepthQueWidth"]
+          style_settings[:lineExtension] = page.rendering_options["LineExtension"]
+          style_settings[:lineEndWidth] = page.rendering_options["LineEndWidth"]
+          style_settings[:displayText] = page.rendering_options["DisplayText"]
+          style_settings[:sectionCutWidth] = page.rendering_options["SectionCutWidth"]
+          style_settings[:renderMode] = page.rendering_options["RenderMode"]
+          style_settings[:texture] = page.rendering_options["Texture"]
+          style_settings[:displayColorByLayer] = page.rendering_options["DisplayColorByLayer"]
+          style_settings[:EdgeColorMode] = page.rendering_options["EdgeColorMode"]
+
+          # Set new settings directly
+          page.rendering_options["EdgeDisplayMode"] = true
+          page.rendering_options["DrawSilhouettes"] = true
+          page.rendering_options["DrawDepthQue"] = false
+          page.rendering_options["DrawLineEnds"] = false
+          page.rendering_options["JitterEdges"] = false
+          page.rendering_options["ExtendLines"] = false
+          page.rendering_options["SilhouetteWidth"] = 5
+          page.rendering_options["DepthQueWidth"] = 1
+          page.rendering_options["LineExtension"] = 1
+          page.rendering_options["LineEndWidth"] = 1
+          page.rendering_options["DisplayText"] = false
+          page.rendering_options["SectionCutWidth"] = 10
+          page.rendering_options["RenderMode"] = 1
+          page.rendering_options["Texture"] = true
+          page.rendering_options["DisplayColorByLayer"] = true
+          page.rendering_options["EdgeColorMode"] = 0
+        rescue StandardError => e
+          puts "[DEBUG] Error manipulating rendering options for Active View: #{e.message}"
+        end
+        return style_settings
+      end
+
+      # Pages (Scenes): Modify Style In-Place
+      begin
+        style = page.style
+        return {} unless style
+
+        # Only modify if not already done
+        unless page_settings[:modified_styles][style]
+          # Activate style to edit it
+          saved_active = @skpModel.styles.selected_style
+          @skpModel.styles.selected_style = style
+
+          # Capture current settings
+          current_ro = {}
+          @skpModel.rendering_options.each { |k, v| current_ro[k] = v }
+          page_settings[:modified_styles][style] = current_ro
+
+          # Apply Overrides
+          ro = @skpModel.rendering_options
+          ro["EdgeDisplayMode"] = true
+          ro["DrawSilhouettes"] = true
+          ro["DrawDepthQue"] = false
+          ro["DrawLineEnds"] = false
+          ro["JitterEdges"] = false
+          ro["ExtendLines"] = false
+          ro["SilhouetteWidth"] = 5
+          ro["DepthQueWidth"] = 1
+          ro["LineExtension"] = 1
+          ro["LineEndWidth"] = 1
+          ro["DisplayText"] = false
+          ro["SectionCutWidth"] = 10
+          ro["RenderMode"] = 1
+          ro["Texture"] = true
+          ro["DisplayColorByLayer"] = true
+          ro["EdgeColorMode"] = 0
+
+          # Persist changes to Style Definition
+          @skpModel.styles.update_selected_style
+
+          # Restore active style
+          @skpModel.styles.selected_style = saved_active
+        end
+
+        # We don't need to return anything specific per-page for restoration as we use :modified_styles
+      rescue StandardError => e
+        puts "[DEBUG] Error manipulating style for Page #{page_name}: #{e.message}"
+      end
+
+      {}
+    end
+
     def restore_rendering_options(pages, settings_saved, page_settings)
       return unless pages && settings_saved
 
-      pages.each do |page|
-        next unless settings_saved[page]
+      # 1. Restore Active View (Model) settings
+      # We can find the model entry in settings_saved or iterate
+      if settings_saved[@skpModel]
+        begin
+          page = @skpModel
+          opts = settings_saved[page]
+          if opts && !opts.empty?
+            page.rendering_options["EdgeDisplayMode"] = opts[:edgeDisplayMode]
+            page.rendering_options["DrawSilhouettes"] = opts[:drawSilhouettes]
+            page.rendering_options["DrawDepthQue"] = opts[:drawDepthQue]
+            page.rendering_options["DrawLineEnds"] = opts[:drawLineEnds]
+            page.rendering_options["JitterEdges"] = opts[:jitterEdges]
+            page.rendering_options["ExtendLines"] = opts[:extendLines]
+            page.rendering_options["SilhouetteWidth"] = opts[:silhouetteWidth]
+            page.rendering_options["DepthQueWidth"] = opts[:depthQueWidth]
+            page.rendering_options["LineExtension"] = opts[:lineExtension]
+            page.rendering_options["LineEndWidth"] = opts[:lineEndWidth]
+            page.rendering_options["DisplayText"] = opts[:displayText]
+            page.rendering_options["SectionCutWidth"] = opts[:sectionCutWidth]
+            page.rendering_options["RenderMode"] = opts[:renderMode]
+            page.rendering_options["Texture"] = opts[:texture]
+            page.rendering_options["DisplayColorByLayer"] = opts[:displayColorByLayer]
+            page.rendering_options["EdgeColorMode"] = opts[:EdgeColorMode]
+          end
+        rescue StandardError => e
+          puts "[DEBUG] Error restoring Active View rendering options: #{e.message}"
+        end
+      end
 
-        page_name = page.is_a?(Sketchup::Model) ? "Model" : page.name
+      # 2. Restore Modified Styles
+      return unless page_settings[:modified_styles]
+
+      saved_active = @skpModel.styles.selected_style
+
+      page_settings[:modified_styles].each do |style, original_ro|
+        next unless style && style.valid?
 
         begin
-          opts = settings_saved[page]
-          page.rendering_options["EdgeDisplayMode"] = opts[:edgeDisplayMode]
-          page.rendering_options["DrawSilhouettes"] = opts[:drawSilhouettes]
-          page.rendering_options["DrawDepthQue"] = opts[:drawDepthQue]
-          page.rendering_options["DrawLineEnds"] = opts[:drawLineEnds]
-          page.rendering_options["JitterEdges"] = opts[:jitterEdges]
-          page.rendering_options["ExtendLines"] = opts[:extendLines]
-          page.rendering_options["SilhouetteWidth"] = opts[:silhouetteWidth]
-          page.rendering_options["DepthQueWidth"] = opts[:depthQueWidth]
-          page.rendering_options["LineExtension"] = opts[:lineExtension]
-          page.rendering_options["LineEndWidth"] = opts[:lineEndWidth]
-          page.rendering_options["DisplayText"] = opts[:displayText]
-          page.rendering_options["SectionCutWidth"] = opts[:sectionCutWidth] # NOTE: Typo fixed in original? Original was SectionCutWidth
-          page.rendering_options["RenderMode"] = opts[:renderMode]
-          page.rendering_options["Texture"] = opts[:texture]
-          page.rendering_options["DisplayColorByLayer"] = opts[:displayColorByLayer]
-          page.rendering_options["EdgeColorMode"] = opts[:EdgeColorMode]
+          @skpModel.styles.selected_style = style
+          ro = @skpModel.rendering_options
+          original_ro.each { |k, v| ro[k] = v }
+          @skpModel.styles.update_selected_style
         rescue StandardError => e
-          puts "[DEBUG] Error restoring rendering options for #{page_name}: #{e.message}"
+          puts "[DEBUG] Error restoring Style #{style.name}: #{e.message}"
         end
-
-        next if page == @skpModel
-        next unless page_settings[page]
-
-        page.use_rendering_options = page_settings[page][:use_rendering_options]
-        page.use_camera = page_settings[page][:use_camera]
       end
+
+      @skpModel.styles.selected_style = saved_active
     end
 
     def load_rear_view_definitions
@@ -758,11 +883,50 @@ module Skalp
 
       scene_names = pages_info.map { |h| h[:page_name] }
 
+      scene_names = pages_info.map { |h| h[:page_name] }
+
+      puts ">>> [DEBUG] calling get_exploded_entities"
+      puts "    temp_model: #{temp_model}"
+      if File.exist?(temp_model)
+        size = File.size(temp_model)
+        puts "    temp_model size: #{size} bytes"
+        begin
+          desktop_path = File.join(Dir.home, "Desktop", "skalp_debug_reversed.skp")
+          require "fileutils"
+          FileUtils.cp(temp_model, desktop_path)
+          puts "    >>> COPIED temp_model to: #{desktop_path}"
+        rescue StandardError => e
+          puts "    >>> FAILED to copy temp_model: #{e.message}"
+        end
+      else
+        puts "    >>> ERROR: temp_model does not exist!"
+      end
+
+      puts "    pages_info count: #{pages_info.size}"
+      pages_info.each_with_index do |info, i|
+        puts "    Input #{i}: name='#{info[:page_name]}', index=#{info[:index]}, target=#{info[:target]}, eye=#{info[:eye]}"
+        puts "             scale=#{info[:scale]}, perspective=#{info[:perspective]}"
+      end
+
       t_start_c_app = Time.now
       result = Skalp.get_exploded_entities(temp_model, @height, page_info_to_array(pages_info, :index),
                                            page_info_to_array(pages_info, :scale), page_info_to_array(pages_info, :perspective),
                                            page_info_to_array(pages_info, :target), rear_view, progress_weight, scene_names)
       Skalp.record_timing("get_exploded_entities_c_ext", Time.now - t_start_c_app)
+
+      puts ">>> [DEBUG] get_exploded_entities result count: #{result.size}"
+      result.each_with_index do |scene, i|
+        puts "  > Scene #{i}: Page=#{scene.page.respond_to?(:name) ? scene.page.name : scene.page}"
+        puts "    Target: #{scene.target.inspect}"
+        if scene.lines
+          puts "    Lines keys: #{scene.lines.keys.inspect}"
+          scene.lines.each do |layer, lines|
+            puts "      Layer: #{layer} -> #{lines.size} lines"
+          end
+        else
+          puts "    Lines: NIL"
+        end
+      end
 
       target2d_array = page_info_to_array(pages_info, :target2d)
 
