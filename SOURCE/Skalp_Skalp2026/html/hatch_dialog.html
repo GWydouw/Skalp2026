@@ -89,13 +89,17 @@
                 <!-- Pattern Fill Color -->
                 <div class="field-row">
                     <label id="translate_06">Fill Color:</label>
-                    <input type="text" id="fill_color_input" class="spectrum-picker" value="rgb(255,255,255)">
+                    <div id="fill_color_block" class="color-block" style="background-color: rgb(255, 255, 255);"></div>
+                    <input type="text" id="fill_color_input" class="spectrum-picker" value="rgb(255,255,255)"
+                        style="display:none;">
                 </div>
 
                 <!-- Pattern Line Color -->
                 <div class="field-row">
                     <label id="translate_17">Line Color:</label>
-                    <input type="text" id="line_color_input" class="spectrum-picker" value="rgb(0,0,0)">
+                    <div id="line_color_block" class="color-block" style="background-color: rgb(0, 0, 0);"></div>
+                    <input type="text" id="line_color_input" class="spectrum-picker" value="rgb(0,0,0)"
+                        style="display:none;">
                 </div>
 
                 <!-- Pattern Line Width Paper -->
@@ -266,15 +270,25 @@
                 allowEmpty: false,
                 preferredFormat: "rgb",
                 clickoutFiresChange: true,
+                replacerClassName: 'hidden-spectrum-replacer', // Hide default replacer via CSS
                 move: function (color) {
-                    // Live preview while dragging
+                    var id = $(this).attr('id').replace('_input', '_block');
+                    $('#' + id).css('background-color', color.toRgbString());
                 },
                 change: function (color) {
+                    var id = $(this).attr('id').replace('_input', '_block');
+                    $('#' + id).css('background-color', color.toRgbString());
                     create_preview(0);
                 },
                 hide: function (color) {
                     create_preview(0);
                 }
+            });
+
+            // Link native blocks to spectrum
+            $(".color-block").click(function () {
+                var inputId = $(this).attr('id').replace('_block', '_input');
+                $("#" + inputId).spectrum("toggle");
             });
         });
 
@@ -315,7 +329,11 @@
         }
 
         function cancel_edit() {
-            sketchup.cancel_edit();
+            if (typeof sketchup !== 'undefined' && sketchup.cancel_edit) {
+                sketchup.cancel_edit();
+            } else {
+                window.location = 'skp:cancel_edit@';
+            }
         }
 
         function create_preview(force) {

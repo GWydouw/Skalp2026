@@ -4,7 +4,7 @@ module Skalp
   require "base64"
   require "logger"
 
-  DEBUG = false unless defined? DEBUG
+  DEBUG = true unless defined? DEBUG
 
   LICENSE_SERVER = "license.skalp4sketchup.com" # "license.skalp4sketchup.com"
   DOWNLOAD_SERVER = "license.skalp4sketchup.com"
@@ -233,6 +233,7 @@ module Skalp
   end
 
   Sketchup.require "Skalp_Skalp2026/Skalp_info"
+  Sketchup.require "Skalp_Skalp2026/Skalp_progress_dialog"
 
   @log = Logger.new(SKALP_PATH + "Skalp_log.txt")
   @log.level = Logger::INFO
@@ -681,9 +682,6 @@ module Skalp
     skalp_require_license
 
     require "Skalp_Skalp2026/Skalp_preferences"
-    require "Skalp_Skalp2026/Skalp_logger"
-    Skalp::DebugLogger.clear # Clear previous logs on reload/start
-
     require "Skalp_Skalp2026/Skalp_observers"
     require "Skalp_Skalp2026/Skalp_html_inputbox"
     require "Skalp_Skalp2026/Skalp_box_section"
@@ -692,7 +690,6 @@ module Skalp
     require "Skalp_Skalp2026/Skalp_lib2"
     require "Skalp_Skalp2026/Skalp_geom2"
     require "Skalp_Skalp2026/Skalp_material_dialog"
-    require "Skalp_Skalp2026/Skalp_material_replacement"
     require "Skalp_Skalp2026/Skalp_paintbucket"
     require "Skalp_Skalp2026/Skalp_dwg_export_dialog"
     require "Skalp_Skalp2026/Skalp_cad_converter"
@@ -711,7 +708,7 @@ module Skalp
                     :clipper, :clipperOffset, :block_observers, :skalp_layout_export, :skalp_dwg_export,
                     :observer_check, :observer_check_result, :info_dialog, :info_dialog_active, :skalp_activate, :skalp_toolbar, :skalp_dwg_export, :set_bugtracking,
                     :isolate_UI_loaded, :new_pattern_layer_list, :timer_started, :converter_started,
-                    :new_sectionplane, :block_color_by_layer, :skalp_paint
+                    :new_sectionplane, :block_color_by_layer, :skalp_paint, :progress_dialog
 
       attr_reader :transformation_down
     end
@@ -753,20 +750,10 @@ module Skalp
     def self.stop_skalp(close_dialog = true)
       Sketchup.active_model.select_tool(nil) if Sketchup.active_model
       @status = 0
-      @status = 0
-      begin
-        @materialSelector.close if @materialSelector
-      rescue StandardError
-      end
-      begin
-        @dialog.close if @dialog && @dialog.visible? && close_dialog
-      rescue StandardError
-      end
+      @materialSelector.close if @materialSelector
+      @dialog.close if @dialog && @dialog.visible? && close_dialog
       @dialog = nil unless close_dialog
-      begin
-        @hatch_dialog.close if @hatch_dialog
-      rescue StandardError
-      end
+      @hatch_dialog.close if @hatch_dialog
       @hatch_dialog = nil
       @clipper = nil
       @clipperOffset = nil
@@ -788,20 +775,81 @@ module Skalp
     end
 
     def self.activate_model(skpModel)
+      puts ">>> [DEBUG] activate_model called for: #{begin
+        skpModel.title
+      rescue StandardError
+        'unknown'
+      end} (object_id: #{skpModel.object_id})"
       return unless skpModel
       return if skpModel.get_attribute("Skalp", "CreateSection") == false
       return if @unloaded
 
       # CRITICAL FIX: Don't re-activate if already active
-      return if @models && @models[skpModel]
+      if @models && @models[skpModel]
+        puts ">>> [DEBUG] Model ALREADY ACTIVATED, returning early"
+        return
+      end
 
+      puts ">>> [DEBUG] Model NOT in @models, creating new instance..."
+      puts ">>> [DEBUG] @models keys: #{@models ? @models.keys.map { |m| m.object_id }.join(', ') : 'nil'}"
       @models[skpModel] = Model.new(skpModel)
+      puts ">>> [DEBUG] Model created successfully, loading observers..."
       @models[skpModel].load_observers
+      puts ">>> [DEBUG] Observers loaded, checking dialog..."
+
+      # Check for legacy model data after activation is complete (before dialog check)
+      check_legacy_model(skpModel)
 
       return unless Skalp.dialog
 
+      puts ">>> [DEBUG] Dialog exists, updating..."
+
       Skalp.dialog.update_styles(skpModel)
       Skalp.dialog.update(1)
+      puts ">>> [DEBUG] activate_model COMPLETED"
+    end
+
+    # Check if model was saved with older Skalp version and offer to update
+    def self.check_legacy_model(skpModel)
+      return unless skpModel && skpModel.valid?
+
+      needs_update = false
+
+      # Check version attribute - current version starts with "202"
+      current_prefix = begin
+        Skalp::SKALP_VERSION[0..2]
+      rescue StandardError
+        "202"
+      end
+      saved_version = skpModel.get_attribute("Skalp", "version")
+
+      # If model has Skalp data but version is different or missing
+      if skpModel.get_attribute("Skalp",
+                                "CreateSection") && (saved_version.nil? || saved_version[0..2] != current_prefix)
+        needs_update = true
+      end
+
+      # Also check for legacy rear view components
+      unless needs_update
+        legacy_def = skpModel.definitions.find { |d| !d.deleted? && d.name =~ /^Skalp - .*rear view/i }
+        needs_update = true if legacy_def
+      end
+
+      return unless needs_update
+
+      # Use timer to let UI settle before showing dialog
+      UI.start_timer(1.0, false) do
+        msg = Skalp.translate("Skalp detected this model was saved with an older version.") + "\n" +
+              Skalp.translate("To fix alignment and rear view issues, a full update is recommended.") + "\n\n" +
+              Skalp.translate("Update all scenes now? (This might take a while)")
+
+        result = UI.messagebox(msg, MB_YESNO)
+        if result == IDYES
+          skModel = @models[skpModel]
+          skModel ||= Skalp.active_model
+          skModel.update_all_pages(true, true, Skalp.translate("Legacy Model Update")) if skModel
+        end
+      end
     end
 
     def self.change_active_model(skpModel)
@@ -842,6 +890,8 @@ module Skalp
     end
 
     def self.errors(e)
+      puts ">>> [DEBUG] Skalp.errors called with: #{e.class}: #{e.message}"
+      puts ">>> [DEBUG] Backtrace: #{e.backtrace.first(3).join(' | ')}"
       return if e.message.to_s == "reference to deleted Pages" # error bij afsluiten model
 
       if e.class == TypeError

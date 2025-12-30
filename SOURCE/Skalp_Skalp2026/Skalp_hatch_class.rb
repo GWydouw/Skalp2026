@@ -589,12 +589,12 @@ module Skalp
         angle = SkalpHatch.lineangle(p0, p1)
         dx = Math.cos(angle) * pen / 2
         dy = Math.sin(angle) * pen / 2
+        return if [p0.x, p0.y, p1.x, p1.y, pen, dx, dy].any? { |v| v.nan? || v.infinite? }
+
         p0_left = Point2D.new(p0.x - dx, p0.y + dy)
         p0_right = Point2D.new(p0.x + dx, p0.y - dy)
         p1_left = Point2D.new(p1.x - dx, p1.y + dy)
         p1_right = Point2D.new(p1.x + dx, p1.y - dy)
-
-        return if [p0.x, p0.y, p1.x, p1.y, pen].any? { |v| v.nan? || v.infinite? }
 
         ChunkyPNG::Vector(p0_left, p0_right, p1_right, p1_left)
       end
@@ -608,7 +608,7 @@ module Skalp
       private :draw_one_pixel_line
 
       def draw_pen_line(p0, p1, pen, png, stroke_color, v0)
-        return if p0.x.nan? || p0.y.nan? || p1.x.nan? || p1.y.nan?
+        return if p0.x.nan? || p0.y.nan? || p1.x.nan? || p1.y.nan? || v0.nil?
 
         png.polygon(v0, stroke_color, fill_color = stroke_color)
         png.circle_float(p0, pen / 2, stroke_color, 1.1)

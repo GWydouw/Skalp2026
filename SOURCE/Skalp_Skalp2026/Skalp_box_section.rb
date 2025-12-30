@@ -602,7 +602,7 @@ module Skalp
         @@frame_observer ||= SectionBoxFrameChangeObserver.new
         model.add_observer(@@model_observer)
         model.selection.add_observer(@@selection_observer)
-        Sketchup.add_frame_change_observer(@@frame_observer)
+        Sketchup::Pages.add_frame_change_observer(@@frame_observer)
         @@observers_active = true
       end
 
@@ -695,7 +695,7 @@ module Skalp
 
         model.remove_observer(@@model_observer) if @@model_observer
         model.selection.remove_observer(@@selection_observer) if @@selection_observer
-        Sketchup.remove_frame_change_observer(@@frame_observer) if @@frame_observer
+        Sketchup::Pages.remove_frame_change_observer(@@frame_observer) if @@frame_observer
         @@observers_active = false
       end
 
@@ -1002,6 +1002,68 @@ module Skalp
         model.active_view.invalidate
       rescue StandardError => e
         puts "Skalp Debug: Error enter context: #{e.message}" if defined?(DEBUG) && DEBUG
+      end
+
+      def self.create_folder(parent_id = nil)
+        model = Sketchup.active_model
+        h = Data.get_hierarchy(model)
+
+        result = Skalp::InputBox.ask(["Folder Name:"], ["New Folder"], [], "Create Folder")
+        return unless result && !result[0].empty?
+
+        new_folder = {
+          "id" => "folder_" + Time.now.to_i.to_s,
+          "name" => result[0].strip,
+          "type" => "folder",
+          "children" => [],
+          "open" => true
+        }
+
+        if parent_id.nil?
+          h << new_folder
+        else
+          insert_into = lambda { |items|
+            items.each do |i|
+              if i["id"] == parent_id && i["type"] == "folder"
+                i["children"] ||= []
+                i["children"] << new_folder
+                return true
+              end
+              return true if i["children"] && insert_into.call(i["children"])
+            end
+            false
+          }
+          insert_into.call(h) || (h << new_folder)
+        end
+
+        Data.save_hierarchy(model, h)
+        @@manager.sync_data if @@manager
+      end
+
+      def self.rename_folder(fid)
+        model = Sketchup.active_model
+        h = Data.get_hierarchy(model)
+
+        target_folder = nil
+        find_folder = lambda { |items|
+          items.each do |i|
+            if i["id"] == fid && i["type"] == "folder"
+              target_folder = i
+              return true
+            end
+            return true if i["children"] && find_folder.call(i["children"])
+          end
+          false
+        }
+        find_folder.call(h)
+        return unless target_folder
+
+        result = Skalp::InputBox.ask(["New Name:"], [target_folder["name"]], [], "Rename Folder")
+        return unless result && !result[0].empty?
+
+        target_folder["name"] = result[0].strip
+        Data.save_hierarchy(model, h)
+        @@manager.sync_data if @@manager
       end
 
       def self.on_exit_box_context(model)

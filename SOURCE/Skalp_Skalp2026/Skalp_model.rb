@@ -18,6 +18,7 @@ module Skalp
     attr_reader :active_section
 
     def initialize(skpModel)
+      puts ">>> [DEBUG] Model.initialize START (model object_id: #{skpModel.object_id})"
       load_multitags_materials
       @incontext = false
       @hide_rest_of_model = skpModel.rendering_options["InactiveHidden"]
@@ -93,10 +94,7 @@ module Skalp
       Skalp.fixTagFolderBug("Model initialize")
       Skalp.create_skalp_material_instance
       commit
-    end
-
-    def inspect
-      "#<#{self.class}:#{object_id} @skpModel=#{@skpModel}>"
+      puts ">>> [DEBUG] Model.initialize COMPLETED"
     end
 
     def modified_multi_tags(objects)
@@ -340,6 +338,10 @@ module Skalp
       # Skalp.p("+++ COMMIT OPERATION +++ #{caller}")
     end
 
+    def active_operation
+      @operation > 0 ? @commitname : nil
+    end
+
     def start(name = "Skalp", new = false)
       @commitname = name
 
@@ -464,46 +466,36 @@ module Skalp
           style_value = value[style_key]
           if style_key == :style_rules && style_value.respond_to?(:rules)
             object.set_attribute(dict_name, "ss_#{style_key}", style_value.rules.inspect)
-          elsif style_key == :depth_clipping_distance && style_value.respond_to?(:to_s)
-            # Distance objects must be serialized to string for SketchUp to store
-            object.set_attribute(dict_name, "ss_#{style_key}", style_value.to_s)
           elsif !style_value.is_a?(Hash)
-            # Ensure we don't force .to_s if it's already a native type (Boolean, Numeric)
-            object.set_attribute(dict_name, "ss_#{style_key}", style_value)
+            object.set_attribute(dict_name, "ss_#{style_key}", style_value.to_s)
           end
         end
       # Write simple types to native attributes
-      elsif value.nil? || value.is_a?(String) || value.is_a?(Numeric) || value.is_a?(TrueClass) || value.is_a?(FalseClass) || value.is_a?(Length)
-        object.set_attribute(dict_name, key.to_s, value)
+      elsif value.nil? || value.is_a?(String) || value.is_a?(Numeric) || value.is_a?(TrueClass) || value.is_a?(FalseClass)
+        object.set_attribute(dict_name, key, value)
       end
     end
 
     def get_memory_attribute(object, dict_name, key)
       return nil unless object # Guard against nil object
 
-      # MIGRATION SU2026: If the key is style_settings, we need to reconstruct it from flattened native attributes
-      if key.to_s == "style_settings" || key.to_sym == :style_settings
-        # First check if we already have it in native attributes as flattened keys (ss_*)
+      # Handle style_settings specially: reconstruct Hash from flattened native attributes
+      if ["style_settings", :style_settings].include?(key)
         reconstructed = {}
         has_any = false
         STYLE_SETTINGS_KEYS.each do |style_key|
           native_value = object.get_attribute(dict_name, "ss_#{style_key}")
-          next if native_value.nil?
+          next unless native_value
 
           has_any = true
+          # Convert back from string to appropriate type
           reconstructed[style_key] = case style_key
-                                     when :drawing_scale
+                                     when :drawing_scale, :depth_clipping_distance
                                        native_value.to_f
-                                     when :depth_clipping_distance
-                                       Distance.new(native_value)
                                      when :rearview_status, :section_cut_width_status, :depth_clipping_status
-                                       Skalp.to_boolean(native_value)
+                                       ["true", true].include?(native_value)
                                      when :style_rules
-                                       begin
-                                         native_value ? Skalp::StyleRules.new(eval(native_value)) : nil
-                                       rescue StandardError
-                                         nil
-                                       end
+                                       native_value ? Skalp::StyleRules.new(eval(native_value)) : nil
                                      else
                                        native_value
                                      end
@@ -516,21 +508,10 @@ module Skalp
             old_hash = old_blob.is_a?(String) ? eval(old_blob) : old_blob
             if old_hash.is_a?(Hash)
               STYLE_SETTINGS_KEYS.each do |style_key|
-                next unless !reconstructed.key?(style_key) && old_hash.key?(style_key)
-
-                val = old_hash[style_key]
-                # Ensure correct type even from old blob
-                reconstructed[style_key] = case style_key
-                                           when :drawing_scale
-                                             val.to_f
-                                           when :depth_clipping_distance
-                                             Distance.new(val)
-                                           when :rearview_status, :section_cut_width_status, :depth_clipping_status
-                                             Skalp.to_boolean(val)
-                                           else
-                                             val
-                                           end
-                has_any = true
+                if !reconstructed.key?(style_key) && old_hash.key?(style_key)
+                  reconstructed[style_key] = old_hash[style_key]
+                  has_any = true
+                end
               end
             end
           rescue StandardError => e
@@ -540,19 +521,13 @@ module Skalp
 
         if has_any
           # HEURISTIC: Only consider page settings as an "override" if they are meaningful
+          # (i.e., not just defaults like false/0.0/empty rules).
+          # Model settings are always considered meaningful.
           is_meaningful = object.is_a?(Sketchup::Model) ||
                           reconstructed.any? do |k, v|
                             case k
-                            when :drawing_scale
+                            when :drawing_scale, :depth_clipping_distance
                               v.to_f > 0.01
-                            when :depth_clipping_distance
-                              # Distance objects have input_value, not to_f
-                              val = begin
-                                v.respond_to?(:input_value) ? v.input_value : v.to_f
-                              rescue StandardError
-                                0
-                              end
-                              val > 0.01
                             when :rearview_status, :section_cut_width_status, :depth_clipping_status
                               v == true
                             when :style_rules
@@ -582,25 +557,13 @@ module Skalp
 
         return nil
       end
-
       # For other keys: read from native attributes first
       value = object.get_attribute(dict_name, key.to_s)
-
-      # Type reconstruction for common non-style_settings keys
-      value = Skalp.to_boolean(value) if key.to_s =~ /_status$|lineweights|rearview_update/i && !value.nil?
 
       # Fallback to memory_attributes for old data during migration
       if value.nil? && @memory_attributes.include?(object)
         value = @memory_attributes[object][key.to_s] || @memory_attributes[object][key.to_sym]
       end
-
-      # if defined?(DEBUG) && DEBUG && !value.nil? && key.to_s != "style_settings"
-      #   puts "[LOG] get_memory_attribute('#{if object.is_a?(Sketchup::Model)
-      #                                         'Model'
-      #                                       else
-      #                                         (object.respond_to?(:name) ? object.name : object.to_s)
-      #                                       end}', '#{key}') -> #{value} (#{value.class})"
-      # end
 
       value
     end
@@ -806,6 +769,7 @@ module Skalp
     end
 
     def load_observers
+      puts ">>> [DEBUG] load_observers START"
       @entities_observer = SkalpEntitiesObserver.new
       @skpModel.entities.add_observer(@entities_observer) if @skpModel.entities
 
@@ -814,9 +778,6 @@ module Skalp
 
       @pages_observer = SkalpPagesObserver.new
       @skpModel.pages.add_observer(@pages_observer) if @skpModel.pages
-
-      @scope_observer = SkalpSceneTransitionObserver.new
-      @skpModel.pages.add_frame_change_observer(@scope_observer) if @skpModel.pages
 
       @layers_observer = SkalpLayersObserver.new
       @skpModel.layers.add_observer(@layers_observer) if @skpModel.layers
@@ -832,7 +793,10 @@ module Skalp
 
       @model_observer = SkalpModelObserver.new
       @skpModel.add_observer(@model_observer)
+      puts ">>> [DEBUG] load_observers COMPLETED"
     rescue StandardError => e
+      puts ">>> [DEBUG] ERROR in load_observers: #{e.class}: #{e.message}"
+      puts e.backtrace.first(10).join("\n")
       Skalp.errors(e)
     end
 
@@ -851,7 +815,6 @@ module Skalp
       @skpModel.layers.remove_observer(@layers_observer) if @skpModel.layers && @layers_observer
       @skpModel.materials.remove_observer(@materials_observer) if @skpModel.materials && @materials_observer
       @skpModel.pages.remove_observer(@pages_observer) if @skpModel.pages && @pages_observer
-      @skpModel.pages.remove_frame_change_observer(@scope_observer) if @skpModel.pages && @scope_observer
       if @skpModel.entities && @skpModel.selection && @selection_observer
         @skpModel.selection.remove_observer(@selection_observer)
       end
@@ -1198,15 +1161,16 @@ module Skalp
       end
     end
 
-    def update_selected_pages_dxf
+    def update_selected_pages_dxf(&block)
       check_pages
 
       pages = Skalp.export_scene_list
-      for skpPage in pages
+      pages.each_with_index do |skpPage, i|
         next unless get_memory_attribute(
           skpPage, "Skalp", "ID"
         )
 
+        block.call(i + 1, skpPage.name) if block_given?
         sectionplane_by_id(get_memory_attribute(skpPage, "Skalp", "sectionplaneID")).calculate_section(false,
                                                                                                        skpPage)
       end
@@ -1330,7 +1294,7 @@ module Skalp
       @section_result_group.locked = true
     end
 
-    def update_all_pages(save = true, rear_view = true)
+    def update_all_pages(save = true, rear_view = true, dialog_title = nil)
       Skalp.block_observers = true
       skalp_pages = []
       no_skalp_pages = []
@@ -1351,107 +1315,89 @@ module Skalp
 
       commit
 
-      if OS == :WINDOWS
-        Sketchup.set_status_text "#{Skalp.translate('Processing Scene')} (#{Skalp.translate('step')} 1/4) #{Skalp.translate('Please wait...')}"
-        start("Skalp - Processing Scene", true)
-        skalp_pages.each do |skpPage|
-          sectionplane_by_id(get_memory_attribute(skpPage, "Skalp", "sectionplaneID")).calculate_section(false, skpPage)
-        end
+      # Adaptive weighting based on historical timings
+      # Adaptive weighting based on historical timings
+      w_sections = Skalp.get_avg_timing("update_all_pages_sections", 0.5)
+      w_addlines = Skalp.get_avg_timing("update_all_pages_addlines", 0.1)
 
-        manage_sections(skalp_pages, no_skalp_pages)
-        skalp_pages.each do |skpPage|
-          Skalp.update_page(skpPage)
-          sectionplaneID = get_memory_attribute(skpPage, "Skalp", "sectionplaneID")
-          set_memory_attribute(skpPage, "Skalp", "sectionplaneID", sectionplaneID) # Ensure it's persisted as native ss_ key if possible
-        end
-        commit
+      # Hardcoded weights to match reality and avoid auto-learning corruption from previous bad data
+      w_rearlines = 0.25 # ~12s total / 63 pages = ~0.2s per page
+      w_prep = 10.0      # Save ~4s + Reverse ~5s = ~9s total constant overhead
 
-        start("Skalp - Processing rear lines", true)
-        Sketchup.set_status_text "#{Skalp.translate('Processing rear lines')} (#{Skalp.translate('step')} 2/4) #{Skalp.translate('Please wait...')}"
-        @hiddenlines.update_rear_lines(:all, true) if rear_view
-        commit
+      # Normalize weights to be "per scene"
+      # (If it's the first run, it defaults to 1:5:1 ratio)
 
-        if rear_view
-          Sketchup.set_status_text "#{Skalp.translate('Adding rear lines')} (#{Skalp.translate('step')} 3/4) #{Skalp.translate('Please wait...')}"
-          start("Skalp - adding rear lines", true)
-          @hiddenlines.add_rear_lines_to_model(:all)
-          manage_sections(skalp_pages, no_skalp_pages)
-          commit
-        end
-
-        Skalp.block_observers = false
-
-        if save
-          Sketchup.set_status_text "#{Skalp.translate('Saving Model')} (#{Skalp.translate('step')} 4/4) #{Skalp.translate('Please wait...')}"
-          Sketchup.send_action "saveDocument:"
-          Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')} #{Skalp.translate('Model saved.')}"
-        else
-          Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')}"
-        end
-
-        Skalp.active_model.observer_active = true
-        Skalp.exportLObutton_off
-      else
-        # Mac: Chain timers to ensure sequential execution
-        UI.start_timer(0.01, false) do
-          Sketchup.set_status_text "#{Skalp.translate('Processing Scene')} (#{Skalp.translate('step')} 1/4) #{Skalp.translate('Please wait...')}"
-          start("Skalp - Processing Scene", true)
-          skalp_pages.each do |skpPage|
-            sectionplane_by_id(get_memory_attribute(skpPage, "Skalp", "sectionplaneID")).calculate_section(false,
-                                                                                                           skpPage)
-          end
-          manage_sections(skalp_pages, no_skalp_pages)
-          commit
-
-          if rear_view
-            UI.start_timer(0.01, false) do
-              Sketchup.set_status_text "#{Skalp.translate('Processing rear lines')} (#{Skalp.translate('step')} 2/4) #{Skalp.translate('Please wait...')}"
-              start("Skalp - Processing rear lines", true)
-              @hiddenlines.update_rear_lines(:all, true)
-              commit
-
-              UI.start_timer(0.01, false) do
-                Sketchup.set_status_text "#{Skalp.translate('Adding rear lines')} (#{Skalp.translate('step')} 3/4) #{Skalp.translate('Please wait...')}"
-                start("Skalp - adding rear lines", true)
-                @hiddenlines.add_rear_lines_to_model(:all)
-                manage_sections(skalp_pages, no_skalp_pages)
-                skalp_pages.each do |skpPage|
-                  Skalp.update_page(skpPage)
-                  sectionplaneID = get_memory_attribute(skpPage, "Skalp", "sectionplaneID")
-                  set_memory_attribute(skpPage, "Skalp", "sectionplaneID", sectionplaneID)
-                end
-                commit
-
-                if save
-                  UI.start_timer(0.01, false) do
-                    Sketchup.set_status_text "#{Skalp.translate('Saving Model')} (#{Skalp.translate('step')} 4/4) #{Skalp.translate('Please wait...')}"
-                    Sketchup.send_action "saveDocument:"
-                    Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')} #{Skalp.translate('Model saved.')}"
-                    Skalp.active_model.observer_active = true
-                    Skalp.exportLObutton_off
-                  end
-                else
-                  Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')}"
-                  Skalp.active_model.observer_active = true
-                  Skalp.exportLObutton_off
-                end
-              end
-            end
-          elsif save
-            UI.start_timer(0.01, false) do
-              Sketchup.set_status_text "#{Skalp.translate('Saving Model')} (#{Skalp.translate('step')} 4/4) #{Skalp.translate('Please wait...')}"
-              Sketchup.send_action "saveDocument:"
-              Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')} #{Skalp.translate('Model saved.')}"
-              Skalp.active_model.observer_active = true
-              Skalp.exportLObutton_off
-            end
-          else
-            Sketchup.set_status_text "#{Skalp.translate('All Scenes successfully processed.')}"
-            Skalp.active_model.observer_active = true
-            Skalp.exportLObutton_off
-          end
-        end
+      total_weighted_steps = skalp_pages.size * w_sections
+      if rear_view
+        total_weighted_steps += w_prep
+        total_weighted_steps += skalp_pages.size * w_rearlines
+        total_weighted_steps += skalp_pages.size * w_addlines
       end
+      total_weighted_steps += 0.5 if save # small weight for save
+
+      # Initialize progress dialog
+      current_title = dialog_title || Skalp.translate("Update for Layout")
+      progress = Skalp::ProgressDialog.new(current_title, total_weighted_steps)
+      progress.show
+      Skalp.progress_dialog = progress
+
+      # Timing trackers
+      t_start_sections = Time.now
+
+      # Phase 1: Process sections
+      progress.offset = 0
+      progress.phase(Skalp.translate("Updating sections"))
+      start("Skalp - Updating sections", true)
+      skalp_pages.each_with_index do |skpPage, i|
+        progress.update(i * w_sections, Skalp.translate("Updating section"), skpPage.name)
+        sectionplane_by_id(get_memory_attribute(skpPage, "Skalp", "sectionplaneID")).calculate_section(false, skpPage)
+      end
+      Skalp.record_timing("update_all_pages_sections", (Time.now - t_start_sections) / [skalp_pages.size, 1].max)
+
+      manage_sections(skalp_pages, no_skalp_pages)
+      skalp_pages.each do |skpPage|
+        Skalp.update_page(skpPage)
+        sectionplaneID = get_memory_attribute(skpPage, "Skalp", "sectionplaneID")
+        set_memory_attribute(skpPage, "Skalp", "sectionplaneID", sectionplaneID)
+      end
+      commit
+
+      # Phase 2: Process rear lines (C Application)
+      if rear_view
+        # Phase 2: Preparing rear lines calculation
+        progress.offset = skalp_pages.size * w_sections
+        progress.phase(Skalp.translate("Preparing rear lines calculation"))
+
+        t_start_prep = Time.now
+        # Phase 3: Process rear lines (C Application)
+        # update_rear_lines calls get_lines which calls save_temp_model and reverse_scenes
+        @hiddenlines.update_rear_lines(:all, true, w_rearlines, w_prep)
+        Skalp.record_timing("update_all_pages_prep", Time.now - t_start_prep)
+
+        # Phase 3: Add rear lines to model
+        progress.offset = (skalp_pages.size * w_sections) + w_prep + (skalp_pages.size * w_rearlines)
+        start("Skalp - adding rear lines", true)
+        progress.phase(Skalp.translate("Adding rear lines to model"))
+        t_start_addlines = Time.now
+        @hiddenlines.add_rear_lines_to_model(:all)
+        Skalp.record_timing("update_all_pages_addlines", (Time.now - t_start_addlines) / [skalp_pages.size, 1].max)
+        manage_sections(skalp_pages, no_skalp_pages)
+        commit
+      end
+
+      # Phase 4: Save
+      if save
+        progress.offset = skalp_pages.size * (w_sections + (rear_view ? (w_rearlines + w_addlines) : 0))
+        progress.update(0.1, Skalp.translate("Saving model"), "")
+        Sketchup.send_action "saveDocument:"
+      end
+
+      Skalp.log_timing_report
+      Skalp.block_observers = false
+      progress.close
+      Skalp.progress_dialog = nil
+      Skalp.active_model.observer_active = true
+      Skalp.exportLObutton_off
     end
 
     def turn_off_animation

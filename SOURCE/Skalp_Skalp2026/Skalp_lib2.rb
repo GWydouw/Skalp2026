@@ -591,22 +591,101 @@ module Skalp
   end
 
   def setup_reversed_scene(temp_dir, new_temp_dir, index_array, reversed_eye_array, reversed_target_array,
-                           transformation_array, group_id_array, up_vector_array, modelbounds)
+                           transformation_array, group_id_array, up_vector_array, scene_name_array, modelbounds)
     require "Skalp_Skalp2026/shellwords/shellwords"
 
     path = Shellwords.escape(SKALP_PATH + "lib/")
 
     if OS == :WINDOWS
-      command = %("#{path[1..-2]}Skalp.exe" "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{modelbounds}")
+      command = %("#{path[1..-2]}Skalp.exe" "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{array_to_string_array(scene_name_array)}" "#{modelbounds}")
     else
-      command = %(#{path}Skalp "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{modelbounds}")
+      command = %(#{path}Skalp "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{array_to_string_array(scene_name_array)}" "#{modelbounds}")
     end
 
     stdout = start_new_process(command.encode("utf-8"))
     stdout.close if stdout && OS == :WINDOWS
   end
 
-  def get_exploded_entities(temp_dir, height, index_array, scale_array, perspective_array, target_array, rear_view)
+  def record_timing(key, duration)
+    return if duration <= 0
+
+    @session_timings ||= {}
+    @session_timings[key] = duration
+
+    require "json"
+    file = File.join(SKALP_PATH, "skalp_timings.json")
+    timings = {}
+    begin
+      timings = JSON.parse(File.read(file)) if File.exist?(file)
+    rescue StandardError => e
+      timings = {}
+    end
+    timings[key] ||= []
+    timings[key] << duration
+    timings[key] = timings[key].last(10) # Keep last 10
+    File.write(file, JSON.generate(timings))
+  rescue StandardError => e
+    # Silently fail
+  end
+
+  def log_timing_report
+    @session_timings ||= {}
+    return if @session_timings.empty?
+
+    log_file = File.join(SKALP_PATH, "skalp_process_timings.log")
+    report = ["--- Skalp Process Timing Report ---", "Time: #{Time.now}", ""]
+
+    @session_timings.each do |key, val|
+      report << "#{key.ljust(35)}: #{'%.3f' % val} sec"
+    end
+
+    report << ""
+    report << "Average Historical Weights (from skalp_timings.json):"
+
+    begin
+      file = File.join(SKALP_PATH, "skalp_timings.json")
+      if File.exist?(file)
+        timings = JSON.parse(File.read(file))
+        timings.each do |key, vals|
+          avg = vals.empty? ? 0 : vals.sum / vals.size.to_f
+          report << "  - #{key.ljust(33)}: #{'%.3f' % avg} sec (samples: #{vals.size})"
+        end
+      end
+    rescue StandardError
+    end
+
+    File.open(log_file, "a") { |f| f.puts report.join("\n") + "\n\n" }
+    @session_timings = {} # Clear for next run
+  rescue StandardError
+  end
+
+  # Forcefully commit all open operations (helper for cleanup)
+  def self.force_commit_all
+    model = Sketchup.active_model
+    count = 0
+    while model.active_operation && count < 10
+      puts "[DEBUG] Closing stuck operation: #{model.active_operation}"
+      model.commit
+      count += 1
+    end
+  rescue StandardError
+  end
+
+  def get_avg_timing(key, default = 1.0)
+    require "json"
+    file = File.join(SKALP_PATH, "skalp_timings.json")
+    return default unless File.exist?(file)
+
+    begin
+      timings = JSON.parse(File.read(file))
+      return timings[key].sum / timings[key].size.to_f if timings[key] && !timings[key].empty?
+    rescue StandardError
+    end
+    default
+  end
+
+  def get_exploded_entities(temp_dir, height, index_array, scale_array, perspective_array, target_array, rear_view,
+                            progress_weight = 1.0, scene_names = [])
     require "Skalp_Skalp2026/shellwords/shellwords"
 
     path = Skalp::Shellwords.escape(SKALP_PATH + "lib/")
@@ -616,39 +695,92 @@ module Skalp
       command = %(#{path}Skalp "get_exploded_entities" "#{temp_dir}" "#{height}" "#{array_to_string_array(index_array)}" "#{array_to_string_array(scale_array)}" "#{array_to_string_array(perspective_array)}" "#{point_array_to_string_array(target_array)}" "#{rear_view}")
     end
 
-    stdout = start_new_process(command.encode("utf-8"))
-
-    hiddenline_data = nil
     exploded_lines = []
+    hiddenline_data = nil
 
-    return exploded_lines unless stdout
-
-    stdout.each_line do |line|
-      # The cout stream sometimes add an error message in front about that the stream is a bad TIFF or MDI file
-      # We remove all added messages in front of our cout stream
-      line = line.sub(/^.*?(\*[DITLE]\*)/, '\1')
-
+    # Internal helper to process a single line of output
+    processor = lambda do |line|
+      line = line.sub(/^.*?(\*[DITLEP]\*)/, '\1')
       type = line[0, 3]
       data = line[3..-1]
+      return if !data || data.include?("inf") || data.include?("INF") || data =~ /\bnan\b/i
 
       case type
       when "*D*"
-        pp data
+        pp data if defined?(DEBUG) && DEBUG
+      when "*P*"
+        parts = data.to_s.split("|")
+        if parts.size >= 3
+          idx = parts[0].to_i
+          # Map numeric index to scene name if available
+          scene_name = if scene_names && scene_names[idx]
+                         scene_names[idx]
+                       else
+                         (parts.size > 3 ? parts[3] : "")
+                       end
+          # Scale current progress by progress_weight
+          Skalp.progress_dialog&.update(idx * progress_weight, parts[2], scene_name)
+        end
       when "*I*"
         hiddenline_data = Hiddenlines_data.new(data)
       when "*T*"
-        hiddenline_data.target = Skalp.safe_eval(data)
+        hiddenline_data.target = eval(data) if hiddenline_data
       when "*L*"
         rgb = data[0..data.index("[") - 1]
-        data = data[data.index("[")..-1]
-        layer = Skalp.active_model.hiddenlines.get_hiddenline_properties(rgb)
-        hiddenline_data.add_line(Skalp.safe_eval(data), layer)
+        at_idx = data.index("[")
+        if at_idx && hiddenline_data
+          l_data = data[at_idx..-1]
+          layer = Skalp.active_model.hiddenlines.get_hiddenline_properties(rgb)
+          hiddenline_data.add_line(eval(l_data), layer)
+        end
       when "*E*"
-        exploded_lines << hiddenline_data
+        exploded_lines << hiddenline_data if hiddenline_data
       end
     end
 
-    stdout.close if OS == :WINDOWS
+    if OS == :WINDOWS
+      stdout = start_new_process(command.encode("utf-8"))
+      return [] unless stdout
+
+      stdout.each_line { |line| processor.call(line) }
+      stdout.close
+    else
+      require "open3"
+      Open3.popen3(command.encode("utf-8")) do |stdin, stdout, stderr, wait_thr|
+        buffer = ""
+        last_yield = Time.now
+        while wait_thr.alive? || !buffer.empty?
+          # Shorter timeout for select to keep checking
+          ready = IO.select([stdout], nil, nil, 0.01)
+          if ready
+            begin
+              # Read larger chunks for better throughput
+              chunk = stdout.read_nonblock(65_536)
+              buffer << chunk
+              while (line_end = buffer.index("\n"))
+                line = buffer.slice!(0..line_end)
+                processor.call(line)
+              end
+            rescue EOFError
+              break
+            rescue Errno::EAGAIN, Errno::EWOULDBLOCK
+            end
+          end
+          # Yield to SketchUp UI only every 50ms to maintain high performance
+          if Time.now - last_yield > 0.05
+            sleep(0.01)
+            last_yield = Time.now
+          end
+        end
+        error = ""
+        begin
+          error = stderr.read_nonblock(4096) while true
+        rescue StandardError
+        end
+        puts "SKALPDEBUG: STDERR: #{error}" if defined?(DEBUG) && DEBUG && !error.empty?
+      end
+    end
+
     exploded_lines
   end
 
@@ -687,11 +819,11 @@ module Skalp
       require "open3"
       result = nil
       error = nil
-      Open3.popen3(cmd) do |_stdin, stdout, stderr|
+      Open3.popen3(cmd) do |stdin, stdout, stderr|
         result = stdout.read
         error = stderr.read
       end
-      return result
+      puts "SKALPDEBUG: STDERR: #{error}" if defined?(DEBUG) && DEBUG && error && !error.empty?
     end
 
     result
@@ -1555,25 +1687,34 @@ module Skalp
     @message_dialog.close
   end
 
-  def safe_eval(string)
-    return nil if string.nil? || string.empty?
+  # Timing / Logging
+  @timings = {}
 
-    # Check if string contains NaN or Infinity and log where it came from
-    if string =~ /\b(NaN|nan|Infinity|inf|INF)\b/
-      puts "=" * 60
-      puts "⚠️  Skalp.safe_eval: NaN/Infinity detected!"
-      puts "    Value found: #{::Regexp.last_match(1)}"
-      puts "    String preview: #{string[0..200]}..."
-      puts "    Called from:"
-      caller[0..5].each { |line| puts "      #{line}" }
-      puts "=" * 60
+  def self.record_timing(key, duration)
+    @timings ||= {}
+    @timings[key] ||= []
+    @timings[key] << duration
+  end
+
+  def self.get_avg_timing(key, default = 1.0)
+    @timings ||= {}
+    return default unless @timings[key] && !@timings[key].empty?
+
+    @timings[key].sum / @timings[key].size.to_f
+    # puts "[DEBUG] Avg timing for #{key}: #{avg.round(4)}s (count: #{@timings[key].size})"
+  end
+
+  def self.log_timing_report
+    return unless @timings && !@timings.empty?
+
+    puts "\n=== SKALP TIMING REPORT ==="
+    @timings.each do |key, durations|
+      avg = durations.sum / durations.size.to_f
+      min = durations.min
+      max = durations.max
+      puts "  #{key}: Avg=#{avg.round(4)}s | Min=#{min.round(4)}s | Max=#{max.round(4)}s | Count=#{durations.size}"
     end
-
-    # Replace NaN and Infinity with nil to avoid NameError during eval
-    clean_string = string.gsub(/\b(NaN|nan|Infinity|inf|INF)\b/, "nil")
-    eval(clean_string)
-  rescue StandardError => e
-    puts "Skalp.safe_eval error: #{e.message} for string: #{string[0..100]}..."
-    nil
+    puts "===========================\n"
+    @timings = {} # Reset after reporting
   end
 end

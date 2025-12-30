@@ -1,7 +1,3 @@
-# Require RearView classes before Hiddenlines that depends on them
-require_relative "Skalp_rear_view_state"
-require_relative "Skalp_rear_view_manager"
-
 module Skalp
   class Hiddenlines_data
     attr_accessor :page, :target, :lines
@@ -19,25 +15,9 @@ module Skalp
   end
 
   class Hiddenlines
-    attr_reader :forward_lines_result, :pages_info_result, :rear_view, :model
-    attr_accessor :rear_view_instances, :linestyle, :hiddenline_layer_setup
-
-    # Backward-compatible accessors that delegate to @rear_view manager
-    def uptodate
-      @rear_view.uptodate_hash
-    end
-
-    def calculated
-      @rear_view.calculated_hash
-    end
-
-    def rear_view_definitions
-      @rear_view.definitions_hash
-    end
-
-    def rear_lines_result
-      @rear_view.polylines_hash
-    end
+    attr_reader :forward_lines_result, :rear_lines_result, :pages_info_result
+    attr_accessor :rear_view_instances, :rear_view_definitions, :uptodate, :calculated, :linestyle,
+                  :hiddenline_layer_setup
 
     R_MASK  = 0b111111110000000000000000 unless defined? R_MASK
     G_MASK  = 0b000000001111111100000000 unless defined? G_MASK
@@ -57,20 +37,18 @@ module Skalp
     end
 
     def initialize(model)
+      @uptodate = {}
+      @calculated = {}
       @model = model
       @skpModel = @model.skpModel
+      @rear_view_definitions = {}
       @forward_lines_result = {}
+      @rear_lines_result = {}
+      load_rear_view_definitions
 
-      # Initialize the new unified RearViewManager
-      @rear_view = RearViewManager.new(self)
-      @rear_view.load_all
-
-      @temp_model = SKALP_PATH + "lib/temp.skp"
-      @temp_model_reversed = SKALP_PATH + "lib/temp_reversed.skp"
-    end
-
-    def inspect
-      "#<#{self.class}:#{object_id} @model=#{@model}>"
+      tmp_path = ENV["TMPDIR"] || ENV["TMP"] || "/tmp/"
+      @temp_model = File.join(tmp_path, "skalp_temp.skp")
+      @temp_model_reversed = File.join(tmp_path, "skalp_temp_reversed.skp")
     end
 
     def get_hiddenline_properties(rgb)
@@ -130,8 +108,11 @@ module Skalp
     end
 
     def restore_layers
+      return unless @hiddenline_layer_setup
+
       Skalp.active_model.skpModel.layers.each do |layer|
         next if layer.get_attribute("Skalp", "ID")
+        next unless @hiddenline_layer_setup[layer]
 
         layer.color = @hiddenline_layer_setup[layer].original_color
       end
@@ -145,12 +126,12 @@ module Skalp
     end
 
     def sectionplane_changed(id)
-      @rear_view.clear_for_sectionplane(id)
+      @uptodate.delete_if { |k, v| v == id }
     end
 
     def clear_hiddenlines
       @forward_lines_result = {}
-      # rear_lines_result is now managed by @rear_view, but we keep forward_lines separate for now
+      @rear_lines_result = {}
     end
 
     def update_hiddenlines(scenes = :active)
@@ -159,28 +140,30 @@ module Skalp
     end
 
     def update_forward_lines(scenes = :active)
-      result = get_lines(scenes, false)
-      @forward_lines_result = result || {}
+      @forward_lines_result = get_lines(scenes, false)
     end
 
-    def update_rear_lines(scenes = :active, save_temp = true, auto_add_to_model = true)
-      result = get_lines(scenes, true, save_temp)
-      @model.model_changes = false if result
-
-      # Fix timing issue: add lines to model immediately after calculation
-      # This ensures rear_lines_result[page] is populated before add_lines_to_page is called
-      add_rear_lines_to_model(scenes) if auto_add_to_model && result && result != {}
+    def update_rear_lines(scenes = :active, save_temp = true, progress_weight = 1.0, prep_weight = 0.0)
+      # Show progress dialog if updating all scenes and not already showing one
+      if scenes == :all && Skalp.progress_dialog.nil?
+        Skalp::ProgressDialog.show(Skalp.translate("Update Rearlines"), @skpModel.pages.size) do |progress|
+          @rear_lines_result = get_lines(scenes, true, save_temp, progress_weight, prep_weight)
+        end
+      else
+        @rear_lines_result = get_lines(scenes, true, save_temp, progress_weight, prep_weight)
+      end
+      @model.model_changes = false if @rear_lines_result != {}
     end
 
     def set_active_page_hiddenlines_to_model_hiddenlines
       selected = Skalp.active_model.skpModel.pages.selected_page
       return unless selected
 
-      # Forward lines remain separate for now
+      @rear_lines_result[@skpModel] = @rear_lines_result[selected]
+      @rear_view_definitions[@skpModel] = @rear_view_definitions[selected]
       @forward_lines_result[@skpModel] = @forward_lines_result[selected]
-
-      # Rear view state is synced via manager
-      @rear_view.sync_to_model(selected)
+      @calculated[@skpModel] = @calculated[selected]
+      @uptodate[@skpModel] = @uptodate[selected]
     end
 
     def add_rear_lines_to_model(scenes = :active)
@@ -205,20 +188,23 @@ module Skalp
     def update_scale
       selected = Skalp.active_model.skpModel.pages.selected_page
 
-      if rear_view_definitions[selected] && Skalp.dialog.rearview_status(selected)
-        add_lines_to_component(rear_view_definitions[selected],
-                               rear_lines_result[selected])
+      if @rear_view_definitions[selected] && Skalp.dialog.rearview_status(selected)
+        add_lines_to_component(@rear_view_definitions[selected],
+                               @rear_lines_result[selected])
       end
-      return unless rear_view_definitions[@skpModel] && Skalp.dialog.rearview_status
+      return unless @rear_view_definitions[@skpModel] && Skalp.dialog.rearview_status
 
-      add_lines_to_component(rear_view_definitions[@skpModel],
-                             rear_lines_result[@skpModel])
+      add_lines_to_component(@rear_view_definitions[@skpModel],
+                             @rear_lines_result[@skpModel])
     end
 
     def add_lines_to_page(page = @skpModel, copy_to_active_view = false)
+      puts "[DEBUG] add_lines_to_page for: #{page.is_a?(Sketchup::Page) ? page.name : 'Model'}"
       style_settings = Skalp.dialog.style_settings(page) # Better than direct memory access for inheritance
       rv_status = Skalp.dialog.rearview_status(page)
-      has_lines = rear_lines_result && rear_lines_result[page]
+      puts "[DEBUG] rv_status: #{rv_status}"
+      has_lines = @rear_lines_result && @rear_lines_result[page]
+      puts "[DEBUG] has_lines: #{has_lines ? 'YES' : 'NO'}"
 
       if style_settings.class == Hash
         @linestyle = style_settings[:rearview_linestyle]
@@ -231,46 +217,50 @@ module Skalp
       end
 
       # We must call this to ensure existing rearview instances are cleared if status is OFF
-      # With Group refactor: this will HIDE the group if status is off, or initiate cleanup
-      # Pass nil for lines to indicate checking status/hiding
-      add_rear_view_to_sectiongroup(page, nil)
+      add_rear_view_to_sectiongroup(nil, page) # nil definition forces clear
 
-      # Debug: trace why rearview group might not be created
-      has_rear_lines = rear_lines_result && rear_lines_result[page]
-      rv_status_val = Skalp.dialog.rearview_status(page)
+      return unless @rear_lines_result && @rear_lines_result[page]
+      return unless Skalp.dialog.rearview_status(page)
 
-      return unless has_rear_lines
-      return unless rv_status_val
+      if @rear_view_definitions[page] && @rear_view_definitions[page].valid?
+        rear_view_definition = @rear_view_definitions[page]
 
-      # We have lines and status is ON.
-      # Pass the lines to be added to the group.
-      lines = rear_lines_result[page]
-      add_rear_view_to_sectiongroup(page, lines)
+        rear_view_definition.instances.each do |instance|
+          instance.erase!
+        end
+        rear_view_definition.entities.clear!
+      else
+        definitions = Skalp.active_model.skpModel.definitions
+        new_name = definitions.unique_name "Skalp - #{Skalp.translate('rear view')}"
+        rear_view_definition = Skalp.active_model.skpModel.definitions.add(new_name)
+
+        rear_view_definition.set_attribute("dynamic_attributes", "_hideinbrowser", true)
+        UI.refresh_inspectors
+
+        @rear_view_definitions[page] = rear_view_definition
+        rear_view_definition.set_attribute("Skalp", "type", "rear_view")
+      end
+
+      add_lines_to_component(rear_view_definition, @rear_lines_result[page])
+      add_rear_view_to_sectiongroup(rear_view_definition, page)
 
       return unless copy_to_active_view
 
-      # Copy to active view (Live Section)
-      # Note: 'add_rear_view_to_sectiongroup' handles the destination sectiongroup logic
-      # But copy_to_active_view implies adding to the "Live" sectiongroup too?
-      # The method takes (page, lines). If page is nil, it gets 'skalp_live_sectiongroup'.
-      # BUT 'add_lines_to_page' calls it with ONE argument in original code: add_rear_view_to_sectiongroup(rear_view_definition)
-      # So we should call it with (nil, lines) to target the live sectiongroup.
-
-      add_rear_view_to_sectiongroup(nil, lines)
+      add_rear_view_to_sectiongroup(rear_view_definition)
     end
 
     def remove_rear_view_instance(page)
       observer_status = @model.observer_active
       @model.observer_active = false
 
-      if rear_view_definitions[page] && !rear_view_definitions[page].deleted?
-        rear_view_definitions[page].instances.each do |instance|
+      if @rear_view_definitions[page] && !@rear_view_definitions[page].deleted?
+        @rear_view_definitions[page].instances.each do |instance|
           instance.erase! unless instance.deleted?
         end
       end
 
-      if rear_view_definitions[@skpModel] && !rear_view_definitions[@skpModel].deleted?
-        rear_view_definitions[@skpModel].instances.each do |instance|
+      if @rear_view_definitions[@skpModel] && !@rear_view_definitions[@skpModel].deleted?
+        @rear_view_definitions[@skpModel].instances.each do |instance|
           instance.erase! unless instance.deleted?
         end
       end
@@ -288,7 +278,7 @@ module Skalp
       remove_rear_view_instances(sectiongroup) if sectiongroup
     end
 
-    # private - moved down to expose add_rear_view_to_sectiongroup
+    # NOTE: These methods were made public to allow external calls from Skalp_section.rb
 
     def create_sectiongroup_for_rearview(page)
       return unless page.valid? && Skalp.active_model.pages[page] && Skalp.active_model.pages[page].sectionplane
@@ -298,37 +288,20 @@ module Skalp
       sectiongroup.transform!(transformation)
     end
 
-    def add_rear_view_to_sectiongroup(page = @skpModel, lines = nil, sectiongroup_override = nil)
+    def add_rear_view_to_sectiongroup(rear_view_definition, page = @skpModel)
       return unless @model.active_sectionplane
 
-      sectiongroup = sectiongroup_override || get_sectiongroup(page)
+      sectiongroup = get_sectiongroup(page)
 
-      # Implicit cleanup of old component structure
-      cleanup_legacy_rear_views(sectiongroup) if sectiongroup
-
-      # Create or Retrieve Group if we need to set lines or hide it
-      # If sectiongroup makes a new one, we might need to handle transformation?
-      # Original code calls create_sectiongroup_for_rearview(page) if not found.
-
-      if sectiongroup.nil? && lines
-        # Only create sectiongroup if we have content to add?
-        sectiongroup = create_sectiongroup_for_rearview(page)
+      # If no definition is provided, we are just clearing
+      if rear_view_definition.nil?
+        remove_rear_view_instances(sectiongroup) if sectiongroup
+        return
       end
+
+      sectiongroup ||= create_sectiongroup_for_rearview(page)
 
       return unless sectiongroup && sectiongroup.valid?
-
-      # Find or Create "Skalp - rear view" Group
-      rear_view_group = sectiongroup.entities.grep(Sketchup::Group).find { |g| g.name == "Skalp - #{Skalp.translate('rear view')}" }
-
-      unless rear_view_group
-        # Don't create if we are just clearing/hiding and it doesn't exist
-        return if lines.nil?
-
-        rear_view_group = sectiongroup.entities.add_group
-        rear_view_group.name = "Skalp - #{Skalp.translate('rear view')}"
-        rear_view_group.set_attribute("Skalp", "type", "rear_view")
-        rear_view_group.set_attribute("dynamic_attributes", "_hideinbrowser", true)
-      end
 
       check_rear = if page
                      Skalp.dialog.rearview_status(page)
@@ -336,226 +309,302 @@ module Skalp
                      Skalp.dialog.rearview_status
                    end
 
-      # Logic:
-      # If lines provided -> Fill group. Unhide if check_rear is true.
-      # If lines nil -> Just update visibility (Hide if !check_rear, or Unhide?).
-      # Actually lines=nil usually means "init/clear". If we want to toggle, we might call this with nil?
-      # BUT if lines=nil and we strictly want to HIDE, we do that.
+      # Always clear existing rearview instances first to handle visibility changes correctly
+      remove_rear_view_instances(sectiongroup)
 
-      if lines
-        rear_view_group.entities.clear!
-        add_lines_to_group(rear_view_group, lines)
-      end
+      return unless check_rear
 
-      # Toggle Visibility
-      # If user turned it OFF -> Hide (don't delete)
-      # If user turned it ON -> Unhide
-      if check_rear && (lines || rear_view_group.entities.count > 0)
-        rear_view_group.hidden = false
-        rear_view_group.layer = nil # Ensure it uses default or override? Original used rearviewlayer on ENTS.
-      else
-        rear_view_group.hidden = true
-      end
-
-      # Ensure sectiongroup itself is visible on the page (or correctly managed)
-      if page && page.is_a?(Sketchup::Page)
-        Skalp.sectiongroup_visibility(sectiongroup, true, page)
-      else
-        Skalp.sectiongroup_visibility(sectiongroup, true, nil)
-      end
+      rear_view = sectiongroup.entities.add_instance(rear_view_definition, Geom::Transformation.new)
+      rear_view.name = "Skalp - #{Skalp.translate('rear view')}"
+      rear_view.set_attribute("Skalp", "type", "rear_view")
     end
 
     private
 
-    def cleanup_legacy_rear_views(sectiongroup)
-      # Removes old component-based rearviews
+    def remove_rear_view_instances(sectiongroup)
       sectiongroup.entities.grep(Sketchup::ComponentInstance).each do |instance|
-        next unless instance.valid? && (instance.get_attribute("Skalp",
-                                                               "type") == "rear_view" || instance.name =~ /^Skalp - .*rear view/i)
-
-        # Optional: maybe migrating definitions? For now, we just remove instances as we rebuild groups.
-        instance.erase!
+        if instance.valid? && (instance.get_attribute("Skalp",
+                                                      "type") == "rear_view" || instance.name =~ /^Skalp - .*rear view/i)
+          instance.erase!
+        end
       end
     end
 
-    def save_temp_model
+    def save_temp_model(prep_weight = 1.0)
       observers = @model.observer_active
       @model.observer_active = false
+      Skalp.force_commit_all # Ensure we start clean
 
       settings_saved = {}
-      # shadow_settings_saved = {}
-
-      pages = [Skalp.active_model.skpModel]
-
-      @model.start("Skalp - save temp model preparation", true)
-      delete_rear_view_instances
-      setup_layers
-
-      Skalp.active_model.skpModel.pages.each do |page|
-        pages << page
-      end
-
       page_settings = {}
+      pages = [@skpModel]
+      @skpModel.pages.each { |p| pages << p }
 
-      pages.each do |page|
-        next unless page
+      puts "[DEBUG] Skalp save_temp_model starting for #{pages.size} pages"
 
-        unless page == Skalp.active_model.skpModel
-          page_settings[page] = { use_rendering_options: page.use_rendering_options?, use_camera: page.use_camera? }
-          page.use_rendering_options = true
-          page.use_camera = true
+      @model.start("Skalp - save temp model", true)
+      begin
+        t_start_setup = Time.now
+        delete_rear_view_instances
+        setup_layers
+        Skalp.record_timing("save_temp_model_setup", Time.now - t_start_setup)
+
+        t_start_loop = Time.now
+        pages.each_with_index do |page, i|
+          next unless page
+
+          page_name = page.is_a?(Sketchup::Model) ? "Model" : page.name
+          # puts "[DEBUG] Processing page: #{page_name} (#{i + 1}/#{pages.size})"
+
+          # Progress update removed to prevent flicker
+          # if Skalp.progress_dialog && i.even?
+          #   scaled_i = (i.to_f / pages.size) * (prep_weight * 0.4)
+          #   Skalp.progress_dialog.update(scaled_i, Skalp.translate("Preparing model copy"), page_name)
+          # end
+
+          unless page == @skpModel
+            page_settings[page] = { use_rendering_options: page.use_rendering_options?, use_camera: page.use_camera? }
+            page.use_rendering_options = true
+            page.use_camera = true
+          end
+
+          style_settings = {}
+          begin
+            style_settings[:edgeDisplayMode] = page.rendering_options["EdgeDisplayMode"]
+            style_settings[:drawSilhouettes] = page.rendering_options["DrawSilhouettes"]
+            style_settings[:drawDepthQue] = page.rendering_options["DrawDepthQue"]
+            style_settings[:drawLineEnds] = page.rendering_options["DrawLineEnds"]
+            style_settings[:jitterEdges] = page.rendering_options["JitterEdges"]
+            style_settings[:extendLines] = page.rendering_options["ExtendLines"]
+            style_settings[:silhouetteWidth] = page.rendering_options["SilhouetteWidth"]
+            style_settings[:depthQueWidth] = page.rendering_options["DepthQueWidth"]
+            style_settings[:lineExtension] = page.rendering_options["LineExtension"]
+            style_settings[:lineEndWidth] = page.rendering_options["LineEndWidth"]
+            style_settings[:displayText] = page.rendering_options["DisplayText"]
+            style_settings[:sectionCutWidth] = page.rendering_options["SectionCutWidth"]
+            style_settings[:renderMode] = page.rendering_options["RenderMode"]
+            style_settings[:texture] = page.rendering_options["Texture"]
+            style_settings[:displayColorByLayer] = page.rendering_options["DisplayColorByLayer"]
+            style_settings[:EdgeColorMode] = page.rendering_options["EdgeColorMode"]
+          rescue StandardError => e
+            puts "[DEBUG] Error reading rendering options for #{page_name}: #{e.message}"
+          end
+
+          settings_saved[page] = style_settings
+
+          begin
+            page.rendering_options["EdgeDisplayMode"] = true
+            page.rendering_options["DrawSilhouettes"] = true
+            page.rendering_options["DrawDepthQue"] = false
+            page.rendering_options["DrawLineEnds"] = false
+            page.rendering_options["JitterEdges"] = false
+            page.rendering_options["ExtendLines"] = false
+            page.rendering_options["SilhouetteWidth"] = 5
+            page.rendering_options["DepthQueWidth"] = 1
+            page.rendering_options["LineExtension"] = 1
+            page.rendering_options["LineEndWidth"] = 1
+            page.rendering_options["DisplayText"] = false
+            page.rendering_options["SectionCutWidth"] = 10
+            page.rendering_options["RenderMode"] = 1
+            page.rendering_options["Texture"] = true
+            page.rendering_options["DisplayColorByLayer"] = true
+            page.rendering_options["EdgeColorMode"] = 0
+          rescue StandardError => e
+            puts "[DEBUG] Error writing rendering options for #{page_name}: #{e.message}"
+          end
         end
+        Skalp.record_timing("save_temp_model_loop", Time.now - t_start_loop)
 
-        # shadow_settings = {}
-        #
-        # shadow_settings[:City] = page.shadow_info["City"]
-        # shadow_settings[:Country] = page.shadow_info["Country"]
-        # shadow_settings[:Dark] = page.shadow_info["Dark"]
-        # shadow_settings[:DayOfYear] = page.shadow_info["DayOfYear"]
-        # shadow_settings[:DaylightSavings] = page.shadow_info["DaylightSavings"]
-        # shadow_settings[:DisplayNorth] = page.shadow_info["DisplayNorth"]
-        # shadow_settings[:DisplayOnAllFaces] = page.shadow_info["DisplayOnAllFaces"]
-        # shadow_settings[:DisplayOnGroundPlane] = page.shadow_info["DisplayOnGroundPlane"]
-        # shadow_settings[:DisplayShadows] = page.shadow_info["DisplayShadows"]
-        # shadow_settings[:EdgesCastShadows] = page.shadow_info["EdgesCastShadows"]
-        # shadow_settings[:Latitude] = page.shadow_info["Latitude"]
-        # shadow_settings[:Light] = page.shadow_info["Light"]
-        # shadow_settings[:Longitude] = page.shadow_info["Longitude"]
-        # shadow_settings[:North] = page.shadow_info["North"]
-        # shadow_settings[:ShadowTime] = page.shadow_info["ShadowTime"]
-        # shadow_settings[:TZOffset] = page.shadow_info["TZOffset"]
-        # shadow_settings[:UseSunForAllShading] = page.shadow_info["UseSunForAllShading"]
-        #
-        # shadow_settings_saved[page] = shadow_settings
+        puts "[DEBUG] Deleting old temp files..."
+        File.delete(@temp_model) if File.exist?(@temp_model)
+        File.delete(@temp_model_reversed) if File.exist?(@temp_model_reversed)
 
-        # page.shadow_info["City"] = "Skalp"
-        # page.shadow_info["Country"] = "Skalp"
-        # page.shadow_info["Dark"] = 80 #IMPORTANT TOT GET CORRECT CONVERTION
-        # page.shadow_info["DayOfYear"] = 100
-        # page.shadow_info["DaylightSavings"] = false
-        # page.shadow_info["DisplayNorth"] = false
-        # page.shadow_info["DisplayOnAllFaces"] = false
-        # page.shadow_info["DisplayOnGroundPlane"] = false
-        # page.shadow_info["DisplayShadows"] = false
-        # page.shadow_info["EdgesCastShadows"] = false
-        # page.shadow_info["Latitude"] = 55.18
-        # page.shadow_info["Light"] = 0  #IMPORTANT TOT GET CORRECT CONVERTION
-        # page.shadow_info["Longitude"] = 0.1
-        # page.shadow_info["North"] = 0.0
-        # page.shadow_info["ShadowTime"] = Time.new(2019, 5, 10, 14, 0, 0, "+00:00")
-        # page.shadow_info["TZOffset"] = 0.0
-        # page.shadow_info["UseSunForAllShading"] = true
+        puts "[DEBUG] Saving model copy to: #{@temp_model}"
+        t_start_save = Time.now
+        @skpModel.save_copy(@temp_model)
+        Skalp.record_timing("save_temp_model_save_copy", Time.now - t_start_save)
+        puts "[DEBUG] Save copy complete."
 
-        style_settings = {}
+        # Commit logic moved to ensure block (via restore) if successful flow implies we just finish
+        # But we need to commit the changes we made to temp model?
+        # WAIT: save_copy saves the CURRENT state.
+        # We modify the LIVE model, save COPY, then RESTORE live model.
+        # So we MUST restore.
 
-        style_settings[:edgeDisplayMode] = page.rendering_options["EdgeDisplayMode"]
-        style_settings[:drawSilhouettes] = page.rendering_options["DrawSilhouettes"]
-        style_settings[:drawDepthQue] = page.rendering_options["DrawDepthQue"]
-        style_settings[:drawLineEnds] = page.rendering_options["DrawLineEnds"]
-        style_settings[:jitterEdges] = page.rendering_options["JitterEdges"]
-        style_settings[:extendLines] = page.rendering_options["ExtendLines"]
+        puts "[DEBUG] Skalp save_temp_model finished successfully."
+      rescue StandardError => e
+        puts "[ERROR] Skalp hiddenlines save_temp_model failed: #{e.message}"
+        puts e.backtrace.join("\n")
+        @model.abort if @model.active_operation == "Skalp - save temp model"
+      ensure
+        puts "[DEBUG] Executing ensure block in save_temp_model"
 
-        style_settings[:silhouetteWidth] = page.rendering_options["SilhouetteWidth"]
-        style_settings[:depthQueWidth] = page.rendering_options["DepthQueWidth"]
-        style_settings[:lineExtension] = page.rendering_options["LineExtension"]
-        style_settings[:lineEndWidth] = page.rendering_options["LineEndWidth"]
+        t_start_restore = Time.now
 
-        style_settings[:displayText] = page.rendering_options["DisplayText"]
-        style_settings[:sectionCutWidth] = page.rendering_options["SectionCutWidth"]
+        # Always restore layers and styles
+        restore_layers
+        restore_rendering_options(pages, settings_saved, page_settings)
+        Skalp.record_timing("save_temp_model_restore", Time.now - t_start_restore)
 
-        style_settings[:renderMode] = page.rendering_options["RenderMode"]
-        style_settings[:texture] = page.rendering_options["Texture"]
-        style_settings[:displayColorByLayer] = page.rendering_options["DisplayColorByLayer"]
-        style_settings[:EdgeColorMode] = page.rendering_options["EdgeColorMode"]
-
-        settings_saved[page] = style_settings
-
-        page.rendering_options["EdgeDisplayMode"] = true
-        page.rendering_options["DrawSilhouettes"] = true
-        page.rendering_options["DrawDepthQue"] = false
-        page.rendering_options["DrawLineEnds"] = false
-        page.rendering_options["JitterEdges"] = false
-        page.rendering_options["ExtendLines"] = false
-
-        page.rendering_options["SilhouetteWidth"] = 5
-        page.rendering_options["DepthQueWidth"] = 1
-        page.rendering_options["LineExtension"] = 1
-        page.rendering_options["LineEndWidth"] = 1
-
-        page.rendering_options["DisplayText"] = false
-        page.rendering_options["SectionCutWidth"] = 10
-
-        page.rendering_options["RenderMode"] = 1
-        page.rendering_options["Texture"] = true
-        page.rendering_options["DisplayColorByLayer"] = true
-        page.rendering_options["EdgeColorMode"] = 0
-      end
-
-      File.delete(@temp_model) if File.exist?(@temp_model)
-      File.delete(@temp_model_reversed) if File.exist?(@temp_model_reversed)
-
-      @model.commit
-      Skalp.active_model.skpModel.save_copy(@temp_model)
-      @model.start("Skalp - save temp model cleanup", true)
-
-      restore_layers
-
-      pages.each do |page|
-        page.rendering_options["EdgeDisplayMode"] = settings_saved[page][:edgeDisplayMode]
-        page.rendering_options["DrawSilhouettes"] = settings_saved[page][:drawSilhouettes]
-        page.rendering_options["DrawDepthQue"] = settings_saved[page][:drawDepthQue]
-        page.rendering_options["DrawLineEnds"] = settings_saved[page][:drawLineEnds]
-        page.rendering_options["JitterEdges"] = settings_saved[page][:jitterEdges]
-        page.rendering_options["ExtendLines"] = settings_saved[page][:extendLines]
-
-        page.rendering_options["SilhouetteWidth"] = settings_saved[page][:silhouetteWidth]
-        page.rendering_options["DepthQueWidth"] = settings_saved[page][:depthQueWidth]
-        page.rendering_options["LineExtension"] = settings_saved[page][:lineExtension]
-        page.rendering_options["LineEndWidth"] = settings_saved[page][:lineEndWidth]
-
-        page.rendering_options["DisplayText"] = settings_saved[page][:displayText]
-        page.rendering_options["SectionCutWidth"] = settings_saved[page][:sectionCutWidth]
-
-        page.rendering_options["RenderMode"] = settings_saved[page][:renderMode]
-        page.rendering_options["Texture"] = settings_saved[page][:texture]
-        page.rendering_options["DisplayColorByLayer"] = settings_saved[page][:displayColorByLayer]
-        page.rendering_options["EdgeColorMode"] = settings_saved[page][:EdgeColorMode]
-
-        unless page == Skalp.active_model.skpModel
-          page.use_rendering_options = page_settings[page][:use_rendering_options]
-          page.use_camera = page_settings[page][:use_camera]
+        # Safety net: ensure ANY open Skalp temp model operation is closed
+        # Now using the newly added logic where we check if active_operation is safe
+        if @model.respond_to?(:active_operation) && @model.active_operation =~ /Skalp - save temp model/
+          puts "[DEBUG] Closing lingering operation in ensure block: #{@model.active_operation}"
+          @model.commit
         end
-
-        # page.shadow_info["City"] = shadow_settings_saved[page][:City]
-        # page.shadow_info["Country"] = shadow_settings_saved[page][:Country]
-        # page.shadow_info["Dark"] = shadow_settings_saved[page][:Dark]
-        # page.shadow_info["DayOfYear"] = shadow_settings_saved[page][:DayOfYear]
-        # page.shadow_info["DaylightSavings"] = shadow_settings_saved[page][:DaylightSavings]
-        # page.shadow_info["DisplayNorth"] = shadow_settings_saved[page][:DisplayNorth]
-        # page.shadow_info["DisplayOnAllFaces"] = shadow_settings_saved[page][:DisplayOnAllFaces]
-        # page.shadow_info["DisplayOnGroundPlane"] = shadow_settings_saved[page][:DisplayOnGroundPlane]
-        # page.shadow_info["DisplayShadows"] = shadow_settings_saved[page][:DisplayShadows]
-        # page.shadow_info["EdgesCastShadows"] = shadow_settings_saved[page][:EdgesCastShadows]
-        # page.shadow_info["Latitude"] = shadow_settings_saved[page][:Latitude]
-        # page.shadow_info["Light"] = shadow_settings_saved[page][:Light]
-        # page.shadow_info["Longitude"] = shadow_settings_saved[page][:Longitude]
-        # page.shadow_info["North"] = shadow_settings_saved[page][:North]
-        # page.shadow_info["ShadowTime"] = shadow_settings_saved[page][:ShadowTime]
-        # page.shadow_info["TZOffset"] = shadow_settings_saved[page][:TZOffset]
-        # page.shadow_info["UseSunForAllShading"] = shadow_settings_saved[page][:UseSunForAllShading]
+        @model.observer_active = observers
       end
-
-      @model.commit
-      @model.observer_active = observers
     end
 
-    # Original load_rear_view_definitions removed.
-    # Logic is now handled by RearViewManager#load_all and RearViewState.
+    def restore_rendering_options(pages, settings_saved, page_settings)
+      return unless pages && settings_saved
+
+      pages.each do |page|
+        next unless settings_saved[page]
+
+        page_name = page.is_a?(Sketchup::Model) ? "Model" : page.name
+
+        begin
+          opts = settings_saved[page]
+          page.rendering_options["EdgeDisplayMode"] = opts[:edgeDisplayMode]
+          page.rendering_options["DrawSilhouettes"] = opts[:drawSilhouettes]
+          page.rendering_options["DrawDepthQue"] = opts[:drawDepthQue]
+          page.rendering_options["DrawLineEnds"] = opts[:drawLineEnds]
+          page.rendering_options["JitterEdges"] = opts[:jitterEdges]
+          page.rendering_options["ExtendLines"] = opts[:extendLines]
+          page.rendering_options["SilhouetteWidth"] = opts[:silhouetteWidth]
+          page.rendering_options["DepthQueWidth"] = opts[:depthQueWidth]
+          page.rendering_options["LineExtension"] = opts[:lineExtension]
+          page.rendering_options["LineEndWidth"] = opts[:lineEndWidth]
+          page.rendering_options["DisplayText"] = opts[:displayText]
+          page.rendering_options["SectionCutWidth"] = opts[:sectionCutWidth] # NOTE: Typo fixed in original? Original was SectionCutWidth
+          page.rendering_options["RenderMode"] = opts[:renderMode]
+          page.rendering_options["Texture"] = opts[:texture]
+          page.rendering_options["DisplayColorByLayer"] = opts[:displayColorByLayer]
+          page.rendering_options["EdgeColorMode"] = opts[:EdgeColorMode]
+        rescue StandardError => e
+          puts "[DEBUG] Error restoring rendering options for #{page_name}: #{e.message}"
+        end
+
+        next if page == @skpModel
+        next unless page_settings[page]
+
+        page.use_rendering_options = page_settings[page][:use_rendering_options]
+        page.use_camera = page_settings[page][:use_camera]
+      end
+    end
+
+    def load_rear_view_definitions
+      @used_definitions = []
+
+      Skalp.active_model.skpModel.pages.each do |page|
+        load_rear_view_definition(page)
+      end
+      load_rear_view_definition
+    end
+
+    def load_rear_view_definition(page = @skpModel)
+      page_name = page.is_a?(Sketchup::Page) ? page.name : "Model"
+      sectiongroup = get_sectiongroup(page)
+
+      if defined?(DEBUG) && DEBUG
+        puts "[DEBUG] load_rear_view_definition for page: #{page_name}"
+        puts "        sectiongroup: #{sectiongroup ? sectiongroup.name : 'NIL'}"
+      end
+
+      return unless sectiongroup && sectiongroup.entities
+
+      if defined?(DEBUG) && DEBUG
+        component_count = sectiongroup.entities.grep(Sketchup::ComponentInstance).count
+        puts "        component instances in sectiongroup: #{component_count}"
+      end
+
+      sectiongroup.entities.grep(Sketchup::ComponentInstance).each do |rear_view_instance|
+        if defined?(DEBUG) && DEBUG
+          type_attrib = rear_view_instance.get_attribute("Skalp", "type")
+          puts "        checking component: '#{rear_view_instance.name}' (type=#{type_attrib})"
+          puts "        definition name: '#{rear_view_instance.definition.name}'"
+        end
+
+        # Use Skalp type attribute or fallback to name for identification
+        # Check both instance name AND definition name since instance name may be empty
+        is_rearview = rear_view_instance.get_attribute("Skalp", "type") == "rear_view" ||
+                      rear_view_instance.name =~ /^Skalp - .*rear view/i ||
+                      rear_view_instance.definition.name =~ /^Skalp - .*rear view/i ||
+                      rear_view_instance.definition.name =~ /^Skalp - rear view/i
+        next unless is_rearview
+
+        if defined?(DEBUG) && DEBUG
+          puts "        FOUND rearview component: #{rear_view_instance.name}"
+          puts "        definition: #{rear_view_instance.definition.name}"
+          already_used = @used_definitions.include?(rear_view_instance.definition)
+          puts "        definition already used: #{already_used}"
+        end
+
+        # NOTE: We still track used definitions to avoid duplicates, but we
+        # associate the definition with THIS page regardless
+        # (previously: next if @used_definitions.include?(rear_view_instance.definition))
+        # This was causing pages to not have their rearview definition loaded if
+        # another page already used the same definition.
+
+        @rear_view_definitions[page] = rear_view_instance.definition
+        unless @used_definitions.include?(rear_view_instance.definition)
+          @used_definitions << rear_view_instance.definition
+        end
+
+        # Initialize uptodate at load time so UI status is correct
+        sectionplaneID = @model.get_memory_attribute(page, "Skalp", "sectionplaneID")
+        @uptodate[page] = sectionplaneID if sectionplaneID && sectionplaneID != ""
+
+        puts "        ✓ Loaded rear_view_definition for page: #{page_name}" if defined?(DEBUG) && DEBUG
+
+        attrib_data = rear_view_instance.definition.get_attribute("Skalp", "rear_view_lines")
+
+        if attrib_data && attrib_data != ""
+          begin
+            lines = eval(attrib_data)
+          rescue SyntaxError => e
+            lines = nil
+          end
+
+          if lines && lines.class == Hash
+            polylines_by_layer = {}
+            lines.each do |layer_name, line_data|
+              next unless line_data
+
+              polylines = PolyLines.new
+              polylines.fill_from_layout(line_data)
+              su_layer = Skalp.active_model.skpModel.layers[layer_name]
+              polylines_by_layer[su_layer] = polylines if su_layer
+            end
+
+            @rear_lines_result[page] = polylines_by_layer
+
+            # Sync up-to-date status
+            sectionplaneID = if page == @skpModel
+                               @model.get_memory_attribute(@skpModel, "Skalp", "active_sectionplane_ID")
+                             else
+                               @model.get_memory_attribute(page, "Skalp", "sectionplaneID")
+                             end
+
+            @calculated[page] = @uptodate[page] = sectionplaneID if sectionplaneID && sectionplaneID != ""
+          end
+        # @rear_lines_result[page] = polylines_by_layer
+        else
+          rear_view_instance.definition.set_attribute("Skalp", "rear_view_lines", "")
+        end
+      end
+
+      return unless @rear_view_definitions[page] && @rear_lines_result[page]
+
+      @calculated[page] =
+        @uptodate[page] = Skalp.active_model.get_memory_attribute(page, "Skalp", "sectionplaneID")
+    end
 
     def delete_rear_view_instances
-      return unless rear_view_definitions
+      return unless @rear_view_definitions
 
-      rear_view_definitions.each_value do |definition|
+      @rear_view_definitions.each_value do |definition|
         next unless definition && definition.valid?
 
         definition.instances.each do |instance|
@@ -565,9 +614,7 @@ module Skalp
     end
 
     def delete_rear_view_instance(page = @skpModel)
-      return unless rear_view_definitions[page]
-
-      rear_view_definitions[page].instances.each do |instance|
+      @rear_view_definitions[page].instances.each do |instance|
         instance.erase!
       end
     end
@@ -590,25 +637,25 @@ module Skalp
       nil
     end
 
-    def add_lines_to_group(rear_view_group, lines)
+    def add_lines_to_component(rear_view_definition, lines)
       return unless lines
-      return if rear_view_group.deleted?
+      return if rear_view_definition.deleted?
 
       rear_view_lines = {}
       lines.each do |layer, polylines|
         rear_view_lines[layer.name] = polylines.lines
       end
 
-      rear_view_group.set_attribute("Skalp", "rear_view_lines", rear_view_lines.inspect)
-      export_to_sketchup(rear_view_group, @linestyle, lines)
+      rear_view_definition.set_attribute("Skalp", "rear_view_lines", rear_view_lines.inspect)
+      export_to_sketchup(rear_view_definition, @linestyle, lines)
     end
 
-    def export_to_sketchup(rear_view_group, linestyle, hiddenlines_by_layer)
+    def export_to_sketchup(rear_view_definition, linestyle, hiddenlines_by_layer)
       # wordt soms getest buiten Skalp om.
       Skalp.active_model.start("Skalp - add rearview lines to model") if Skalp.active_model
 
       if Sketchup.read_default("Skalp", "linestyles") == "Skalp"
-        mesh = Skalp::DashedMesh.new(rear_view_group) # DashedMesh supports Group entities via initializer
+        mesh = Skalp::DashedMesh.new(rear_view_definition)
 
         hiddenlines_by_layer.each_value do |lines|
           mesh.dashing_overflow_protection(lines.total_line_length)
@@ -617,14 +664,17 @@ module Skalp
 
         mesh.add_mesh
       else
-        component_entities = rear_view_group.entities
-        # component_entities.clear! # Already cleared in caller
+        component_entities = rear_view_definition.entities
+        component_entities.clear!
+
+        linestyle_group = component_entities.add_group
+        layer = Skalp.create_linestyle_layer(linestyle)
+        linestyle_group.layer = layer
 
         hiddenlines_by_layer.each do |layer, lines|
           rearviewlayer = Skalp.create_rearview_layer(layer.name)
           lines.all_curves.each do |curve|
-            # Add directly to group definition
-            lines = component_entities.add_curve(curve)
+            lines = linestyle_group.entities.add_curve(curve)
             next unless lines
 
             lines.each do |e|
@@ -649,7 +699,7 @@ module Skalp
       true
     end
 
-    def get_lines(scenes = :active, reversed = false, save_temp = true)
+    def get_lines(scenes = :active, reversed = false, save_temp = true, progress_weight = 1.0, prep_weight = 0.0)
       pages_info = get_pages_info(scenes, reversed)
 
       block_observer_status = Skalp.block_observers
@@ -659,9 +709,20 @@ module Skalp
         if Skalp.active_model.skpModel.path == ""
           UI.messagebox(Skalp.translate("Your model needs to be saved first."))
           Skalp.block_observers = block_observer_status
-          return nil
+          return {}
         else
-          save_temp_model
+          save_temp_model(prep_weight)
+
+          # Force UI refresh to clear "thick lines" before potentially long wait
+          # The view might be stuck in "thick" state if the operation commit didn't trigger a repaint
+          # Force UI refresh to clear "thick lines" before potentially long wait
+          # The view might be stuck in "thick" state if the operation commit didn't trigger a repaint
+          Sketchup.active_model.active_view.invalidate
+          # Also try to refresh inspectors which can force a redraw
+          UI.refresh_inspectors
+          # Give the UI thread a moment to actually repaint before we block it again
+          sleep 0.2
+
           Skalp.block_observers = block_observer_status
         end
       end
@@ -669,9 +730,9 @@ module Skalp
       rear_view = 1.0
 
       if reversed
-        result = reverse_scenes
+        result = reverse_scenes(prep_weight)
 
-        return nil unless result
+        return {} unless result
 
         rear_view = -1.0
 
@@ -680,6 +741,7 @@ module Skalp
           sleep 0.1
           break if Time.now - start_time > 30.0
         end
+        Skalp.record_timing("get_lines_wait_loop", Time.now - start_time)
 
         temp_model = @temp_model_reversed
 
@@ -689,14 +751,23 @@ module Skalp
         temp_model = @temp_model
       end
 
+      # Jump offset forward for C-App
+      Skalp.progress_dialog.offset += prep_weight if Skalp.progress_dialog && prep_weight > 0
+
+      scene_names = pages_info.map { |h| h[:page_name] }
+
+      scene_names = pages_info.map { |h| h[:page_name] }
+
+      t_start_c_app = Time.now
       result = Skalp.get_exploded_entities(temp_model, @height, page_info_to_array(pages_info, :index),
                                            page_info_to_array(pages_info, :scale), page_info_to_array(pages_info, :perspective),
-                                           page_info_to_array(pages_info, :target), rear_view)
+                                           page_info_to_array(pages_info, :target), rear_view, progress_weight, scene_names)
+      Skalp.record_timing("get_exploded_entities_c_ext", Time.now - t_start_c_app)
 
       target2d_array = page_info_to_array(pages_info, :target2d)
 
       all_polylines = if reversed
-                        rear_lines_result
+                        @rear_lines_result
                       else
                         @forward_lines_result
                       end
@@ -704,6 +775,8 @@ module Skalp
       remove_not_valid_pages_from_hash(all_polylines)
 
       result.each do |scene|
+        next unless scene.target && scene.target.size >= 2 && scene.target[0] && scene.target[1]
+
         lo_target_point = Geom::Point3d.new(scene.target[0], scene.target[1], 0.0)
         t = Geom::Transformation.translation(target2d_array.shift - lo_target_point)
         lines = {}
@@ -735,50 +808,42 @@ module Skalp
           all_polylines[page] = polylines_by_layer
           active_sectionplane_id = Skalp.active_model.get_memory_attribute(Skalp.active_model.skpModel, "Skalp",
                                                                            "active_sectionplane_ID")
-
-          # Update manager state for this page
-          @rear_view.update(page,
-                            definition: @rear_view[page].definition,
-                            polylines: polylines_by_layer,
-                            sectionplane_id: active_sectionplane_id)
+          @calculated[page] = @uptodate[page] = active_sectionplane_id
 
           selected_page = Skalp.active_model.skpModel.pages.selected_page
+          # Only sync polylines if sectionplanes match, but always sync uptodate
           if selected_page
-            # Only sync polylines if sectionplanes match
             if Skalp.active_model.pages[selected_page] &&
                Skalp.active_model.pages[selected_page].sectionplane &&
                Skalp.active_model.pages[selected_page].sectionplane.skpSectionPlane == Skalp.active_model.skpModel.entities.active_section_plane
               all_polylines[selected_page] = polylines_by_layer
-              @rear_view.update(selected_page,
-                                definition: @rear_view[selected_page].definition,
-                                polylines: polylines_by_layer,
-                                sectionplane_id: active_sectionplane_id)
-            else
-              # Always sync sectionplane_id so UI indicator is correct
-              @rear_view.sync_sectionplane_id(selected_page, active_sectionplane_id)
+              @calculated[selected_page] = active_sectionplane_id
             end
+            # Always update uptodate for selected_page so UI indicator is correct
+            @uptodate[selected_page] = active_sectionplane_id
           end
         else
           all_polylines[page] = polylines_by_layer
-          sectionplane_id = Skalp.active_model.get_memory_attribute(page, "Skalp", "sectionplaneID")
-          @rear_view.update(page,
-                            definition: @rear_view[page].definition,
-                            polylines: polylines_by_layer,
-                            sectionplane_id: sectionplane_id)
+          @calculated[page] = @uptodate[page] = Skalp.active_model.get_memory_attribute(page, "Skalp", "sectionplaneID")
         end
       end
 
       all_polylines
     end
 
-    def reverse_scenes
+    def reverse_scenes(prep_weight = 1.0)
       pages_info = []
       if Skalp.dialog.rearview_status
         info = get_reverse_scene_info("active_view")
         pages_info << info if info
       end
 
-      @skpModel.pages.each do |page|
+      @skpModel.pages.each_with_index do |page, i|
+        if Skalp.progress_dialog && i.even?
+          # Use 40% of the prep weight for reversal (total prep = 80%, leaving some buffer)
+          scaled_i = (prep_weight * 0.4) + ((i.to_f / @skpModel.pages.size) * (prep_weight * 0.4))
+          Skalp.progress_dialog.update(scaled_i, Skalp.translate("Reversing sections for rear view"), page.name)
+        end
         info = get_reverse_scene_info(page.name)
         pages_info << info if info
       end
@@ -786,9 +851,11 @@ module Skalp
       return false if pages_info == []
 
       modelbounds = @skpModel.bounds.diagonal.to_f
+      t_start_reverse = Time.now
       Skalp.setup_reversed_scene(@temp_model, @temp_model_reversed, page_info_to_array(pages_info, :index), page_info_to_array(pages_info, :reversed_eye),
                                  page_info_to_array(pages_info, :reversed_target), page_info_to_array(pages_info, :transformation),
-                                 page_info_to_array(pages_info, :group_id), page_info_to_array(pages_info, :up_vector), modelbounds)
+                                 page_info_to_array(pages_info, :group_id), page_info_to_array(pages_info, :up_vector), page_info_to_array(pages_info, :name), modelbounds)
+      Skalp.record_timing("setup_reversed_scene_external", Time.now - t_start_reverse)
       true
     end
 
@@ -810,8 +877,6 @@ module Skalp
       return nil if [nil, ""].include?(sectionplaneID)
 
       sectionplane = @model.sectionplane_by_id(sectionplaneID)
-      return nil unless sectionplane && sectionplane.skpSectionPlane && sectionplane.skpSectionPlane.valid?
-
       plane = sectionplane.skpSectionPlane.get_plane
 
       vector = Geom::Vector3d.new(plane[0], plane[1], plane[2])
@@ -823,27 +888,7 @@ module Skalp
 
       centerline = [center, center2]
       new_target = Geom.intersect_line_plane(centerline, plane)
-
-      # Debug: check if intersection failed
-      if new_target.nil?
-        puts "[DEBUG RearView] get_reverse_scene_info: intersect_line_plane returned nil for #{page_name}"
-        puts "  centerline: #{centerline.inspect}"
-        puts "  plane: #{plane.inspect}"
-        return nil
-      end
-
       dist = new_target.distance(camera.eye)
-
-      # Debug: log camera info for vertical sections
-      if plane[2].abs < 0.1 # Vertical section (normal is mostly horizontal)
-        puts "[DEBUG RearView] Vertical section detected for #{page_name}"
-        puts "  plane normal: [#{plane[0]}, #{plane[1]}, #{plane[2]}]"
-        puts "  camera.eye: #{camera.eye.to_a}"
-        puts "  camera.direction: #{camera.direction.to_a}"
-        puts "  new_target: #{new_target.to_a}"
-        puts "  dist: #{dist}"
-      end
-
       eye_vector = vector.reverse
       eye_vector.length = dist
       new_eye = new_target.offset(eye_vector)
@@ -863,6 +908,7 @@ module Skalp
 
       params[:group_id] = page_id
       params[:up_vector] = up_vector.to_a
+      params[:name] = page_name
 
       params
     end
@@ -908,6 +954,7 @@ module Skalp
 
     def collect_page_info(index, info, page, reversed)
       result = get_page_info(index)
+      result[:page_name] = page.is_a?(Sketchup::Model) ? Skalp.translate("Model") : page.name
       if reversed
         result[:perspective] = false
         info << result if result[:sectionplane] && Skalp.dialog.rearview_status(page)

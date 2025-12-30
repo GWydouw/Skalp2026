@@ -539,10 +539,12 @@ function delete_hatch() {
 
 function set_fill_color(rgb) {
     $("#fill_color_input").spectrum("set", rgb);
+    $("#fill_color_block").css('background-color', rgb);
 }
 
 function set_line_color(rgb) {
     $("#line_color_input").spectrum("set", rgb);
+    $("#line_color_block").css('background-color', rgb);
 }
 
 // Helper function to convert rgb string to hex
