@@ -44,7 +44,8 @@ module Skalp
       @rear_view_definitions = {}
       @forward_lines_result = {}
       @rear_lines_result = {}
-      load_rear_view_definitions
+      @used_definitions = []
+      load_rear_view_definition
 
       tmp_path = ENV["TMPDIR"] || ENV["TMP"] || "/tmp/"
       @temp_model = File.join(tmp_path, "skalp_temp.skp")
@@ -351,12 +352,47 @@ module Skalp
         setup_layers
         Skalp.record_timing("save_temp_model_setup", Time.now - t_start_setup)
 
+        active_planes = {}
+        pages.each do |page|
+          next unless page.is_a?(Sketchup::Page)
+
+          if page.respond_to?(:active_section_planes)
+            active_planes[page] = page.active_section_planes
+          elsif page.respond_to?(:active_section_plane)
+            active_planes[page] = [page.active_section_plane].compact
+          end
+        end
+
         t_start_loop = Time.now
         pages.each_with_index do |page, _i|
           next unless page
 
           settings_saved[page] = prepare_page_for_temp_save(page, page_settings)
+
+          # User Requirement: Set use_section_planes = true (force it ON for the temp save)
+          page.use_section_planes = true if page.is_a?(Sketchup::Page)
         end
+
+        # RESTORE ACTIVE SECTION PLANES BEFORE SAVE
+        active_planes.each do |page, planes|
+          next unless planes
+
+          if page.respond_to?(:active_section_planes=)
+            page.active_section_planes = planes
+          elsif page.respond_to?(:active_section_plane=)
+            page.active_section_plane = planes[0] if planes.is_a?(Array)
+          end
+        end
+
+        # DEBUG: Verify state of pages BEFORE save_copy
+        pages.each do |page|
+          next unless page.is_a?(Sketchup::Page)
+
+          eye = page.camera.eye
+          planes = page.respond_to?(:active_section_planes) ? page.active_section_planes : []
+          puts "[DEBUG] PRE-SAVE Scene check: name='#{page.name}', eye=#{eye.to_a}, planes=#{planes.size}"
+        end
+
         Skalp.record_timing("save_temp_model_loop", Time.now - t_start_loop)
 
         puts "[DEBUG] Deleting old temp files..."
@@ -369,12 +405,6 @@ module Skalp
         Skalp.record_timing("save_temp_model_save_copy", Time.now - t_start_save)
         puts "[DEBUG] Save copy complete."
 
-        # Commit logic moved to ensure block (via restore) if successful flow implies we just finish
-        # But we need to commit the changes we made to temp model?
-        # WAIT: save_copy saves the CURRENT state.
-        # We modify the LIVE model, save COPY, then RESTORE live model.
-        # So we MUST restore.
-
         puts "[DEBUG] Skalp save_temp_model finished successfully."
       rescue StandardError => e
         puts "[ERROR] Skalp hiddenlines save_temp_model failed: #{e.message}"
@@ -385,13 +415,25 @@ module Skalp
 
         t_start_restore = Time.now
 
-        # Always restore layers and styles
         restore_layers
         restore_rendering_options(pages, settings_saved, page_settings)
+
+        # RESTORE ACTIVE SECTION PLANES AFTER RESTORE
+        # To ensure the original state is kept in the live model
+        if defined?(active_planes)
+          active_planes.each do |page, planes|
+            next unless planes
+
+            if page.respond_to?(:active_section_planes=)
+              page.active_section_planes = planes
+            elsif page.respond_to?(:active_section_plane=)
+              page.active_section_plane = planes[0] if planes.is_a?(Array)
+            end
+          end
+        end
+
         Skalp.record_timing("save_temp_model_restore", Time.now - t_start_restore)
 
-        # Safety net: ensure ANY open Skalp temp model operation is closed
-        # Now using the newly added logic where we check if active_operation is safe
         if @model.respond_to?(:active_operation) && @model.active_operation =~ /Skalp - save temp model/
           puts "[DEBUG] Closing lingering operation in ensure block: #{@model.active_operation}"
           @model.commit
@@ -403,36 +445,32 @@ module Skalp
     def create_derived_style(source_style)
       return nil unless source_style
 
-      # Unique name for the temp style based on source
-      style_name = "Skalp Temp #{source_style.name} #{source_style.object_id}"
+      style_name = "Skalp Temp #{source_style.name} #{source_style.object_id} #{Time.now.to_i}"
 
-      # Check if already exists in model (unlikely if unique, but safety)
+      # Check if already exists
       existing = @skpModel.styles[style_name]
       return existing if existing
 
-      # 1. Capture Source Settings
       saved_active_style = @skpModel.styles.selected_style
 
+      # 1. Capture source rendering options
       @skpModel.styles.selected_style = source_style
       source_ro = {}
       @skpModel.rendering_options.each { |k, v| source_ro[k] = v }
 
-      # 2. Create New Base Style (from default.style)
+      # 2. Create new style from default
       base_dir = File.dirname(__FILE__)
       style_path = File.join(base_dir, "resources", "SUstyles", "default.style")
-
       unless File.exist?(style_path)
-        puts "[ERROR] Skalp default.style not found at #{style_path}"
         @skpModel.styles.selected_style = saved_active_style
-        return source_style # Fallback
+        return source_style
       end
 
-      @skpModel.styles.add_style(style_path, true) # Load and Activate
+      @skpModel.styles.add_style(style_path, true)
       new_style = @skpModel.styles.selected_style
       new_style.name = style_name
-      new_style.description = "Skalp Temp Clone of #{source_style.name}"
 
-      # 3. Apply Source Settings (Cloning)
+      # 3. Apply source options to active view (which is now new_style)
       ro = @skpModel.rendering_options
       source_ro.each { |k, v| ro[k] = v }
 
@@ -454,28 +492,25 @@ module Skalp
       ro["DisplayColorByLayer"] = true
       ro["EdgeColorMode"] = 0
 
-      # 5. Persist changes
+      # 5. Persist to new style
       @skpModel.styles.update_selected_style
 
-      # 6. Restore original active style
+      # 6. Restore active
       @skpModel.styles.selected_style = saved_active_style
 
       new_style
     end
 
     def prepare_page_for_temp_save(page, page_settings)
-      page_name = page.is_a?(Sketchup::Model) ? "Model" : page.name
-      page_settings[page] = {}
-
-      # Use a shared hash in page_settings to track modified styles across pages
-      # We assume page_settings is the same object passed in the loop
-      page_settings[:modified_styles] ||= {}
-
-      # Active View (Active Model): Keep original behavior (Direct Modify)
+      # Active View (Model)
       if page == @skpModel
+        # ... (Keep existing logic for Active View if it works, or simplify)
+        # Logic for Active View must be in-place because we can't assign style to Model directly via wrapper?
+        # Actually checking original code:
         style_settings = {}
+        # ... existing active view capture logic ...
+        # For brevity reusing the capture block from before but ensuring we return it.
         begin
-          # Save current settings
           style_settings[:edgeDisplayMode] = page.rendering_options["EdgeDisplayMode"]
           style_settings[:drawSilhouettes] = page.rendering_options["DrawSilhouettes"]
           style_settings[:drawDepthQue] = page.rendering_options["DrawDepthQue"]
@@ -493,7 +528,6 @@ module Skalp
           style_settings[:displayColorByLayer] = page.rendering_options["DisplayColorByLayer"]
           style_settings[:EdgeColorMode] = page.rendering_options["EdgeColorMode"]
 
-          # Set new settings directly
           page.rendering_options["EdgeDisplayMode"] = true
           page.rendering_options["DrawSilhouettes"] = true
           page.rendering_options["DrawDepthQue"] = false
@@ -511,121 +545,91 @@ module Skalp
           page.rendering_options["DisplayColorByLayer"] = true
           page.rendering_options["EdgeColorMode"] = 0
         rescue StandardError => e
-          puts "[DEBUG] Error manipulating rendering options for Active View: #{e.message}"
+          puts "[DEBUG] Error active view: #{e.message}"
         end
         return style_settings
       end
 
-      # Pages (Scenes): Modify Style In-Place
+      # Pages (Scenes) -> Use Temp Style
       begin
-        style = page.style
-        return {} unless style
+        original_style = page.style
+        return {} unless original_style
 
-        # Only modify if not already done
-        unless page_settings[:modified_styles][style]
-          # Activate style to edit it
-          saved_active = @skpModel.styles.selected_style
-          @skpModel.styles.selected_style = style
+        # Cache created styles to avoid recreation
+        page_settings[:created_styles] ||= {}
 
-          # Capture current settings
-          current_ro = {}
-          @skpModel.rendering_options.each { |k, v| current_ro[k] = v }
-          page_settings[:modified_styles][style] = current_ro
-
-          # Apply Overrides
-          ro = @skpModel.rendering_options
-          ro["EdgeDisplayMode"] = true
-          ro["DrawSilhouettes"] = true
-          ro["DrawDepthQue"] = false
-          ro["DrawLineEnds"] = false
-          ro["JitterEdges"] = false
-          ro["ExtendLines"] = false
-          ro["SilhouetteWidth"] = 5
-          ro["DepthQueWidth"] = 1
-          ro["LineExtension"] = 1
-          ro["LineEndWidth"] = 1
-          ro["DisplayText"] = false
-          ro["SectionCutWidth"] = 10
-          ro["RenderMode"] = 1
-          ro["Texture"] = true
-          ro["DisplayColorByLayer"] = true
-          ro["EdgeColorMode"] = 0
-
-          # Persist changes to Style Definition
-          @skpModel.styles.update_selected_style
-
-          # Restore active style
-          @skpModel.styles.selected_style = saved_active
+        unless page_settings[:created_styles][original_style]
+          page_settings[:created_styles][original_style] = create_derived_style(original_style)
         end
 
-        # We don't need to return anything specific per-page for restoration as we use :modified_styles
-      rescue StandardError => e
-        puts "[DEBUG] Error manipulating style for Page #{page_name}: #{e.message}"
-      end
+        derived = page_settings[:created_styles][original_style]
+        if derived
+          if page.respond_to?(:use_style=)
+            page.use_style = derived
+          elsif page.respond_to?(:style=)
+            page.style = derived
+          end
 
+          # Force update to be sure it persists in the page object for the temp save
+          flag = defined?(SketchUp::Page::PAGE_USE_STYLE) ? SketchUp::Page::PAGE_USE_STYLE : 128
+          page.update(flag)
+          return { original_style: original_style }
+        end
+      rescue StandardError => e
+        puts "[DEBUG] Error page prepare: #{e.message}"
+      end
       {}
     end
 
     def restore_rendering_options(pages, settings_saved, page_settings)
       return unless pages && settings_saved
 
-      # 1. Restore Active View (Model) settings
-      # We can find the model entry in settings_saved or iterate
       if settings_saved[@skpModel]
+        # Restore active view
+        opts = settings_saved[@skpModel]
         begin
           page = @skpModel
-          opts = settings_saved[page]
-          if opts && !opts.empty?
-            page.rendering_options["EdgeDisplayMode"] = opts[:edgeDisplayMode]
-            page.rendering_options["DrawSilhouettes"] = opts[:drawSilhouettes]
-            page.rendering_options["DrawDepthQue"] = opts[:drawDepthQue]
-            page.rendering_options["DrawLineEnds"] = opts[:drawLineEnds]
-            page.rendering_options["JitterEdges"] = opts[:jitterEdges]
-            page.rendering_options["ExtendLines"] = opts[:extendLines]
-            page.rendering_options["SilhouetteWidth"] = opts[:silhouetteWidth]
-            page.rendering_options["DepthQueWidth"] = opts[:depthQueWidth]
-            page.rendering_options["LineExtension"] = opts[:lineExtension]
-            page.rendering_options["LineEndWidth"] = opts[:lineEndWidth]
-            page.rendering_options["DisplayText"] = opts[:displayText]
-            page.rendering_options["SectionCutWidth"] = opts[:sectionCutWidth]
-            page.rendering_options["RenderMode"] = opts[:renderMode]
-            page.rendering_options["Texture"] = opts[:texture]
-            page.rendering_options["DisplayColorByLayer"] = opts[:displayColorByLayer]
-            page.rendering_options["EdgeColorMode"] = opts[:EdgeColorMode]
+          @skpModel.rendering_options.each do |k, v|
+            # Map logical keys to RenderingOptions keys if needed, assuming direct map
+            # Original code used distinct keys like :edgeDisplayMode vs "EdgeDisplayMode"
+            # Simplified restore:
           end
-        rescue StandardError => e
-          puts "[DEBUG] Error restoring Active View rendering options: #{e.message}"
+          page.rendering_options["EdgeDisplayMode"] = opts[:edgeDisplayMode]
+          page.rendering_options["DrawSilhouettes"] = opts[:drawSilhouettes]
+          page.rendering_options["DrawDepthQue"] = opts[:drawDepthQue]
+          page.rendering_options["DrawLineEnds"] = opts[:drawLineEnds]
+          page.rendering_options["JitterEdges"] = opts[:jitterEdges]
+          page.rendering_options["ExtendLines"] = opts[:extendLines]
+          page.rendering_options["SilhouetteWidth"] = opts[:silhouetteWidth]
+          page.rendering_options["DepthQueWidth"] = opts[:depthQueWidth]
+          page.rendering_options["LineExtension"] = opts[:lineExtension]
+          page.rendering_options["LineEndWidth"] = opts[:lineEndWidth]
+          page.rendering_options["DisplayText"] = opts[:displayText]
+          page.rendering_options["SectionCutWidth"] = opts[:sectionCutWidth]
+          page.rendering_options["RenderMode"] = opts[:renderMode]
+          page.rendering_options["Texture"] = opts[:texture]
+          page.rendering_options["DisplayColorByLayer"] = opts[:displayColorByLayer]
+          page.rendering_options["EdgeColorMode"] = opts[:EdgeColorMode]
+        rescue StandardError
         end
       end
 
-      # 2. Restore Modified Styles
-      return unless page_settings[:modified_styles]
+      pages.each do |page|
+        next if page == @skpModel
+        next unless settings_saved[page]
 
-      saved_active = @skpModel.styles.selected_style
+        old_style = settings_saved[page][:original_style]
+        next unless old_style
 
-      page_settings[:modified_styles].each do |style, original_ro|
-        next unless style && style.valid?
-
-        begin
-          @skpModel.styles.selected_style = style
-          ro = @skpModel.rendering_options
-          original_ro.each { |k, v| ro[k] = v }
-          @skpModel.styles.update_selected_style
-        rescue StandardError => e
-          puts "[DEBUG] Error restoring Style #{style.name}: #{e.message}"
+        if page.respond_to?(:use_style=)
+          page.use_style = old_style
+        elsif page.respond_to?(:style=)
+          page.style = old_style
         end
+
+        flag = defined?(SketchUp::Page::PAGE_USE_STYLE) ? SketchUp::Page::PAGE_USE_STYLE : 128
+        page.update(flag)
       end
-
-      @skpModel.styles.selected_style = saved_active
-    end
-
-    def load_rear_view_definitions
-      @used_definitions = []
-
-      Skalp.active_model.skpModel.pages.each do |page|
-        load_rear_view_definition(page)
-      end
-      load_rear_view_definition
     end
 
     def load_rear_view_definition(page = @skpModel)
@@ -855,13 +859,15 @@ module Skalp
       rear_view = 1.0
 
       if reversed
-        result = reverse_scenes(prep_weight)
+        puts "[DEBUG] REVERSED MODE ACTIVE"
+        result = reverse_scenes(scenes, prep_weight)
 
         return {} unless result
 
         rear_view = -1.0
 
         start_time = Time.now
+
         until File.exist?(@temp_model_reversed)
           sleep 0.1
           break if Time.now - start_time > 30.0
@@ -906,6 +912,7 @@ module Skalp
       pages_info.each_with_index do |info, i|
         puts "    Input #{i}: name='#{info[:page_name]}', index=#{info[:index]}, target=#{info[:target]}, eye=#{info[:eye]}"
         puts "             scale=#{info[:scale]}, perspective=#{info[:perspective]}"
+        puts "             up=#{info[:up_vector] || 'NIL'}"
       end
 
       t_start_c_app = Time.now
@@ -977,12 +984,8 @@ module Skalp
           selected_page = Skalp.active_model.skpModel.pages.selected_page
           # Only sync polylines if sectionplanes match, but always sync uptodate
           if selected_page
-            if Skalp.active_model.pages[selected_page] &&
-               Skalp.active_model.pages[selected_page].sectionplane &&
-               Skalp.active_model.pages[selected_page].sectionplane.skpSectionPlane == Skalp.active_model.skpModel.entities.active_section_plane
-              all_polylines[selected_page] = polylines_by_layer
-              @calculated[selected_page] = active_sectionplane_id
-            end
+            all_polylines[selected_page] = polylines_by_layer
+            @calculated[selected_page] = active_sectionplane_id
             # Always update uptodate for selected_page so UI indicator is correct
             @uptodate[selected_page] = active_sectionplane_id
           end
@@ -995,21 +998,18 @@ module Skalp
       all_polylines
     end
 
-    def reverse_scenes(prep_weight = 1.0)
-      pages_info = []
-      if Skalp.dialog.rearview_status
-        info = get_reverse_scene_info("active_view")
-        pages_info << info if info
-      end
+    def reverse_scenes(scenes = :active, prep_weight = 1.0)
+      pages_info = get_pages_info(scenes, true)
 
-      @skpModel.pages.each_with_index do |page, i|
-        if Skalp.progress_dialog && i.even?
-          # Use 40% of the prep weight for reversal (total prep = 80%, leaving some buffer)
-          scaled_i = (prep_weight * 0.4) + ((i.to_f / @skpModel.pages.size) * (prep_weight * 0.4))
-          Skalp.progress_dialog.update(scaled_i, Skalp.translate("Reversing sections for rear view"), page.name)
+      if Skalp.progress_dialog
+        pages_info.each_with_index do |info, i|
+          next unless i.even?
+
+          # Use 40% of the prep weight for reversal
+          scaled_i = (prep_weight * 0.4) + ((i.to_f / pages_info.size) * (prep_weight * 0.4))
+          Skalp.progress_dialog.update(scaled_i, Skalp.translate("Reversing sections for rear view"),
+                                       info[:page_name])
         end
-        info = get_reverse_scene_info(page.name)
-        pages_info << info if info
       end
 
       return false if pages_info == []
@@ -1018,7 +1018,8 @@ module Skalp
       t_start_reverse = Time.now
       Skalp.setup_reversed_scene(@temp_model, @temp_model_reversed, page_info_to_array(pages_info, :index), page_info_to_array(pages_info, :reversed_eye),
                                  page_info_to_array(pages_info, :reversed_target), page_info_to_array(pages_info, :transformation),
-                                 page_info_to_array(pages_info, :group_id), page_info_to_array(pages_info, :up_vector), page_info_to_array(pages_info, :name), modelbounds)
+                                 page_info_to_array(pages_info, :group_id), page_info_to_array(pages_info, :up_vector), page_info_to_array(pages_info, :page_name),
+                                 page_info_to_array(pages_info, :sectionplaneID), modelbounds)
       Skalp.record_timing("setup_reversed_scene_external", Time.now - t_start_reverse)
       true
     end
@@ -1073,6 +1074,7 @@ module Skalp
       params[:group_id] = page_id
       params[:up_vector] = up_vector.to_a
       params[:name] = page_name
+      params[:sectionplaneID] = sectionplaneID
 
       params
     end
@@ -1117,7 +1119,8 @@ module Skalp
     end
 
     def collect_page_info(index, info, page, reversed)
-      result = get_page_info(index)
+      result = get_page_info(index, reversed)
+
       result[:page_name] = page.is_a?(Sketchup::Model) ? Skalp.translate("Model") : page.name
       if reversed
         result[:perspective] = false
@@ -1128,8 +1131,9 @@ module Skalp
       info
     end
 
-    def get_page_info(page_index)
+    def get_page_info(page_index, reversed = false)
       params = {}
+      @height ||= 200.0 # Fallback
 
       if page_index == -1
         sectionplaneID = @model.get_memory_attribute(@skpModel, "Skalp", "active_sectionplane_ID")
@@ -1148,7 +1152,61 @@ module Skalp
         camera = page.camera
       end
 
-      v1 = camera.target - camera.eye
+      # REVERSED CAMERA LOGIC UNIFIED
+      if reversed && sectionplaneID && sectionplaneID != ""
+        sectionplane = @model.sectionplane_by_id(sectionplaneID)
+        plane = sectionplane.skpSectionPlane.get_plane
+
+        vector = Geom::Vector3d.new(plane[0], plane[1], plane[2])
+        vector.length = -2 * Skalp.tolerance
+        new_trans = Geom::Transformation.translation(vector)
+
+        center = @skpModel.bounds.center
+        center2 = new_trans * center
+
+        centerline = [center, center2]
+        new_target = Geom.intersect_line_plane(centerline, plane)
+        dist = camera.eye.distance(new_target)
+        eye_vector = vector.reverse
+        eye_vector.length = dist
+        new_eye = new_target.offset(eye_vector)
+
+        up_vector = Skalp.get_up_vector(plane)
+
+        # Override camera for reversed calculation
+        # Note: We don't modify the camera object itself, we just use these values
+        work_eye = new_eye
+        work_target = new_target
+        work_up = up_vector
+        work_perspective = false # Rear views are always ortho
+
+        # For reverse model setup compatibility
+        params[:reversed_eye] = new_eye.to_a
+        params[:reversed_target] = new_target.to_a
+        params[:up_vector] = up_vector.to_a
+
+        page_id = if page_index == -1
+                    "skalp_live_sectiongroup"
+                  else
+                    @model.get_memory_attribute(
+                      @skpModel.pages[page_index], "Skalp", "ID"
+                    )
+                  end
+        params[:transformation] = if Skalp.get_section_group(page_id)
+                                    (new_trans * Skalp.get_section_group(page_id).transformation).to_a
+                                  else
+                                    new_trans.to_a
+                                  end
+        params[:group_id] = page_id
+        params[:sectionplaneID] = sectionplaneID
+      else
+        work_eye = camera.eye
+        work_target = camera.target
+        work_up = camera.respond_to?(:up) ? camera.up : nil # Optional
+        work_perspective = camera.perspective?
+      end
+
+      v1 = work_target - work_eye
 
       if plane
         v2 = Geom::Vector3d.new(plane[0], plane[1], plane[2])
@@ -1179,15 +1237,22 @@ module Skalp
         target = camera.target
       end
 
-      distance = camera.eye.distance(target).to_f
-      scale = (@height / (Math.sin(fov) / Math.cos(fov) * distance * 2.0))
+      distance = work_eye.distance(target).to_f
+      scale = if work_perspective && fov > 0
+                (@height / (Math.sin(fov) / Math.cos(fov) * distance * 2.0))
+              else
+                # Ortho scale
+                @height / camera.height
+              end
 
       params[:sectionplane] = plane ? true : false
       params[:index] = page_index
       params[:target2d] = target2D || target
       params[:scale] = scale
-      params[:perspective] = camera.perspective?
+      params[:perspective] = work_perspective
       params[:target] = target.to_a
+      params[:eye] = work_eye.to_a
+      params[:up] = work_up.to_a if work_up
 
       params
     end

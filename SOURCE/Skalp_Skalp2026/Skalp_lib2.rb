@@ -254,7 +254,7 @@ module Skalp
     definition
   end
 
-  def update_page(page)
+  def update_page(page, update_camera = true, update_section_planes = true)
     page.use_section_planes = true
     page.use_style = true
     page.use_hidden = true
@@ -264,7 +264,9 @@ module Skalp
     Sketchup.active_model.rendering_options["DisplaySectionCuts"] = true
     Sketchup.active_model.rendering_options["SectionCutFilled"] = false
 
-    mask = 115
+    mask = 50 # 2 (Style) + 16 (Hidden) + 32 (Layers)
+    mask += 1 if update_camera
+    mask += 64 if update_section_planes
     mask += 4 if page.use_shadow_info?
     mask += 8 if page.use_axes?
 
@@ -272,6 +274,7 @@ module Skalp
     result = true
     result = make_new_style_from_active_settings if styles.active_style_changed
 
+    puts "[DEBUG] update_page: '#{page.name}', mask=#{mask}" if defined?(DEBUG) && DEBUG
     page.update(mask) if result
   end
 
@@ -307,7 +310,7 @@ module Skalp
     option_hash
   end
 
-  def force_style_to_show_skalp_section(skpPage)
+  def force_style_to_show_skalp_section(skpPage, update_camera = true, update_section_planes = true)
     return unless skpPage.rendering_options["SectionCutFilled"]
 
     styles = Sketchup.active_model.styles
@@ -318,7 +321,9 @@ module Skalp
     hash_to_rendering_options(page_rendering_options)
     styles.update_selected_style
 
-    mask = 115
+    mask = 50 # 2 (Style) + 16 (Hidden) + 32 (Layers)
+    mask += 1 if update_camera
+    mask += 64 if update_section_planes
     mask += 4 if skpPage.use_shadow_info?
     mask += 8 if skpPage.use_axes?
 
@@ -591,15 +596,15 @@ module Skalp
   end
 
   def setup_reversed_scene(temp_dir, new_temp_dir, index_array, reversed_eye_array, reversed_target_array,
-                           transformation_array, group_id_array, up_vector_array, scene_name_array, modelbounds)
+                           transformation_array, group_id_array, up_vector_array, scene_name_array, sectionplane_id_array, modelbounds)
     require "Skalp_Skalp2026/shellwords/shellwords"
 
     path = Shellwords.escape(SKALP_PATH + "lib/")
 
     if OS == :WINDOWS
-      command = %("#{path[1..-2]}Skalp.exe" "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{array_to_string_array(scene_name_array)}" "#{modelbounds}")
+      command = %("#{path[1..-2]}Skalp.exe" "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{array_to_string_array(sectionplane_id_array)}" "#{modelbounds}")
     else
-      command = %(#{path}Skalp "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{array_to_string_array(scene_name_array)}" "#{modelbounds}")
+      command = %(#{path}Skalp "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{array_to_string_array(sectionplane_id_array)}" "#{modelbounds}")
     end
 
     stdout = start_new_process(command.encode("utf-8"))
@@ -718,6 +723,7 @@ module Skalp
                        else
                          (parts.size > 3 ? parts[3] : "")
                        end
+          puts "[DEBUG] Progress: idx=#{idx}, weight=#{progress_weight}, calc=#{idx * progress_weight}, msg='#{parts[2]}', scene='#{scene_name}'"
           # Scale current progress by progress_weight
           Skalp.progress_dialog&.update(idx * progress_weight, parts[2], scene_name)
         end
@@ -824,6 +830,7 @@ module Skalp
         error = stderr.read
       end
       puts "SKALPDEBUG: STDERR: #{error}" if defined?(DEBUG) && DEBUG && error && !error.empty?
+      puts "SKALPDEBUG: STDOUT: #{result}" if defined?(DEBUG) && DEBUG && result && !result.empty?
     end
 
     result

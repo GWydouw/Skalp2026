@@ -1,4 +1,5 @@
 #include <iostream>
+#include <map>
 #include <stdio.h>
 #include <string>
 #include <vector>
@@ -12,6 +13,7 @@
 #include <SketchUpAPI/model/group.h>
 #include <SketchUpAPI/model/material.h>
 #include <SketchUpAPI/model/model.h>
+#include <SketchUpAPI/model/rendering_options.h>
 #include <SketchUpAPI/model/scene.h>
 #include <SketchUpAPI/model/section_plane.h>
 #include <SketchUpAPI/model/texture.h>
@@ -137,14 +139,12 @@ bool move_section_group(SUEntitiesRef entities, std::string ruby_id,
  * It seems to be creating orthogonal views for sections, reversing section
  * planes, and applying transforms.
  */
-bool setup_reversed_scene(std::string path, std::string new_path,
-                          std::vector<int> page_index_array,
-                          std::vector<SUPoint3D> eye_array,
-                          std::vector<SUPoint3D> target_array,
-                          std::vector<SUTransformation> transformation_array,
-                          std::vector<std::string> id_array,
-                          std::vector<SUVector3D> up_vector_array,
-                          double bounds) {
+bool setup_reversed_scene(
+    std::string path, std::string new_path, std::vector<int> page_index_array,
+    std::vector<SUPoint3D> eye_array, std::vector<SUPoint3D> target_array,
+    std::vector<SUTransformation> transformation_array,
+    std::vector<std::string> id_array, std::vector<SUVector3D> up_vector_array,
+    std::vector<std::string> sectionplane_id_array, double bounds) {
   SUInitialize();
 
   SUModelRef model = SU_INVALID;
@@ -191,6 +191,24 @@ bool setup_reversed_scene(std::string path, std::string new_path,
     }
   }
 
+  // --- Map Section Planes by Skalp ID ---
+  std::map<std::string, SUSectionPlaneRef> sectionplane_map;
+  if (num_sectionplanes > 0) {
+    std::vector<SUSectionPlaneRef> sectionplanes_list(num_sectionplanes);
+    for (size_t i = 0; i < num_sectionplanes; ++i)
+      SUSetInvalid(sectionplanes_list[i]);
+    size_t count_got;
+    SUEntitiesGetSectionPlanes(entities, num_sectionplanes,
+                               &sectionplanes_list[0], &count_got);
+    for (size_t i = 0; i < count_got; i++) {
+      std::string sid = get_attribute(
+          SUSectionPlaneToEntity(sectionplanes_list[i]), "Skalp", "ID");
+      if (!sid.empty()) {
+        sectionplane_map[sid] = sectionplanes_list[i];
+      }
+    }
+  }
+
   // --- Process Scenes / Cameras ---
 
   SUEntitiesRef section_group_entities = get_sectiongroups(entities);
@@ -223,38 +241,75 @@ bool setup_reversed_scene(std::string path, std::string new_path,
                        transformation_array[j]);
 
     if (page_index != -1) {
-      // Modifying a specific Scene
       if (page_index >= 0 && page_index < num_scenes) {
+        std::cerr << "[C++] Processing scene index: " << page_index
+                  << " eye: " << new_eye.x << "," << new_eye.y << ","
+                  << new_eye.z << std::endl;
+
+        SUSceneSetUseCamera(scenes[page_index], true);
+        SUSceneSetUseSectionPlanes(scenes[page_index], true);
+
+        if (j < sectionplane_id_array.size()) {
+          std::string target_sid = sectionplane_id_array[j];
+          if (!target_sid.empty() && sectionplane_map.count(target_sid)) {
+            SUEntitiesSetActiveSectionPlane(entities,
+                                            sectionplane_map[target_sid]);
+            SUSceneUpdate(scenes[page_index], FLAG_USE_SECTION_PLANES);
+            std::cerr << "[C++] Activated section plane ID: " << target_sid
+                      << " for scene " << page_index << std::endl;
+          }
+        }
+
         SUCameraRef scene_cam = SU_INVALID;
-        SUSceneGetCamera(scenes[page_index], &scene_cam);
-
-        // If scene has no camera (uses modeleditors?), we might need to
-        // create/copy? API: SUSceneGetCamera returns the camera of the scene.
-
+        SUCameraCreate(&scene_cam);
         SUCameraSetOrientation(scene_cam, &new_eye, &new_target,
                                &new_up_vector);
-        SUCameraSetPerspective(scene_cam, false); // Ortho
+        SUCameraSetPerspective(scene_cam, false);
         SUCameraSetOrthographicFrustumHeight(scene_cam, bounds);
 
-        // Set back to scene? SUSceneSetCamera copies details?
-        // Not strictly necessary if scene_cam is reference to internal object?
-        // API usually requires Set.
-        SUSceneSetCamera(scenes[page_index], scene_cam);
+        SUResult res = SUSceneSetCamera(scenes[page_index], scene_cam);
+        if (res != SU_ERROR_NONE) {
+          std::cerr << "[C++] ERROR setting camera for scene " << page_index
+                    << " code: " << res << std::endl;
+        } else {
+          std::cerr << "[C++] Camera set successfully for scene " << page_index
+                    << std::endl;
+        }
+        SUCameraRelease(&scene_cam);
+      } else {
+        std::cerr << "[C++] ERROR: scene index " << page_index
+                  << " out of bounds (max " << num_scenes << ")" << std::endl;
       }
     } else {
-      // Modifying the Model's active view logic? Or a temp camera?
-      // "Else" branch in original code seemed to modify Model Camera?
-
+      std::cerr << "[C++] Processing model camera eye: " << new_eye.x << ","
+                << new_eye.y << "," << new_eye.z << std::endl;
       SUCameraRef camera = SU_INVALID;
       SUModelGetCamera(model, &camera);
-
       SUCameraSetOrientation(camera, &new_eye, &new_target, &new_up_vector);
       SUCameraSetPerspective(camera, false);
       SUCameraSetOrthographicFrustumHeight(camera, bounds);
-
       SUModelSetCamera(model, &camera);
     }
   }
+
+  // --- Global Rendering Options ---
+  SURenderingOptionsRef rendering_options = SU_INVALID;
+  SUModelGetRenderingOptions(model, &rendering_options);
+
+  SUTypedValueRef bool_true = SU_INVALID;
+  SUTypedValueCreate(&bool_true);
+  SUTypedValueSetBool(bool_true, true);
+
+  SUTypedValueRef bool_false = SU_INVALID;
+  SUTypedValueCreate(&bool_false);
+  SUTypedValueSetBool(bool_false, false);
+
+  SURenderingOptionsSetValue(rendering_options, "DisplaySectionCuts",
+                             bool_true);
+  SURenderingOptionsSetValue(rendering_options, "SectionCutFilled", bool_false);
+
+  SUTypedValueRelease(&bool_true);
+  SUTypedValueRelease(&bool_false);
 
   remove_materials(model);
 

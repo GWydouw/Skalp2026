@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "skalp_convert.h"
+#include "sketchup.h"
 #include <LayOutAPI/layout.h>
 #include <LayOutAPI/model/style.h>
 #include <SketchUpAPI/common.h>
@@ -214,16 +215,21 @@ std::vector<hiddenlines> get_exploded_entities(
         LOSketchUpModelSetCurrentScene(lo_model_ref, page_index_array[j] + 1);
 
     if (SU_ERROR_NONE != result) {
-      // Error switching scene - abort
+      std::cerr
+          << "[C++] ERROR: LOSketchUpModelSetCurrentScene failed for index: "
+          << page_index_array[j] << " code: " << result << std::endl;
       break;
+    } else {
+      std::cerr << "[C++] Layout switched to scene index: "
+                << page_index_array[j] + 1 << std::endl;
     }
 
-    double current_scale;
-    if (perspective_array[j]) {
-      current_scale = scale_array[j];
-    } else {
+    double current_scale = scale_array[j];
+    if (!perspective_array[j] && current_scale > 0) {
+      LOSketchUpModelSetScale(lo_model_ref, current_scale);
+    } else if (!perspective_array[j]) {
       LOSketchUpModelGetScale(lo_model_ref, &current_scale);
-    };
+    }
 
     // Explode
     LOEntityListRef exploded_entity_list = SU_INVALID;
@@ -296,10 +302,11 @@ std::vector<hiddenlines> get_exploded_entities(
     LOEntityListRelease(&exploded_entity_list);
   }
 
-  // Debug/Test output if needed
-  // std::string lo_filepath = file_path + "CreatedFromRuby.layout";
-  // LODocumentSaveToFile(lo_document_ref, lo_filepath.c_str(),
-  // LODocumentVersion_Current);
+  // Debug/Test output    // SAVE LAYOUT ONLY FOR TESTING IF NEEDED
+  // Force save to Desktop to be sure
+  std::string lo_filepath = "/Users/guywydouw/Desktop/CreatedFromRuby.layout";
+  LODocumentSaveToFile(lo_document_ref, lo_filepath.c_str(),
+                       LODocumentVersion_Current);
 
   // Final Cleanup
   if (SUIsValid(model))

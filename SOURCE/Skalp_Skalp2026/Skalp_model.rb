@@ -1055,7 +1055,7 @@ module Skalp
       check_pages
       for skpPage in @skpModel.pages
         if get_memory_attribute(skpPage, "Skalp", "ID")
-          Skalp.force_style_to_show_skalp_section(skpPage)
+          Skalp.force_style_to_show_skalp_section(skpPage, false, false)
           skalp_pages << skpPage
         else
           no_skalp_pages << skpPage
@@ -1304,7 +1304,7 @@ module Skalp
 
       for skpPage in @skpModel.pages
         if get_memory_attribute(skpPage, "Skalp", "ID")
-          Skalp.force_style_to_show_skalp_section(skpPage)
+          Skalp.force_style_to_show_skalp_section(skpPage, false, false)
           skalp_pages << skpPage
         else
           no_skalp_pages << skpPage
@@ -1356,7 +1356,7 @@ module Skalp
 
       manage_sections(skalp_pages, no_skalp_pages)
       skalp_pages.each do |skpPage|
-        Skalp.update_page(skpPage)
+        Skalp.update_page(skpPage, false, false)
         sectionplaneID = get_memory_attribute(skpPage, "Skalp", "sectionplaneID")
         set_memory_attribute(skpPage, "Skalp", "sectionplaneID", sectionplaneID)
       end

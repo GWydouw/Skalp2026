@@ -283,7 +283,7 @@ module Skalp
   @log.info("Skalp version: " + SKALP_VERSION)
   @log.info("Sketchup version: " + Sketchup.version)
 
-  EXPIRE_DATE = Time.new(2025, 12, 31) # TODO: set beta expire date
+  EXPIRE_DATE = Time.new(2030, 12, 31) # TODO: set beta expire date
 
   @log.info("OS: " + RUBY_PLATFORM + " " + Sketchup.os_language)
 
@@ -451,6 +451,11 @@ module Skalp
 
   if Time.now > EXPIRE_DATE
     @version_expired = true
+
+    # STUB missing methods for expired state
+    def self.online? = Sketchup.is_online
+    def self.new_version = false
+
     encoderErrorCheck
     show_info([:update])
   else
