@@ -16,6 +16,8 @@
 #include <SketchUpAPI/model/rendering_options.h>
 #include <SketchUpAPI/model/scene.h>
 #include <SketchUpAPI/model/section_plane.h>
+#include <SketchUpAPI/model/style.h>
+#include <SketchUpAPI/model/styles.h>
 #include <SketchUpAPI/model/texture.h>
 #include <SketchUpAPI/model/typed_value.h>
 
@@ -51,6 +53,60 @@ bool remove_materials(SUModelRef model) {
       SUMaterialSetType(materials[i], SUMaterialType_Colored);
     }
   }
+  return true;
+}
+
+/**
+ * Iterates through all scenes in the model and overrides their rendering
+ * options to match Skalp's hidden-line requirements.
+ */
+/**
+ * Loads a style from file and applies it to all scenes in the model.
+ */
+bool load_and_apply_style(SUModelRef model, const std::string &style_path) {
+  SUStylesRef styles = SU_INVALID;
+  SUModelGetStyles(model, &styles);
+  if (SUIsInvalid(styles))
+    return false;
+
+  // Add the style and activate it so we can retrieve it
+  SUResult res = SUStylesAddStyle(styles, style_path.c_str(), true);
+  if (res != SU_ERROR_NONE) {
+    std::cerr << "[C++] Failed to add style from: " << style_path
+              << " (Error: " << res << ")" << std::endl;
+    // Attempt to proceed if it was a duplicate?
+    if (res != SU_ERROR_DUPLICATE)
+      return false;
+  } else {
+    std::cerr << "[C++] Style added: " << style_path << std::endl;
+  }
+
+  // Get the active style (which should be the one we just added/activated)
+  SUStyleRef style = SU_INVALID;
+  res = SUStylesGetActiveStyle(styles, &style);
+  if (res != SU_ERROR_NONE || SUIsInvalid(style)) {
+    std::cerr << "[C++] Failed to get active style." << std::endl;
+    return false;
+  }
+
+  size_t num_scenes = 0;
+  SUModelGetNumScenes(model, &num_scenes);
+  if (num_scenes == 0)
+    return true;
+
+  std::vector<SUSceneRef> scenes(num_scenes);
+  SUModelGetScenes(model, num_scenes, &scenes[0], &num_scenes);
+
+  for (size_t i = 0; i < num_scenes; ++i) {
+    // Apply the style to the scene
+    res = SUStylesApplyStyleToScene(styles, style, scenes[i]);
+    if (res != SU_ERROR_NONE) {
+      std::cerr << "[C++] Failed to apply style to scene " << i
+                << " Error: " << res << std::endl;
+    }
+  }
+
+  std::cerr << "[C++] Style applied to all scenes." << std::endl;
   return true;
 }
 
@@ -134,17 +190,42 @@ bool move_section_group(SUEntitiesRef entities, std::string ruby_id,
   return true;
 }
 
+// Helper to find section planes in a generic entities collection
+void collect_section_planes(SUEntitiesRef entities,
+                            std::map<std::string, SUSectionPlaneRef> &map) {
+  if (SUIsInvalid(entities))
+    return;
+
+  size_t num_sectionplanes;
+  SUEntitiesGetNumSectionPlanes(entities, &num_sectionplanes);
+  if (num_sectionplanes > 0) {
+    std::vector<SUSectionPlaneRef> planes(num_sectionplanes);
+    size_t count;
+    SUEntitiesGetSectionPlanes(entities, num_sectionplanes, &planes[0], &count);
+    for (size_t i = 0; i < count; ++i) {
+      std::string sid =
+          get_attribute(SUSectionPlaneToEntity(planes[i]), "Skalp", "ID");
+      if (!sid.empty()) {
+        map[sid] = planes[i];
+      }
+    }
+  }
+}
+
 /**
  * Sets up a reversed scene?
  * It seems to be creating orthogonal views for sections, reversing section
  * planes, and applying transforms.
  */
-bool setup_reversed_scene(
-    std::string path, std::string new_path, std::vector<int> page_index_array,
-    std::vector<SUPoint3D> eye_array, std::vector<SUPoint3D> target_array,
-    std::vector<SUTransformation> transformation_array,
-    std::vector<std::string> id_array, std::vector<SUVector3D> up_vector_array,
-    std::vector<std::string> sectionplane_id_array, double bounds) {
+bool setup_reversed_scene(std::string path, std::string new_path,
+                          std::vector<int> page_index_array,
+                          std::vector<SUPoint3D> eye_array,
+                          std::vector<SUPoint3D> target_array,
+                          std::vector<SUTransformation> transformation_array,
+                          std::vector<std::string> id_array,
+                          std::vector<SUVector3D> up_vector_array,
+                          std::vector<std::string> sectionplane_id_array,
+                          double bounds, std::string style_path) {
   SUInitialize();
 
   SUModelRef model = SU_INVALID;
@@ -191,32 +272,62 @@ bool setup_reversed_scene(
     }
   }
 
-  // --- Map Section Planes by Skalp ID ---
+  // --- Flatten Sections Strategy ---
+  // Iterate the "Skalp sections" group, find all planes, and recreate them in
+  // the Model Root. This ensures we can easily activate them without worrying
+  // about nested paths.
+
   std::map<std::string, SUSectionPlaneRef> sectionplane_map;
-  if (num_sectionplanes > 0) {
-    std::vector<SUSectionPlaneRef> sectionplanes_list(num_sectionplanes);
-    for (size_t i = 0; i < num_sectionplanes; ++i)
-      SUSetInvalid(sectionplanes_list[i]);
-    size_t count_got;
-    SUEntitiesGetSectionPlanes(entities, num_sectionplanes,
-                               &sectionplanes_list[0], &count_got);
-    for (size_t i = 0; i < count_got; i++) {
-      std::string sid = get_attribute(
-          SUSectionPlaneToEntity(sectionplanes_list[i]), "Skalp", "ID");
-      if (!sid.empty()) {
-        sectionplane_map[sid] = sectionplanes_list[i];
-      }
-    }
-  }
-
-  // --- Process Scenes / Cameras ---
-
   SUEntitiesRef section_group_entities = get_sectiongroups(entities);
 
-  if (SUIsInvalid(section_group_entities)) {
-    // std::cout << "sectiongroup NOT found" << std::endl;
-    // Proceeding might fail if move_section_group depends on it?
-    // move_section_group checks constraints.
+  if (!SUIsInvalid(section_group_entities)) {
+    size_t num_group_planes;
+    SUEntitiesGetNumSectionPlanes(section_group_entities, &num_group_planes);
+    if (num_group_planes > 0) {
+      std::vector<SUSectionPlaneRef> g_planes(num_group_planes);
+      size_t count;
+      SUEntitiesGetSectionPlanes(section_group_entities, num_group_planes,
+                                 &g_planes[0], &count);
+
+      for (size_t i = 0; i < count; ++i) {
+        std::string sid =
+            get_attribute(SUSectionPlaneToEntity(g_planes[i]), "Skalp", "ID");
+        if (!sid.empty()) {
+          // Get properties
+          SUPlane3D eq;
+          SUSectionPlaneGetPlane(g_planes[i], &eq);
+
+          // Create NEW plane in ROOT
+          SUSectionPlaneRef new_plane = SU_INVALID;
+          SUSectionPlaneCreate(&new_plane);
+          SUSectionPlaneSetPlane(new_plane, &eq);
+
+          // Copy ID
+          SUAttributeDictionaryRef dict = SU_INVALID;
+          SUEntityGetAttributeDictionary(SUSectionPlaneToEntity(new_plane),
+                                         "Skalp", &dict);
+          if (SUIsInvalid(dict)) {
+            SUAttributeDictionaryCreate(&dict, "Skalp");
+            SUEntityAddAttributeDictionary(SUSectionPlaneToEntity(new_plane),
+                                           dict);
+          }
+          SUTypedValueRef val = SU_INVALID;
+          SUTypedValueCreate(&val);
+          SUTypedValueSetString(val, sid.c_str());
+          SUAttributeDictionarySetValue(dict, "ID", val);
+          SUTypedValueRelease(&val);
+
+          // Add to Root Entities
+          SUEntitiesAddSectionPlanes(entities, 1, &new_plane);
+
+          // Map it
+          sectionplane_map[sid] = new_plane;
+        }
+      }
+    }
+
+    // Also grab any existing root planes just in case
+    collect_section_planes(entities, sectionplane_map);
   }
 
   // Cache scenes lookup?
@@ -237,6 +348,9 @@ bool setup_reversed_scene(
     SUVector3D new_up_vector = up_vector_array[j];
 
     // This function handles invalid entity ref gracefully
+    // Note: section_group_entities might be invalid if we flattened everything?
+    // Actually we keep the group but we ALSO copied the planes.
+    // We still move the group just in case other geometry is in it.
     move_section_group(section_group_entities, id_array[j],
                        transformation_array[j]);
 
@@ -249,19 +363,55 @@ bool setup_reversed_scene(
         SUSceneSetUseCamera(scenes[page_index], true);
         SUSceneSetUseSectionPlanes(scenes[page_index], true);
 
+        // 2. Enable scene-specific rendering options to respect the Per-Scene
+        // styles (which we will modify in Ruby just before export)
+        SUSceneSetUseRenderingOptions(scenes[page_index], true);
+
+        // Debug Style
+        SUStyleRef style = SU_INVALID;
+        SUSceneGetStyle(scenes[page_index], &style);
+        if (!SUIsInvalid(style)) {
+          SUStringRef name = SU_INVALID;
+          SUStringCreate(&name);
+          SUStyleGetName(style, &name);
+          size_t name_l;
+          SUStringGetUTF8Length(name, &name_l);
+          char *name_c = new char[name_l + 1];
+          SUStringGetUTF8(name, name_l + 1, name_c, &name_l);
+          std::cerr << "[C++] Scene Style: " << name_c << std::endl;
+          delete[] name_c;
+          SUStringRelease(&name);
+        } else {
+          std::cerr << "[C++] Scene Style: INVALID/DEFAULT" << std::endl;
+        }
+
         if (j < sectionplane_id_array.size()) {
           std::string target_sid = sectionplane_id_array[j];
-          if (!target_sid.empty() && sectionplane_map.count(target_sid)) {
+          // Check if key exists using find to avoid accidental insertion
+          // (though [] does that, count is safer)
+          if (!target_sid.empty() && sectionplane_map.count(target_sid) > 0) {
+
+            // Activate plane on ROOT entities (since we flattened them)
             SUEntitiesSetActiveSectionPlane(entities,
                                             sectionplane_map[target_sid]);
             SUSceneUpdate(scenes[page_index], FLAG_USE_SECTION_PLANES);
-            std::cerr << "[C++] Activated section plane ID: " << target_sid
+            std::cerr << "[C++] Activated ROOT section plane ID: " << target_sid
                       << " for scene " << page_index << std::endl;
           }
         }
 
         SUCameraRef scene_cam = SU_INVALID;
         SUCameraCreate(&scene_cam);
+
+        // Debug Log Camera
+        std::cerr << "[C++] Cam Set: Eye(" << new_eye.x << "," << new_eye.y
+                  << "," << new_eye.z << ") "
+                  << "Target(" << new_target.x << "," << new_target.y << ","
+                  << new_target.z << ") "
+                  << "Up(" << new_up_vector.x << "," << new_up_vector.y << ","
+                  << new_up_vector.z << ") "
+                  << "Height: " << bounds << std::endl;
+
         SUCameraSetOrientation(scene_cam, &new_eye, &new_target,
                                &new_up_vector);
         SUCameraSetPerspective(scene_cam, false);
@@ -283,34 +433,39 @@ bool setup_reversed_scene(
     } else {
       std::cerr << "[C++] Processing model camera eye: " << new_eye.x << ","
                 << new_eye.y << "," << new_eye.z << std::endl;
+
+      // Also activate section plane for model root (Active View)
+      if (j < sectionplane_id_array.size()) {
+        std::string target_sid = sectionplane_id_array[j];
+        if (!target_sid.empty() && sectionplane_map.count(target_sid) > 0) {
+          SUEntitiesSetActiveSectionPlane(entities,
+                                          sectionplane_map[target_sid]);
+          std::cerr << "[C++] Activated ROOT section plane ID: " << target_sid
+                    << " for model root" << std::endl;
+        }
+      }
+
       SUCameraRef camera = SU_INVALID;
       SUModelGetCamera(model, &camera);
       SUCameraSetOrientation(camera, &new_eye, &new_target, &new_up_vector);
       SUCameraSetPerspective(camera, false);
       SUCameraSetOrthographicFrustumHeight(camera, bounds);
-      SUModelSetCamera(model, &camera);
+      // SUModelSetCamera(model, &camera); // Not needed as we modified the
+      // camera ref
     }
   }
 
-  // --- Global Rendering Options ---
-  SURenderingOptionsRef rendering_options = SU_INVALID;
-  SUModelGetRenderingOptions(model, &rendering_options);
+  // Set Global Rendering Options (Backup, though scenes use their own styles
+  // now) apply_skalp_rendering_settings(model); // REMOVED: Redundant and
+  // incomplete . We rely on the input file having correct styles (manipulated
+  // by Ruby within a transaction).
 
-  SUTypedValueRef bool_true = SU_INVALID;
-  SUTypedValueCreate(&bool_true);
-  SUTypedValueSetBool(bool_true, true);
+  // Apply Skalp Style (To all scenes) - Replaces previous overrides
+  if (!style_path.empty() && style_path != "\"\"" && style_path != "''") {
+    load_and_apply_style(model, style_path);
+  }
 
-  SUTypedValueRef bool_false = SU_INVALID;
-  SUTypedValueCreate(&bool_false);
-  SUTypedValueSetBool(bool_false, false);
-
-  SURenderingOptionsSetValue(rendering_options, "DisplaySectionCuts",
-                             bool_true);
-  SURenderingOptionsSetValue(rendering_options, "SectionCutFilled", bool_false);
-
-  SUTypedValueRelease(&bool_true);
-  SUTypedValueRelease(&bool_false);
-
+  // Clean up unused materials
   remove_materials(model);
 
   SUModelSaveToFileWithVersion(model, new_path.c_str(), SUModelVersion_Current);

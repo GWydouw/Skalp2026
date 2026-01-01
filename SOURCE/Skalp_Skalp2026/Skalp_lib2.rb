@@ -596,15 +596,16 @@ module Skalp
   end
 
   def setup_reversed_scene(temp_dir, new_temp_dir, index_array, reversed_eye_array, reversed_target_array,
-                           transformation_array, group_id_array, up_vector_array, scene_name_array, sectionplane_id_array, modelbounds)
+                           transformation_array, group_id_array, up_vector_array, scene_name_array, sectionplane_id_array, modelbounds, style_path = nil)
     require "Skalp_Skalp2026/shellwords/shellwords"
 
     path = Shellwords.escape(SKALP_PATH + "lib/")
 
+    style_path ||= SKALP_PATH + "resources/SUstyles/default.style"
     if OS == :WINDOWS
-      command = %("#{path[1..-2]}Skalp.exe" "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{array_to_string_array(sectionplane_id_array)}" "#{modelbounds}")
+      command = %("#{path[1..-2]}Skalp.exe" "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{array_to_string_array(sectionplane_id_array)}" "#{modelbounds}" "#{style_path}")
     else
-      command = %(#{path}Skalp "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{array_to_string_array(sectionplane_id_array)}" "#{modelbounds}")
+      command = %(#{path}Skalp "setup_reversed_scene" "#{temp_dir}" "#{new_temp_dir}" "#{array_to_string_array(index_array)}" "#{point_array_to_string_array(reversed_eye_array)}" "#{point_array_to_string_array(reversed_target_array)}" "#{point_array_to_string_array(transformation_array)}" "#{array_to_string_array(group_id_array)}" "#{point_array_to_string_array(up_vector_array)}" "#{array_to_string_array(sectionplane_id_array)}" "#{modelbounds}" "#{style_path}")
     end
 
     stdout = start_new_process(command.encode("utf-8"))
