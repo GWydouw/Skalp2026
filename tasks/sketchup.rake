@@ -8,14 +8,23 @@ namespace :skp do
     puts "🔪 Nuking SketchUp..."
 
     if OS.mac?
-      sh "killall -9 'SketchUp' 2>/dev/null || true"
+      year = Config::SKETCHUP_YEAR
+      puts "🔫 Targeting SketchUp #{year} processes..."
 
-      # Wait for death
-      puts "⏳ Waiting for termination..."
-      start = Time.now
-      while `pgrep -x 'SketchUp'`.strip.length > 0
-        sleep 0.2
-        break if Time.now - start > 5 # Timeout
+      # Find PIDs running from the specific year's application path
+      # Uses pgrep -f to match the command line which typically contains the full path
+      # e.g. /Applications/SketchUp 2026/SketchUp.app
+      pids = `pgrep -f "SketchUp #{year}"`.split("\n")
+
+      if pids.empty?
+        puts "🤷 No SketchUp #{year} processes found."
+      else
+        pids.each do |pid|
+          puts "   💥 Killing PID #{pid}..."
+          sh "kill -9 #{pid} 2>/dev/null || true"
+        end
+        puts "⏳ Waiting for termination..."
+        sleep 2 # Give it a moment to die
       end
     elsif OS.windows?
       sh "taskkill /F /IM SketchUp.exe 2>nul || exit 0"

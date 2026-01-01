@@ -39,12 +39,15 @@ bool setup_hiddenline_style(std::string path);
 bool modifyStyle(std::string path, std::string new_path);
 bool create_white_model(std::string path, std::string fase,
                         SUMaterialRef color_material);
-bool setup_reversed_scene(
-    std::string path, std::string new_path, std::vector<int> page_index_array,
-    std::vector<SUPoint3D> eye_array, std::vector<SUPoint3D> target_array,
-    std::vector<SUTransformation> transformation_array,
-    std::vector<std::string> id_array, std::vector<SUVector3D> up_vector_array,
-    std::vector<std::string> sectionplane_id_array, double bounds);
+bool setup_reversed_scene(std::string path, std::string new_path,
+                          std::vector<int> page_index_array,
+                          std::vector<SUPoint3D> eye_array,
+                          std::vector<SUPoint3D> target_array,
+                          std::vector<SUTransformation> transformation_array,
+                          std::vector<std::string> id_array,
+                          std::vector<SUVector3D> up_vector_array,
+                          std::vector<std::string> sectionplane_id_array,
+                          double bounds, std::string style_path);
 std::vector<hiddenlines> get_exploded_entities(
     std::string path, double height, std::vector<int> page_index_array,
     std::vector<double> scale_array, std::vector<bool> perspective_array,
@@ -151,7 +154,7 @@ int main(int argc, const char *argv[]) {
   // reversed_target_array, transformation_array, group_id_array,
   // up_vector_array, modelbounds
   if (command == "setup_reversed_scene") {
-    if (argc > 11) {
+    if (argc > 12) {
       bool result = setup_reversed_scene(
           path,
           argv[3], // output path?
@@ -159,7 +162,8 @@ int main(int argc, const char *argv[]) {
           convert_point3D_array(argv[6]), convert_transformation_array(argv[7]),
           convert_string_array(argv[8]), convert_vector_array(argv[9]),
           convert_string_array(argv[10]), // sectionplane_id_array
-          convert_double(argv[11]));      // bounds
+          convert_double(argv[11]),       // bounds
+          argv[12]);                      // style_path
 
       if (result) {
         std::cout << "true";

@@ -950,13 +950,13 @@ module Skalp
       if scenes == :active
         info = collect_page_info(-1, info, Skalp.active_model.skpModel, reversed)
       elsif scenes == :all
-        info = collect_page_info(-1, info, Skalp.active_model.skpModel, reversed)
-
         index = 0
         Skalp.active_model.skpModel.pages.each do |page|
           info = collect_page_info(index, info, page, reversed)
           index += 1
         end
+
+        info = collect_page_info(-1, info, Skalp.active_model.skpModel, reversed)
       elsif scenes == :selected
         pages = Skalp.export_scene_list
 

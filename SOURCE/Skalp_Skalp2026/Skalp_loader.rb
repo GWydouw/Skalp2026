@@ -453,8 +453,13 @@ module Skalp
     @version_expired = true
 
     # STUB missing methods for expired state
-    def self.online? = Sketchup.is_online
-    def self.new_version = false
+    def self.online?
+      Sketchup.is_online
+    end
+
+    def self.new_version
+      false
+    end
 
     encoderErrorCheck
     show_info([:update])

@@ -115,7 +115,9 @@ std::vector<hiddenlines> get_exploded_entities(
   SUResult result;
 
   // --- Create LayOut Model ---
-  LOAxisAlignedRect2D bounds = {{0., 0.}, {200., height}};
+  // Add 10% margin to bounds to prevent edge clipping
+  double margin = height * 0.2;
+  LOAxisAlignedRect2D bounds = {{0., 0.}, {height + margin, height + margin}};
 
   result = LOSketchUpModelCreate(&lo_model_ref, path.c_str(), &bounds);
 
@@ -176,8 +178,8 @@ std::vector<hiddenlines> get_exploded_entities(
 
   // Set Page Size large enough
   if (SU_ERROR_NONE == result) {
-    LOPageInfoSetHeight(page_info, 200.0);
-    LOPageInfoSetWidth(page_info, 200.0);
+    LOPageInfoSetHeight(page_info, height + margin);
+    LOPageInfoSetWidth(page_info, height + margin);
   }
 
   // Set Vector rendering
@@ -196,6 +198,14 @@ std::vector<hiddenlines> get_exploded_entities(
     SUTerminate();
     return hiddenline_result;
   }
+
+  // DEBUG: Save LayOut file for inspection
+  std::string debug_lo_path =
+      "/Users/guywydouw/Desktop/skalp_debug_view.layout";
+  LODocumentSaveToFile(lo_document_ref, debug_lo_path.c_str(),
+                       LODocumentVersion_Current);
+  std::cerr << "[C++] DEBUG: Saved LayOut file to: " << debug_lo_path
+            << std::endl;
 
   // Set output lineweight
   result = LOSketchUpModelSetLineWeight(lo_model_ref, 1.0);
