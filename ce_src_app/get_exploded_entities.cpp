@@ -115,9 +115,8 @@ std::vector<hiddenlines> get_exploded_entities(
   SUResult result;
 
   // --- Create LayOut Model ---
-  // Add 10% margin to bounds to prevent edge clipping
-  double margin = height * 0.2;
-  LOAxisAlignedRect2D bounds = {{0., 0.}, {height + margin, height + margin}};
+  // Margin removed as per user request (was based on misunderstanding)
+  LOAxisAlignedRect2D bounds = {{0., 0.}, {height, height}};
 
   result = LOSketchUpModelCreate(&lo_model_ref, path.c_str(), &bounds);
 
@@ -178,8 +177,8 @@ std::vector<hiddenlines> get_exploded_entities(
 
   // Set Page Size large enough
   if (SU_ERROR_NONE == result) {
-    LOPageInfoSetHeight(page_info, height + margin);
-    LOPageInfoSetWidth(page_info, height + margin);
+    LOPageInfoSetHeight(page_info, height);
+    LOPageInfoSetWidth(page_info, height);
   }
 
   // Set Vector rendering
