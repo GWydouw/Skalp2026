@@ -451,11 +451,13 @@ function solid_color(value) {
         $("#tile_x").css('color', 'lightgrey');
         $("#tile_y").css('color', 'lightgrey');
 
-        $("#translate_01").css('color', 'lightgrey');
-        $("#translate_04").css('color', 'lightgrey');
-        $("#translate_08").css('color', 'lightgrey');
-        $("#translate_17").css('color', 'lightgrey');
-        $("#translate_18").css('color', 'lightgrey');
+        $("#translate_01").css('color', 'lightgrey'); // Section Line Width label? No, translate_01 is Line Width (Pattern)
+        $("#translate_05").css('color', 'lightgrey'); // Section Line Width
+        $("#translate_06").css('color', 'lightgrey'); // Fill Color
+        $("#translate_08").css('color', 'lightgrey'); // Line Width
+        $("#translate_17").css('color', 'lightgrey'); // Line Color
+        $("#translate_18").css('color', 'lightgrey'); // Align with objects
+        $("#translate_section_line_color").css('color', 'lightgrey');
     } else {
         $("#units").attr('disabled', false);
         $("#lineweight_model").attr('disabled', false);
@@ -470,10 +472,12 @@ function solid_color(value) {
         $("#tile_y").css('color', 'green');
 
         $("#translate_01").css('color', 'black');
-        $("#translate_04").css('color', 'black');
+        $("#translate_05").css('color', 'black');
+        $("#translate_06").css('color', 'black');
         $("#translate_08").css('color', 'black');
         $("#translate_17").css('color', 'black');
         $("#translate_18").css('color', 'black');
+        $("#translate_section_line_color").css('color', 'black');
     }
 }
 
@@ -504,13 +508,30 @@ function create_hatch() {
         var space = document.getElementById('units').value;
         var pen_paper = document.getElementById('lineweight_paper').value;
         var pen_model = document.getElementById('lineweight_model').value;
-        // Use native color inputs instead of Spectrum
+        // Use Spectrum pickers
         var fill_color = $("#fill_color_input").spectrum("get").toRgbString();
         var line_color = $("#line_color_input").spectrum("get").toRgbString();
+        var section_line_color = $("#section_line_color_input").spectrum("get").toRgbString();
         var aligned = $("#align_pattern").prop('checked');
         var section_cut_width = document.getElementById('sectioncut_linewidth').value;
+        var unify = $("#unify_material").prop('checked');
+        var drawing_priority = document.getElementById('zindex').value;
 
-        var params = utf8(acad_pat).concat(";", size_x, ";", space, ";", pen_paper, ";", pen_model, ";", line_color, ";", fill_color, ";", aligned, ';', section_cut_width, ";", utf8(name));
+        var params = [
+            utf8(acad_pat),
+            size_x,
+            space,
+            pen_paper,
+            pen_model,
+            line_color,
+            fill_color,
+            aligned,
+            section_cut_width,
+            utf8(name),
+            section_line_color,
+            unify,
+            drawing_priority
+        ].join(';');
 
         window.location = 'skp:create_hatch@' + params;
     }
@@ -566,15 +587,36 @@ function create_preview(status) {
     var space = document.getElementById('units').value;
     var pen_paper = document.getElementById('lineweight_paper').value;
     var pen_model = document.getElementById('lineweight_model').value;
-    // Use native color inputs instead of Spectrum
-    var fill_color_input = document.getElementById('fill_color_input');
-    var line_color_input = document.getElementById('line_color_input');
-    var fill_color = fill_color_input ? hexToRgb(fill_color_input.value) : 'rgb(255,255,255)';
-    var line_color = line_color_input ? hexToRgb(line_color_input.value) : 'rgb(0,0,0)';
+
+    // Use Spectrum
+    var fill_color = $("#fill_color_input").spectrum("get").toRgbString();
+    var line_color = $("#line_color_input").spectrum("get").toRgbString();
+    var section_line_color = $("#section_line_color_input").spectrum("get").toRgbString();
+
     var aligned = $("#align_pattern").prop('checked');
     var section_cut_width = document.getElementById('sectioncut_linewidth').value;
     var materialname = document.getElementById('hatch_name').value;
-    var params = utf8(acad_pat).concat(";", size_x, ";", space, ";", pen_paper, ";", pen_model, ";", line_color, ";", fill_color, ";", slider, ";", status, ";", aligned, ";", section_cut_width, ";", utf8(materialname));
+    var unify = $("#unify_material").prop('checked');
+    var drawing_priority = document.getElementById('zindex').value;
+
+    var params = [
+        utf8(acad_pat),
+        size_x,
+        space,
+        pen_paper,
+        pen_model,
+        line_color,
+        fill_color,
+        slider,
+        status,
+        aligned,
+        section_cut_width,
+        utf8(materialname),
+        section_line_color,
+        unify,
+        drawing_priority
+    ].join(';');
+
     if (acad_pat != '') {
         window.location = 'skp:create_preview@' + params;
     }

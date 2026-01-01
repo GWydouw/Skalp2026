@@ -143,8 +143,11 @@
             <div id="section_section" class="section-content">
                 <!-- Section Line Color -->
                 <div class="field-row">
-                    <label id="translate_18" title="Coming Soon..." style="color: #999 !important;">Line Color:</label>
-                    <input type="text" id="section_line_color_input" class="spectrum-picker" disabled>
+                    <label id="translate_section_line_color">Line Color:</label>
+                    <div id="section_line_color_block" class="color-block" style="background-color: rgb(0, 0, 0);">
+                    </div>
+                    <input type="text" id="section_line_color_input" class="spectrum-picker" value="rgb(0,0,0)"
+                        style="display:none;">
                 </div>
 
                 <!-- Section Line Width -->
@@ -178,9 +181,9 @@
 
                 <!-- Unify Material -->
                 <div class="field-row">
-                    <label title="Coming Soon...">Join Section Lines:</label>
-                    <input type="checkbox" name="unify material" value="unify" id="unify_material" disabled
-                        title="Coming Soon...">
+                    <label>Join Section Lines:</label>
+                    <input type="checkbox" name="unify material" value="unify" id="unify_material"
+                        onchange="$('#update_preview').show();create_preview(0);">
                 </div>
             </div>
         </div>
@@ -202,17 +205,15 @@
                         onchange="$('#update_preview').show();">
                 </div>
 
-                <!-- Z-Index -->
+                <!-- Drawing Priority -->
                 <div class="field-row">
-                    <label title="Coming Soon...">Z-Index:</label>
-                    <select id="zindex" disabled title="Coming Soon...">
-                        <option value="-3">-3</option>
-                        <option value="-2">-2</option>
-                        <option value="-1">-1</option>
-                        <option value="0" selected>0</option>
-                        <option value="+1">+1</option>
-                        <option value="+2">+2</option>
-                        <option value="+3">+3</option>
+                    <label>Drawing Priority:</label>
+                    <select id="zindex" onchange="$('#update_preview').show();create_preview(0);">
+                        <option value="-2">very low</option>
+                        <option value="-1">low</option>
+                        <option value="0" selected>neutral</option>
+                        <option value="1">high</option>
+                        <option value="2">very high</option>
                     </select>
                 </div>
             </div>
@@ -344,8 +345,11 @@
             // Get colors from Spectrum pickers (with alpha support)
             var lineColorObj = $("#line_color_input").spectrum("get");
             var fillColorObj = $("#fill_color_input").spectrum("get");
+            var sectionLineColorObj = $("#section_line_color_input").spectrum("get");
+
             var lineColor = lineColorObj ? lineColorObj.toRgbString() : 'rgb(0, 0, 0)';
             var fillColor = fillColorObj ? fillColorObj.toRgbString() : 'rgb(255, 255, 255)';
+            var sectionLineColor = sectionLineColorObj ? sectionLineColorObj.toRgbString() : 'rgb(0, 0, 0)';
 
             var units = document.getElementById('units') ? document.getElementById('units').value : '';
             var lineweight = document.getElementById('lineweight_paper') ? document.getElementById('lineweight_paper').value : '0.18 mm';
@@ -356,19 +360,25 @@
             var sectionCutWidth = document.getElementById('sectioncut_linewidth') ? document.getElementById('sectioncut_linewidth').value : '0.35 mm';
             var materialName = document.getElementById('hatch_name') ? document.getElementById('hatch_name').value : '';
 
+            var unify = document.getElementById('unify_material') && document.getElementById('unify_material').checked ? 'true' : 'false';
+            var drawingPriority = document.getElementById('zindex') ? document.getElementById('zindex').value : '0';
+
             var params = [
-                pattern,         // 0
-                tile_x,          // 1
-                units,           // 2
-                lineweight,      // 3 - lineweight_paper
-                lineweight_model,// 4 - lineweight_model
-                lineColor,       // 5
-                fillColor,       // 6
-                slider,          // 7
-                isNew,           // 8
-                aligned,         // 9
-                sectionCutWidth, // 10
-                materialName     // 11
+                pattern,            // 0
+                tile_x,             // 1
+                units,              // 2
+                lineweight,         // 3 - lineweight_paper
+                lineweight_model,   // 4 - lineweight_model
+                lineColor,          // 5
+                fillColor,          // 6
+                slider,             // 7
+                isNew,              // 8
+                aligned,            // 9
+                sectionCutWidth,    // 10
+                materialName,       // 11
+                sectionLineColor,   // 12
+                unify,              // 13
+                drawingPriority     // 14
             ].join(';');
 
             sketchup.create_preview(params);

@@ -477,8 +477,6 @@ module Skalp
           solidcolor = false
         end
 
-        load_patterns
-
         zoom_factor = 1.0 / ((105 - vars[7].to_i) * 5.0 / 100.0)
 
         # previewing a pattern that already exist in the model
@@ -486,6 +484,16 @@ module Skalp
         drawing_scale = Skalp.dialog ? Skalp.dialog.drawing_scale.to_f : 50.0
 
         script("solid_color(#{solidcolor});")
+
+        # Set new fields in UI
+        section_line_color = pattern_string[:section_line_color] || "rgb(0,0,0)"
+        unify = pattern_string[:unify] == true
+        drawing_priority = pattern_string[:drawing_priority] || 0
+        script("$('#section_line_color_input').spectrum('set', '#{section_line_color}');")
+        script("$('#section_line_color_block').css('background-color', '#{section_line_color}');")
+        script("$('#unify_material').prop('checked', #{unify});")
+        script("$('#zindex').val('#{drawing_priority}');")
+
         pattern_info = @hatch.create_png({
                                            solid_color: solidcolor,
                                            type: :preview,
@@ -582,7 +590,10 @@ module Skalp
                                              print_scale: Skalp.dialog.drawing_scale.to_f,
                                              zoom_factor: zoom_factor,
                                              user_x: @tile.x_value,
-                                             space: vars[2].to_s.to_sym
+                                             space: vars[2].to_s.to_sym,
+                                             section_line_color: vars[12] || "rgb(0,0,0)",
+                                             unify: vars[13] == "true",
+                                             drawing_priority: (vars[14] || 0).to_i
                                            })
           @tile.gauge = pattern_info[:gauge_ratio]
           set_value("gauge_ratio", @tile.gauge.to_s)
@@ -769,7 +780,10 @@ module Skalp
         fill_color: vars[6],
         gauge_ratio: @tile.gauge.to_s,
         pat_scale: pattern_info[:pat_scale],
-        alignment: vars[7]
+        alignment: vars[7],
+        section_line_color: vars[10] || "rgb(0,0,0)",
+        unify: vars[11] == "true",
+        drawing_priority: (vars[12] || 0).to_i
       }
 
       # Generate thumbnail for this pattern

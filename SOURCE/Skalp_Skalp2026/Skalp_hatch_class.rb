@@ -38,7 +38,8 @@ module Skalp
           print_scale: 50, # e.g. 1, 10, 20, 50, 100, 500, 1000 for metric, 1, 12, 24, 48, 96 for imperial
           user_x: 1.5, # [0..2.36] inch
           zoom_factor: 0.5,
-          space: :paperspace
+          space: :paperspace,
+          section_line_color: "rgb(0, 0, 0)"
         }.merge(opts)
 
         if opts[:type] == :thumbnail
@@ -354,10 +355,9 @@ module Skalp
       private :draw_gauges
 
       def draw_section_cut(png, pen_width)
-        return unless pen_width != 0.0 || @opts[:type] == :thumbnail
+        return if pen_width <= 0.0
 
-        pen_width = 0.033 if pen_width == 0.0
-        black = ChunkyPNG::Color::BLACK
+        stroke_color = @opts[:section_line_color] || ChunkyPNG::Color::BLACK
         section_cut_edges = [
           Edge2D.new(Point2D.new(-pen_width / 2.0, 1 + (pen_width / 2.0)), Point2D.new(@hatchtile.width + (pen_width / 2.0), 1 + (pen_width / 2.0))), # bottom
           Edge2D.new(Point2D.new(-pen_width / 2.0, @hatchtile.height - (pen_width / 2.0)), Point2D.new(@hatchtile.width + (pen_width / 2.0), @hatchtile.height - (pen_width / 2.0))), # top
@@ -366,7 +366,7 @@ module Skalp
         ]
 
         section_cut_edges.each do |testedge|
-          draw_an_edge_or_line(testedge, pen_width, png, black)
+          draw_an_edge_or_line(testedge, pen_width, png, stroke_color)
         end
       end
 
@@ -375,6 +375,7 @@ module Skalp
       def parse_colors
         @opts[:line_color] = color_from_string(@opts[:line_color])
         @opts[:fill_color] = color_from_string(@opts[:fill_color])
+        @opts[:section_line_color] = color_from_string(@opts[:section_line_color])
       end
 
       def color_from_string(str)

@@ -1,4 +1,6 @@
 module Skalp
+  extend self
+
   MAPPING_PATH = SKALP_PATH + "resources/layermappings/"
   MATERIAL_PATH = SKALP_PATH + "resources/materials/"
 

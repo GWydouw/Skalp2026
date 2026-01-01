@@ -385,8 +385,6 @@ module Skalp
       case lib
       when "Skalp materials in model"
         type = true
-        # Ensure PNG blobs for model materials before creating the cache
-        Skalp.ensure_png_blobs_for_model_materials if Skalp.respond_to?(:ensure_png_blobs_for_model_materials)
         materials = Skalp.create_thumbnails_cache(true)
         sorted_materials = materials.keys.sort_by(&:downcase)
 
@@ -409,7 +407,7 @@ module Skalp
         n = 0
         sorted_materials.sort_by(&:downcase).each do |material|
           file = Skalp::THUMBNAIL_PATH + material.to_s + ".png"
-          materials[material].write_thumbnail(file, 54)
+          materials[material].write_thumbnail(file, 54) unless File.exist?(file)
           append_SU_thumbnail(material, file, false, n)
           n += 1
         end
@@ -477,36 +475,32 @@ module Skalp
       # 54x18 standard size
       require "base64"
 
-      # Try to load ChunkyPNG if not defined
-      unless defined?(ChunkyPNG)
-        # Attempt to find the file via SketchUp's support file mechanism
-        png_lib = Sketchup.find_support_file("chunky_png.rb", "Plugins/Skalp_Skalp2026/chunky_png/lib")
-        if png_lib
-          require png_lib
+      # Path to the old grey skalp logo
+      logo_path = Sketchup.find_support_file("skalp_empty.png", "Plugins/Skalp_Skalp2026/html/icons")
+
+      if logo_path && File.exist?(logo_path)
+        Base64.encode64(File.binread(logo_path)).gsub("\n", "")
+      else
+        # Fallback to dynamic drawing if file missing
+        # Try to load ChunkyPNG if not defined
+        unless defined?(ChunkyPNG)
+          png_lib = Sketchup.find_support_file("chunky_png.rb", "Plugins/Skalp_Skalp2026/chunky_png/lib")
+          require png_lib if png_lib
+        end
+
+        if defined?(ChunkyPNG)
+          png = ChunkyPNG::Image.new(54, 18, ChunkyPNG::Color::WHITE)
+          border = ChunkyPNG::Color.rgb(200, 200, 200)
+          png.rect(0, 0, 53, 17, border)
+          # Draw a simple grey box/logo placeholder
+          grey = ChunkyPNG::Color.rgb(200, 200, 200)
+          png.rect(10, 4, 43, 13, grey, grey)
+          Base64.encode64(png.to_blob).gsub("\n", "")
         else
-          # Fallback to standard require matching the folder structure
-          require "Skalp_Skalp2026/chunky_png/lib/chunky_png"
+          # Final fallback to 1x1 transparent
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
         end
       end
-
-      raise "ChunkyPNG not loaded" unless defined?(ChunkyPNG)
-
-      png = ChunkyPNG::Image.new(54, 18, ChunkyPNG::Color::WHITE)
-      red = ChunkyPNG::Color.rgb(200, 0, 0)
-      border = ChunkyPNG::Color.rgb(200, 200, 200)
-
-      # Draw Border
-      png.rect(0, 0, 53, 17, border)
-
-      # Draw X
-      png.line(0, 0, 53, 17, red)
-      png.line(0, 17, 53, 0, red)
-
-      Base64.encode64(png.to_blob).gsub("\n", "")
-    rescue StandardError => e
-      puts "Skalp: Could not create none thumbnail: #{e}"
-      # Return a 1x1 transparent pixel valid base64
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
     end
 
     def self.delete_material_from_library(library, materialname)
@@ -521,6 +515,82 @@ module Skalp
       json_data.reject! { |info| info["name"] == materialname }
 
       File.write(json_path, JSON.pretty_generate(json_data))
+    end
+
+    def self.duplicate_material_in_library(library_name, material_name)
+      return if ["SketchUp materials in model"].include?(library_name)
+
+      if library_name == "Skalp materials in model"
+        su_material = Sketchup.active_model.materials[material_name]
+        unless su_material && su_material.get_attribute("Skalp", "ID")
+          UI.messagebox("Material '#{material_name}' not found or not a Skalp material.")
+          return
+        end
+
+        # Request new name
+        new_name = UI.inputbox(["New name for duplicate:"], ["#{material_name} (Copy)"], "Duplicate Material")
+        return unless new_name && !new_name[0].strip.empty?
+
+        new_name = new_name[0].strip
+
+        if Sketchup.active_model.materials[new_name]
+          UI.messagebox("A material with the name '#{new_name}' already exists in the model.")
+          return
+        end
+
+        # Duplicate with attributes
+        Skalp.active_model.start("Skalp - Duplicate Material", true)
+        new_mat = Sketchup.active_model.materials.add(new_name)
+        new_mat.color = su_material.color
+        new_mat.alpha = su_material.alpha
+        if su_material.texture
+          new_mat.texture = su_material.texture.filename
+          new_mat.texture.size = [su_material.texture.width, su_material.texture.height]
+        end
+
+        # Copy Skalp attributes
+        if su_material.attribute_dictionaries["Skalp"]
+          su_material.attribute_dictionaries["Skalp"].each_pair do |key, value|
+            new_mat.set_attribute("Skalp", key, value)
+          end
+        end
+
+        # Update pattern info with new name
+        pattern_info = Skalp.get_pattern_info(new_mat)
+        if pattern_info.is_a?(Hash)
+          pattern_info[:name] = new_name
+          new_mat.set_attribute("Skalp", "pattern_info", pattern_info.inspect)
+        end
+
+        Skalp.active_model.commit
+        create_thumbnails(library_name)
+        UI.messagebox("Material '#{new_name}' created.")
+      else
+        # Library (JSON) duplication
+        json_path = File.join(Skalp::MATERIAL_PATH, "#{library_name}.json")
+        return unless File.exist?(json_path)
+
+        json_data = JSON.parse(File.read(json_path))
+        original_info = json_data.find { |info| info["name"] == material_name }
+        return unless original_info
+
+        new_name = UI.inputbox(["New name for duplicate:"], ["#{material_name} (Copy)"], "Duplicate Material")
+        return unless new_name && !new_name[0].strip.empty?
+
+        new_name = new_name[0].strip
+
+        if json_data.any? { |info| info["name"] == new_name }
+          UI.messagebox("A material with the name '#{new_name}' already exists in '#{library_name}'.")
+          return
+        end
+
+        new_info = original_info.dup
+        new_info["name"] = new_name
+        json_data << new_info
+        File.write(json_path, JSON.pretty_generate(json_data))
+        create_thumbnails(library_name)
+        UI.messagebox("Material '#{new_name}' added to library '#{library_name}'.")
+      end
     end
   end
 end

@@ -1001,6 +1001,26 @@ module Skalp
       puts e.backtrace if defined?(DEBUG) && DEBUG
     end
   end
+
+  def self.edit_material_pattern(material_name)
+    # Check if model material
+    su_material = Sketchup.active_model.materials[material_name]
+    unless su_material && su_material.get_attribute("Skalp", "ID")
+      UI.messagebox("Only Skalp materials in the model can be edited in the Pattern Designer.")
+      return
+    end
+
+    # Open or refresh Hatch Dialog
+    unless Skalp.hatch_dialog && Skalp.hatch_dialog.webdialog.visible?
+      # Ensure Hatch_dialog is defined (required in loader)
+      Skalp.hatch_dialog = Skalp::Hatch_dialog.new
+    end
+    Skalp.hatch_dialog.webdialog.show
+
+    # Select the material in the dialog
+    Skalp.hatch_dialog.hatchname = material_name
+    Skalp.hatch_dialog.load_patterns_and_materials
+  end
 end
 
 # Copy a material between JSON libraries
