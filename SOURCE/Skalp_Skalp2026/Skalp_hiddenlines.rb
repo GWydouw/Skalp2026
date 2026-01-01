@@ -47,8 +47,8 @@ module Skalp
       @used_definitions = []
       load_rear_view_definition
 
-      @temp_model = File.join("/Users/guywydouw/Desktop", "skalp_debug.skp")
-      @temp_model_reversed = File.join("/Users/guywydouw/Desktop", "skalp_debug_reversed.skp")
+      @temp_model = File.join(ENV["TMPDIR"] || "/tmp", "skalp_temp.skp")
+      @temp_model_reversed = File.join(ENV["TMPDIR"] || "/tmp", "skalp_temp_reversed.skp")
     end
 
     def get_hiddenline_properties(rgb)
@@ -201,12 +201,12 @@ module Skalp
     end
 
     def add_lines_to_page(page = @skpModel, copy_to_active_view = false)
-      puts "[DEBUG] add_lines_to_page for: #{page.is_a?(Sketchup::Page) ? page.name : 'Model'}"
+      # puts "[DEBUG] add_lines_to_page for: #{page.is_a?(Sketchup::Page) ? page.name : 'Model'}"
       style_settings = Skalp.dialog.style_settings(page) # Better than direct memory access for inheritance
       rv_status = Skalp.dialog.rearview_status(page)
-      puts "[DEBUG] rv_status: #{rv_status}"
+      # puts "[DEBUG] rv_status: #{rv_status}"
       has_lines = @rear_lines_result && @rear_lines_result[page]
-      puts "[DEBUG] has_lines: #{has_lines ? 'YES' : 'NO'}"
+      # puts "[DEBUG] has_lines: #{has_lines ? 'YES' : 'NO'}"
 
       if style_settings.class == Hash
         @linestyle = style_settings[:rearview_linestyle]
@@ -337,7 +337,7 @@ module Skalp
       @model.observer_active = false
       # Skalp.force_commit_all # Ensure we start clean - REMOVED to avoid breaking undo stack unnecessarily
 
-      puts "[DEBUG] Skalp save_temp_model starting for #{@skpModel.pages.size + 1} pages"
+      # puts "[DEBUG] Skalp save_temp_model starting for #{@skpModel.pages.size + 1} pages"
 
       # Start operation to wrap all temp changes
       @skpModel.start_operation("Skalp - save temp model", true)
@@ -430,23 +430,23 @@ module Skalp
 
         Skalp.record_timing("save_temp_model_setup", Time.now - t_start_loop)
 
-        puts "[DEBUG] Deleting old temp files..."
+        # puts "[DEBUG] Deleting old temp files..."
         # File.delete(@temp_model) if File.exist?(@temp_model)
         # File.delete(@temp_model_reversed) if File.exist?(@temp_model_reversed)
 
-        puts "[DEBUG] Saving model copy to: #{@temp_model}"
+        # puts "[DEBUG] Saving model copy to: #{@temp_model}"
         t_start_save = Time.now
         @skpModel.save_copy(@temp_model)
         Skalp.record_timing("save_temp_model_save_copy", Time.now - t_start_save)
-        puts "[DEBUG] Save copy complete."
+        # puts "[DEBUG] Save copy complete."
 
-        puts "[DEBUG] Skalp save_temp_model finished successfully."
+        # puts "[DEBUG] Skalp save_temp_model finished successfully."
       rescue StandardError => e
         puts "[ERROR] Skalp hiddenlines save_temp_model failed: #{e.message}"
         puts e.backtrace.join("\n")
       ensure
         # Manual Restoration
-        puts "[DEBUG] Restoring original model state..."
+        # puts "[DEBUG] Restoring original model state..."
 
         # 1. Restore each style's settings
         if style_original_settings
@@ -475,7 +475,7 @@ module Skalp
                                                     nil
                                                   end
 
-        puts "[DEBUG] Aborting operation to restore original state..."
+        # puts "[DEBUG] Aborting operation to restore original state..."
         @skpModel.abort_operation
         @model.observer_active = observers
       end
@@ -711,7 +711,7 @@ module Skalp
       rear_view = 1.0
 
       if reversed
-        puts "[DEBUG] REVERSED MODE ACTIVE"
+        # puts "[DEBUG] REVERSED MODE ACTIVE"
         result = reverse_scenes(scenes, prep_weight)
 
         return {} unless result
@@ -743,29 +743,21 @@ module Skalp
 
       scene_names = pages_info.map { |h| h[:page_name] }
 
-      puts ">>> [DEBUG] calling get_exploded_entities"
-      puts "    temp_model: #{temp_model}"
+      # puts ">>> [DEBUG] calling get_exploded_entities"
+      # puts "    temp_model: #{temp_model}"
       if File.exist?(temp_model)
-        size = File.size(temp_model)
-        puts "    temp_model size: #{size} bytes"
-        begin
-          desktop_path = File.join(Dir.home, "Desktop", "skalp_debug_reversed.skp")
-          require "fileutils"
-          FileUtils.cp(temp_model, desktop_path)
-          puts "    >>> COPIED temp_model to: #{desktop_path}"
-        rescue StandardError => e
-          puts "    >>> FAILED to copy temp_model: #{e.message}"
-        end
+        # size = File.size(temp_model)
+        # puts "    temp_model size: #{size} bytes"
       else
-        puts "    >>> ERROR: temp_model does not exist!"
+        # puts "    >>> ERROR: temp_model does not exist!"
       end
 
-      puts "    pages_info count: #{pages_info.size}"
-      pages_info.each_with_index do |info, i|
-        puts "    Input #{i}: name='#{info[:page_name]}', index=#{info[:index]}, target=#{info[:target]}, eye=#{info[:eye]}"
-        puts "             scale=#{info[:scale]}, perspective=#{info[:perspective]}"
-        puts "             up=#{info[:up_vector] || 'NIL'}"
-      end
+      # puts "    pages_info count: #{pages_info.size}"
+      # pages_info.each_with_index do |info, i|
+      #   puts "    Input #{i}: name='#{info[:page_name]}', index=#{info[:index]}, target=#{info[:target]}, eye=#{info[:eye]}"
+      #   puts "             scale=#{info[:scale]}, perspective=#{info[:perspective]}"
+      #   puts "             up=#{info[:up_vector] || 'NIL'}"
+      # end
 
       t_start_c_app = Time.now
       result = Skalp.get_exploded_entities(temp_model, @height, page_info_to_array(pages_info, :index),
@@ -773,19 +765,19 @@ module Skalp
                                            page_info_to_array(pages_info, :target), rear_view, progress_weight, scene_names)
       Skalp.record_timing("get_exploded_entities_c_ext", Time.now - t_start_c_app)
 
-      puts ">>> [DEBUG] get_exploded_entities result count: #{result.size}"
-      result.each_with_index do |scene, i|
-        puts "  > Scene #{i}: Page=#{scene.page.respond_to?(:name) ? scene.page.name : scene.page}"
-        puts "    Target: #{scene.target.inspect}"
-        if scene.lines
-          puts "    Lines keys: #{scene.lines.keys.inspect}"
-          scene.lines.each do |layer, lines|
-            puts "      Layer: #{layer} -> #{lines.size} lines"
-          end
-        else
-          puts "    Lines: NIL"
-        end
-      end
+      # puts ">>> [DEBUG] get_exploded_entities result count: #{result.size}"
+      # result.each_with_index do |scene, i|
+      #   puts "  > Scene #{i}: Page=#{scene.page.respond_to?(:name) ? scene.page.name : scene.page}"
+      #   puts "    Target: #{scene.target.inspect}"
+      #   if scene.lines
+      #     puts "    Lines keys: #{scene.lines.keys.inspect}"
+      #     scene.lines.each do |layer, lines|
+      #       puts "      Layer: #{layer} -> #{lines.size} lines"
+      #     end
+      #   else
+      #     puts "    Lines: NIL"
+      #   end
+      # end
 
       target2d_array = page_info_to_array(pages_info, :target2d)
 
