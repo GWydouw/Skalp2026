@@ -857,7 +857,7 @@ module Skalp
         if result == IDYES
           skModel = @models[skpModel]
           skModel ||= Skalp.active_model
-          skModel.update_all_pages(true, true, Skalp.translate("Legacy Model Update")) if skModel
+          skModel.update_all_pages(false, true, Skalp.translate("Legacy Model Update")) if skModel
         end
       end
     end
