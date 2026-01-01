@@ -598,7 +598,7 @@ module Skalp
 
       return unless object_key
 
-      puts ">>> [MIGRATION] Migrating style_settings for #{object.is_a?(Sketchup::Page) ? object.name : 'Model'} (key: #{object_key})"
+      # puts ">>> [MIGRATION] Migrating style_settings for #{object.is_a?(Sketchup::Page) ? object.name : 'Model'} (key: #{object_key})"
 
       # Old attribute names vs new attribute names mapping
       old_to_new = {
@@ -621,10 +621,30 @@ module Skalp
 
         # Convert and write to new flattened attribute
         converted_value = case new_key
-                          when :drawing_scale, :depth_clipping_distance
-                            old_value.to_s.gsub("cm", "").to_f.to_s
                           when :rearview_status, :section_cut_width_status, :depth_clipping_status
-                            old_value.to_s
+                            # If value is false/missing for Model, try to inherit from Selected Page
+                            # Legacy models often rely on the scene settings for the active view
+                            if object.is_a?(Sketchup::Model) && (old_value.nil? || old_value.to_s == "false")
+                              selected_page = @skpModel.pages.selected_page
+                              if selected_page
+                                page_key = selected_page.get_attribute("Skalp", "ID")
+                                if page_key
+                                  page_value = @skpModel.get_attribute("Skalp_memory_attributes",
+                                                                       "#{page_key}|#{old_key}")
+                                  if page_value.to_s == "true"
+                                    "true"
+                                  else
+                                    old_value.to_s
+                                  end
+                                else
+                                  old_value.to_s
+                                end
+                              else
+                                old_value.to_s
+                              end
+                            else
+                              old_value.to_s
+                            end
                           when :style_rules
                             old_value.to_s
                           else
@@ -632,11 +652,11 @@ module Skalp
                           end
 
         object.set_attribute("Skalp", "ss_#{new_key}", converted_value)
-        puts "    Migrated #{old_key} → ss_#{new_key}: #{converted_value}"
+        # puts "    Migrated #{old_key} → ss_#{new_key}: #{converted_value}"
         migrated_count += 1
       end
 
-      puts "    Total migrated: #{migrated_count} attributes"
+      # puts "    Total migrated: #{migrated_count} attributes"
     rescue StandardError => e
       puts ">>> [MIGRATION ERROR] Failed to migrate style_settings for #{object}: #{e.message}"
       puts e.backtrace.first(5).join("\n")
