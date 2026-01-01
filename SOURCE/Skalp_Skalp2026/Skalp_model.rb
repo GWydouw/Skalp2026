@@ -1385,6 +1385,9 @@ module Skalp
         commit
       end
 
+      # Ensure the model version is updated so the warning doesn't reappear
+      set_version
+
       # Phase 4: Save
       if save
         progress.offset = skalp_pages.size * (w_sections + (rear_view ? (w_rearlines + w_addlines) : 0))
