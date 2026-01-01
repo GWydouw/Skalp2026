@@ -198,14 +198,6 @@ std::vector<hiddenlines> get_exploded_entities(
     return hiddenline_result;
   }
 
-  // DEBUG: Save LayOut file for inspection
-  std::string debug_lo_path =
-      "/Users/guywydouw/Desktop/skalp_debug_view.layout";
-  LODocumentSaveToFile(lo_document_ref, debug_lo_path.c_str(),
-                       LODocumentVersion_Current);
-  std::cerr << "[C++] DEBUG: Saved LayOut file to: " << debug_lo_path
-            << std::endl;
-
   // Set output lineweight
   result = LOSketchUpModelSetLineWeight(lo_model_ref, 1.0);
 
@@ -213,9 +205,7 @@ std::vector<hiddenlines> get_exploded_entities(
 
   for (size_t j = 0; j < total_scenes; ++j) {
     // Progress Report
-    std::cout << "*P*" << j << "|" << total_scenes << "|"
-              << "Processing rear lines"
-              << "|" << std::to_string(page_index_array[j]) << std::endl;
+    // std::cout << "*P*" ...
 
     hiddenline_result.push_back(hiddenlines());
 
@@ -224,13 +214,8 @@ std::vector<hiddenlines> get_exploded_entities(
         LOSketchUpModelSetCurrentScene(lo_model_ref, page_index_array[j] + 1);
 
     if (SU_ERROR_NONE != result) {
-      std::cerr
-          << "[C++] ERROR: LOSketchUpModelSetCurrentScene failed for index: "
-          << page_index_array[j] << " code: " << result << std::endl;
+      // Error handling?
       break;
-    } else {
-      std::cerr << "[C++] Layout switched to scene index: "
-                << page_index_array[j] + 1 << std::endl;
     }
 
     double current_scale = scale_array[j];
@@ -310,12 +295,6 @@ std::vector<hiddenlines> get_exploded_entities(
     // Always release entity list per loop
     LOEntityListRelease(&exploded_entity_list);
   }
-
-  // Debug/Test output    // SAVE LAYOUT ONLY FOR TESTING IF NEEDED
-  // Force save to Desktop to be sure
-  std::string lo_filepath = "/Users/guywydouw/Desktop/CreatedFromRuby.layout";
-  LODocumentSaveToFile(lo_document_ref, lo_filepath.c_str(),
-                       LODocumentVersion_Current);
 
   // Final Cleanup
   if (SUIsValid(model))

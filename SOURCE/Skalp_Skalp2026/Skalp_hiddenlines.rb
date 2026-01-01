@@ -1078,7 +1078,7 @@ module Skalp
         aspect_ratio = camera.aspect_ratio
       end
 
-      @height = 200.0 / aspect_ratio
+      @height = 1000.0 # Fixed large size to prevent resolution issues and aspect ratio clipping
       fov = camera.perspective? ? ((camera.fov / 2.0) * Math::PI / 180.0) : 0.0
 
       if plane && sectionplane
@@ -1093,12 +1093,22 @@ module Skalp
       end
 
       distance = work_eye.distance(target).to_f
-      scale = if work_perspective && fov > 0
-                (@height / (Math.sin(fov) / Math.cos(fov) * distance * 2.0))
-              else
-                # Ortho scale
-                @height / camera.height
-              end
+
+      # Calculate view extent (height) based on camera type
+      view_height = if work_perspective && fov > 0
+                      (Math.sin(fov) / Math.cos(fov) * distance * 2.0)
+                    elsif camera.perspective?
+                      # If we are in Ortho mode (e.g. Reversed) but original camera was Perspective
+                      # We must calculate the equivalent Ortho height from the FOV/Distance
+                      (Math.tan((camera.fov / 2.0) * Math::PI / 180.0) * distance * 2.0)
+                    else
+                      camera.height
+                    end
+
+      # Calculate scale to fit the largest dimension into @height
+      # This prevents clipping when Aspect Ratio > 1.0 (Wide views)
+      # Added 10% safety margin (1.1) to ensure full coverage including edges/lines
+      scale = @height / (view_height * 1.1 * [1.0, aspect_ratio].max)
 
       params[:sectionplane] = plane ? true : false
       params[:index] = page_index
