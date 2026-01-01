@@ -800,23 +800,23 @@ module Skalp
         return
       end
 
-      puts ">>> [DEBUG] Model NOT in @models, creating new instance..."
+      # puts ">>> [DEBUG] Model NOT in @models, creating new instance..."
       puts ">>> [DEBUG] @models keys: #{@models ? @models.keys.map { |m| m.object_id }.join(', ') : 'nil'}"
       @models[skpModel] = Model.new(skpModel)
-      puts ">>> [DEBUG] Model created successfully, loading observers..."
+      # puts ">>> [DEBUG] Model created successfully, loading observers..."
       @models[skpModel].load_observers
-      puts ">>> [DEBUG] Observers loaded, checking dialog..."
+      # puts ">>> [DEBUG] Observers loaded, checking dialog..."
 
       # Check for legacy model data after activation is complete (before dialog check)
       check_legacy_model(skpModel)
 
       return unless Skalp.dialog
 
-      puts ">>> [DEBUG] Dialog exists, updating..."
+      # puts ">>> [DEBUG] Dialog exists, updating..."
 
       Skalp.dialog.update_styles(skpModel)
       Skalp.dialog.update(1)
-      puts ">>> [DEBUG] activate_model COMPLETED"
+      # puts ">>> [DEBUG] activate_model COMPLETED"
     end
 
     # Check if model was saved with older Skalp version and offer to update

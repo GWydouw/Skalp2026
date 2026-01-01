@@ -489,8 +489,8 @@ module Skalp
       sectiongroup = get_sectiongroup(page)
 
       if defined?(DEBUG) && DEBUG
-        puts "[DEBUG] load_rear_view_definition for page: #{page_name}"
-        puts "        sectiongroup: #{sectiongroup ? sectiongroup.name : 'NIL'}"
+        # puts "[DEBUG] load_rear_view_definition for page: #{page_name}"
+        active_scene_name = Sketchup.active_model.pages.selected_page ? Sketchup.active_model.pages.selected_page.name : "Model"
       end
 
       return unless sectiongroup && sectiongroup.entities
@@ -537,7 +537,7 @@ module Skalp
         sectionplaneID = @model.get_memory_attribute(page, "Skalp", "sectionplaneID")
         @uptodate[page] = sectionplaneID if sectionplaneID && sectionplaneID != ""
 
-        puts "        ✓ Loaded rear_view_definition for page: #{page_name}" if defined?(DEBUG) && DEBUG
+        # puts "        ✓ Loaded rear_view_definition for page: #{page_name}" if defined?(DEBUG) && DEBUG
 
         attrib_data = rear_view_instance.definition.get_attribute("Skalp", "rear_view_lines")
 

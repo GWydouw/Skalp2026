@@ -18,7 +18,7 @@ module Skalp
     attr_reader :active_section
 
     def initialize(skpModel)
-      puts ">>> [DEBUG] Model.initialize START (model object_id: #{skpModel.object_id})"
+      # puts ">>> [DEBUG] Model.initialize START (model object_id: #{skpModel.object_id})"
       load_multitags_materials
       @incontext = false
       @hide_rest_of_model = skpModel.rendering_options["InactiveHidden"]
@@ -93,8 +93,15 @@ module Skalp
       setup_skalp_folders
       Skalp.fixTagFolderBug("Model initialize")
       Skalp.create_skalp_material_instance
+
+      # MIGRATION: Migrate old Skalp_memory_attributes to new format on model load
+      migrate_style_settings_for_object(@skpModel)
+      @skpModel.pages.each do |page|
+        migrate_style_settings_for_object(page)
+      end
+
       commit
-      puts ">>> [DEBUG] Model.initialize COMPLETED"
+      # puts ">>> [DEBUG] Model.initialize COMPLETED"
     end
 
     def modified_multi_tags(objects)
@@ -507,10 +514,17 @@ module Skalp
           begin
             old_hash = old_blob.is_a?(String) ? eval(old_blob) : old_blob
             if old_hash.is_a?(Hash)
+              # Temporary Diagnosis Log
+              puts ">>> [DIAGNOSIS] Migrating style_settings for #{object}: Keys in old_hash: #{old_hash.keys.inspect}"
               STYLE_SETTINGS_KEYS.each do |style_key|
-                if !reconstructed.key?(style_key) && old_hash.key?(style_key)
-                  reconstructed[style_key] = old_hash[style_key]
-                  has_any = true
+                unless reconstructed.key?(style_key)
+                  if old_hash.key?(style_key)
+                    reconstructed[style_key] = old_hash[style_key]
+                    has_any = true
+                  elsif old_hash.key?(style_key.to_s)
+                    reconstructed[style_key] = old_hash[style_key.to_s]
+                    has_any = true
+                  end
                 end
               end
             end
@@ -566,6 +580,66 @@ module Skalp
       end
 
       value
+    end
+
+    # Helper method to explicitly migrate old style_settings blob to flattened native attributes
+    # Used during Legacy Model Update to ensure old data is correctly migrated
+    def migrate_style_settings_for_object(object)
+      return unless object
+
+      # Get the object ID for lookup in old Skalp_memory_attributes dictionary
+      object_key = if object.is_a?(Sketchup::Model)
+                     "skpModel"
+                   elsif object.is_a?(Sketchup::Page)
+                     object.get_attribute("Skalp", "ID")
+                   else
+                     return
+                   end
+
+      return unless object_key
+
+      puts ">>> [MIGRATION] Migrating style_settings for #{object.is_a?(Sketchup::Page) ? object.name : 'Model'} (key: #{object_key})"
+
+      # Old attribute names vs new attribute names mapping
+      old_to_new = {
+        "rearview_status" => :rearview_status,
+        "rearview_linestyle" => :rearview_linestyle,
+        "lineweights_status" => :section_cut_width_status,
+        "fog_status" => :depth_clipping_status,
+        "fog_distance" => :depth_clipping_distance,
+        "drawing_scale" => :drawing_scale,
+        "style_rules" => :style_rules
+      }
+
+      migrated_count = 0
+
+      old_to_new.each do |old_key, new_key|
+        # IMPORTANT: Always read from MODEL's Skalp_memory_attributes (not from page)
+        # because all page attributes are stored in the model's dictionary
+        old_value = @skpModel.get_attribute("Skalp_memory_attributes", "#{object_key}|#{old_key}")
+        next unless old_value
+
+        # Convert and write to new flattened attribute
+        converted_value = case new_key
+                          when :drawing_scale, :depth_clipping_distance
+                            old_value.to_s.gsub("cm", "").to_f.to_s
+                          when :rearview_status, :section_cut_width_status, :depth_clipping_status
+                            old_value.to_s
+                          when :style_rules
+                            old_value.to_s
+                          else
+                            old_value.to_s
+                          end
+
+        object.set_attribute("Skalp", "ss_#{new_key}", converted_value)
+        puts "    Migrated #{old_key} → ss_#{new_key}: #{converted_value}"
+        migrated_count += 1
+      end
+
+      puts "    Total migrated: #{migrated_count} attributes"
+    rescue StandardError => e
+      puts ">>> [MIGRATION ERROR] Failed to migrate style_settings for #{object}: #{e.message}"
+      puts e.backtrace.first(5).join("\n")
     end
 
     def clear_memory_attributes(object)
@@ -769,7 +843,7 @@ module Skalp
     end
 
     def load_observers
-      puts ">>> [DEBUG] load_observers START"
+      # puts ">>> [DEBUG] load_observers START"
       @entities_observer = SkalpEntitiesObserver.new
       @skpModel.entities.add_observer(@entities_observer) if @skpModel.entities
 
@@ -793,7 +867,7 @@ module Skalp
 
       @model_observer = SkalpModelObserver.new
       @skpModel.add_observer(@model_observer)
-      puts ">>> [DEBUG] load_observers COMPLETED"
+      # puts ">>> [DEBUG] load_observers COMPLETED"
     rescue StandardError => e
       puts ">>> [DEBUG] ERROR in load_observers: #{e.class}: #{e.message}"
       puts e.backtrace.first(10).join("\n")
