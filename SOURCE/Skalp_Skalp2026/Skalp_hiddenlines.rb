@@ -47,9 +47,8 @@ module Skalp
       @used_definitions = []
       load_rear_view_definition
 
-      tmp_path = ENV["TMPDIR"] || ENV["TMP"] || "/tmp/"
-      @temp_model = File.join(tmp_path, "skalp_temp.skp")
-      @temp_model_reversed = File.join(tmp_path, "skalp_temp_reversed.skp")
+      @temp_model = File.join("/Users/guywydouw/Desktop", "skalp_temp_#{Time.now.to_i}.skp")
+      @temp_model_reversed = File.join("/Users/guywydouw/Desktop", "skalp_temp_reversed_#{Time.now.to_i}.skp")
     end
 
     def get_hiddenline_properties(rgb)
@@ -336,63 +335,81 @@ module Skalp
     def save_temp_model(prep_weight = 1.0)
       observers = @model.observer_active
       @model.observer_active = false
-      Skalp.force_commit_all # Ensure we start clean
+      # Skalp.force_commit_all # Ensure we start clean - REMOVED to avoid breaking undo stack unnecessarily
 
-      settings_saved = {}
-      page_settings = {}
-      pages = [@skpModel]
-      @skpModel.pages.each { |p| pages << p }
+      puts "[DEBUG] Skalp save_temp_model starting for #{@skpModel.pages.size + 1} pages"
 
-      puts "[DEBUG] Skalp save_temp_model starting for #{pages.size} pages"
+      # Start operation to wrap all temp changes
+      @skpModel.start_operation("Skalp - save temp model", true)
 
-      @model.start("Skalp - save temp model", true)
       begin
         t_start_setup = Time.now
         delete_rear_view_instances
         setup_layers
         Skalp.record_timing("save_temp_model_setup", Time.now - t_start_setup)
 
-        active_planes = {}
-        pages.each do |page|
-          next unless page.is_a?(Sketchup::Page)
+        # Removed Ruby-side Style Overrides (now handled in C++)
+        # prepare_page_for_temp_save removed.
 
-          if page.respond_to?(:active_section_planes)
-            active_planes[page] = page.active_section_planes
-          elsif page.respond_to?(:active_section_plane)
-            active_planes[page] = [page.active_section_plane].compact
-          end
-        end
-
+        # Prepare pages (styles, section planes, layers)
         t_start_loop = Time.now
-        pages.each_with_index do |page, _i|
-          next unless page
 
-          settings_saved[page] = prepare_page_for_temp_save(page, page_settings)
+        # Restore style overrides via temporary style copies
+        # Fixes the "solid lines instead of dashed" problem in SU 2023.1/2026
+        style_cache = {}
+        original_root_style = @skpModel.styles.selected_style
+        default_path = SKALP_PATH + "resources/SUstyles/default.style"
 
-          # User Requirement: Set use_section_planes = true (force it ON for the temp save)
-          page.use_section_planes = true if page.is_a?(Sketchup::Page)
-        end
+        @skpModel.pages.each do |page|
+          # User Requirement: Set use_section_planes = true for all pages to ensure export works
+          page.use_section_planes = true
 
-        # RESTORE ACTIVE SECTION PLANES BEFORE SAVE
-        active_planes.each do |page, planes|
-          next unless planes
+          # Create or reuse temporary style
+          if style_cache[page.style]
+            page.use_style = style_cache[page.style]
+          else
+            # NOTE: Style#rendering_options is NOT available.
+            # We must make the style active to modify it via model.rendering_options.
+            original_page_style = page.style
 
-          if page.respond_to?(:active_section_planes=)
-            page.active_section_planes = planes
-          elsif page.respond_to?(:active_section_plane=)
-            page.active_section_plane = planes[0] if planes.is_a?(Array)
+            # 1. Capture original style settings
+            @skpModel.styles.selected_style = original_page_style
+            original_settings = Skalp.rendering_options_to_hash
+
+            # 2. Create new style from template and make it active
+            new_style = @skpModel.styles.add_style(default_path, true)
+
+            # 3. Apply original settings to the new active style
+            Skalp.hash_to_rendering_options(original_settings)
+
+            # 4. Apply all historical and required rendering options (overrides)
+            ro = @skpModel.rendering_options
+            ro["EdgeDisplayMode"] = true
+            ro["DrawSilhouettes"] = true
+            ro["DrawDepthQue"] = false
+            ro["DrawLineEnds"] = false
+            ro["JitterEdges"] = false
+            ro["ExtendLines"] = false
+            ro["SilhouetteWidth"] = 5
+            ro["DepthQueWidth"] = 1
+            ro["LineExtension"] = 1
+            ro["LineEndWidth"] = 1
+            ro["DisplayText"] = false
+            ro["SectionCutWidth"] = 10
+            ro["RenderMode"] = 1 # Hidden Line
+            ro["Texture"] = true
+            ro["DisplayColorByLayer"] = true
+            ro["EdgeColorMode"] = 0
+            ro["DrawBackEdges"] = false # New required setting
+
+            # 5. Bake settings into the new style
+            @skpModel.styles.update_selected_style
+
+            style_cache[original_page_style] = new_style
+            page.use_style = new_style
           end
         end
-
-        # DEBUG: Verify state of pages BEFORE save_copy
-        pages.each do |page|
-          next unless page.is_a?(Sketchup::Page)
-
-          eye = page.camera.eye
-          planes = page.respond_to?(:active_section_planes) ? page.active_section_planes : []
-          puts "[DEBUG] PRE-SAVE Scene check: name='#{page.name}', eye=#{eye.to_a}, planes=#{planes.size}"
-        end
-
+        @skpModel.styles.selected_style = original_root_style
         Skalp.record_timing("save_temp_model_loop", Time.now - t_start_loop)
 
         puts "[DEBUG] Deleting old temp files..."
@@ -409,228 +426,20 @@ module Skalp
       rescue StandardError => e
         puts "[ERROR] Skalp hiddenlines save_temp_model failed: #{e.message}"
         puts e.backtrace.join("\n")
-        @model.abort if @model.active_operation == "Skalp - save temp model"
       ensure
-        puts "[DEBUG] Executing ensure block in save_temp_model"
+        # Cleanup temp style file
+        temp_dir = File.dirname(@temp_model)
+        temp_style_path = File.join(temp_dir, "skalp_temp.style")
+        File.delete(temp_style_path) if File.exist?(temp_style_path)
 
-        t_start_restore = Time.now
-
-        restore_layers
-        restore_rendering_options(pages, settings_saved, page_settings)
-
-        # RESTORE ACTIVE SECTION PLANES AFTER RESTORE
-        # To ensure the original state is kept in the live model
-        if defined?(active_planes)
-          active_planes.each do |page, planes|
-            next unless planes
-
-            if page.respond_to?(:active_section_planes=)
-              page.active_section_planes = planes
-            elsif page.respond_to?(:active_section_plane=)
-              page.active_section_plane = planes[0] if planes.is_a?(Array)
-            end
-          end
-        end
-
-        Skalp.record_timing("save_temp_model_restore", Time.now - t_start_restore)
-
-        if @model.respond_to?(:active_operation) && @model.active_operation =~ /Skalp - save temp model/
-          puts "[DEBUG] Closing lingering operation in ensure block: #{@model.active_operation}"
-          @model.commit
-        end
+        puts "[DEBUG] Aborting operation to restore original state..."
+        @skpModel.abort_operation
         @model.observer_active = observers
       end
     end
 
-    def create_derived_style(source_style)
-      return nil unless source_style
-
-      style_name = "Skalp Temp #{source_style.name} #{source_style.object_id} #{Time.now.to_i}"
-
-      # Check if already exists
-      existing = @skpModel.styles[style_name]
-      return existing if existing
-
-      saved_active_style = @skpModel.styles.selected_style
-
-      # 1. Capture source rendering options
-      @skpModel.styles.selected_style = source_style
-      source_ro = {}
-      @skpModel.rendering_options.each { |k, v| source_ro[k] = v }
-
-      # 2. Create new style from default
-      base_dir = File.dirname(__FILE__)
-      style_path = File.join(base_dir, "resources", "SUstyles", "default.style")
-      unless File.exist?(style_path)
-        @skpModel.styles.selected_style = saved_active_style
-        return source_style
-      end
-
-      @skpModel.styles.add_style(style_path, true)
-      new_style = @skpModel.styles.selected_style
-      new_style.name = style_name
-
-      # 3. Apply source options to active view (which is now new_style)
-      ro = @skpModel.rendering_options
-      source_ro.each { |k, v| ro[k] = v }
-
-      # 4. Apply Skalp Overrides
-      ro["EdgeDisplayMode"] = true
-      ro["DrawSilhouettes"] = true
-      ro["DrawDepthQue"] = false
-      ro["DrawLineEnds"] = false
-      ro["JitterEdges"] = false
-      ro["ExtendLines"] = false
-      ro["SilhouetteWidth"] = 5
-      ro["DepthQueWidth"] = 1
-      ro["LineExtension"] = 1
-      ro["LineEndWidth"] = 1
-      ro["DisplayText"] = false
-      ro["SectionCutWidth"] = 10
-      ro["RenderMode"] = 1
-      ro["Texture"] = true
-      ro["DisplayColorByLayer"] = true
-      ro["EdgeColorMode"] = 0
-
-      # 5. Persist to new style
-      @skpModel.styles.update_selected_style
-
-      # 6. Restore active
-      @skpModel.styles.selected_style = saved_active_style
-
-      new_style
-    end
-
-    def prepare_page_for_temp_save(page, page_settings)
-      # Active View (Model)
-      if page == @skpModel
-        # ... (Keep existing logic for Active View if it works, or simplify)
-        # Logic for Active View must be in-place because we can't assign style to Model directly via wrapper?
-        # Actually checking original code:
-        style_settings = {}
-        # ... existing active view capture logic ...
-        # For brevity reusing the capture block from before but ensuring we return it.
-        begin
-          style_settings[:edgeDisplayMode] = page.rendering_options["EdgeDisplayMode"]
-          style_settings[:drawSilhouettes] = page.rendering_options["DrawSilhouettes"]
-          style_settings[:drawDepthQue] = page.rendering_options["DrawDepthQue"]
-          style_settings[:drawLineEnds] = page.rendering_options["DrawLineEnds"]
-          style_settings[:jitterEdges] = page.rendering_options["JitterEdges"]
-          style_settings[:extendLines] = page.rendering_options["ExtendLines"]
-          style_settings[:silhouetteWidth] = page.rendering_options["SilhouetteWidth"]
-          style_settings[:depthQueWidth] = page.rendering_options["DepthQueWidth"]
-          style_settings[:lineExtension] = page.rendering_options["LineExtension"]
-          style_settings[:lineEndWidth] = page.rendering_options["LineEndWidth"]
-          style_settings[:displayText] = page.rendering_options["DisplayText"]
-          style_settings[:sectionCutWidth] = page.rendering_options["SectionCutWidth"]
-          style_settings[:renderMode] = page.rendering_options["RenderMode"]
-          style_settings[:texture] = page.rendering_options["Texture"]
-          style_settings[:displayColorByLayer] = page.rendering_options["DisplayColorByLayer"]
-          style_settings[:EdgeColorMode] = page.rendering_options["EdgeColorMode"]
-
-          page.rendering_options["EdgeDisplayMode"] = true
-          page.rendering_options["DrawSilhouettes"] = true
-          page.rendering_options["DrawDepthQue"] = false
-          page.rendering_options["DrawLineEnds"] = false
-          page.rendering_options["JitterEdges"] = false
-          page.rendering_options["ExtendLines"] = false
-          page.rendering_options["SilhouetteWidth"] = 5
-          page.rendering_options["DepthQueWidth"] = 1
-          page.rendering_options["LineExtension"] = 1
-          page.rendering_options["LineEndWidth"] = 1
-          page.rendering_options["DisplayText"] = false
-          page.rendering_options["SectionCutWidth"] = 10
-          page.rendering_options["RenderMode"] = 1
-          page.rendering_options["Texture"] = true
-          page.rendering_options["DisplayColorByLayer"] = true
-          page.rendering_options["EdgeColorMode"] = 0
-        rescue StandardError => e
-          puts "[DEBUG] Error active view: #{e.message}"
-        end
-        return style_settings
-      end
-
-      # Pages (Scenes) -> Use Temp Style
-      begin
-        original_style = page.style
-        return {} unless original_style
-
-        # Cache created styles to avoid recreation
-        page_settings[:created_styles] ||= {}
-
-        unless page_settings[:created_styles][original_style]
-          page_settings[:created_styles][original_style] = create_derived_style(original_style)
-        end
-
-        derived = page_settings[:created_styles][original_style]
-        if derived
-          if page.respond_to?(:use_style=)
-            page.use_style = derived
-          elsif page.respond_to?(:style=)
-            page.style = derived
-          end
-
-          # Force update to be sure it persists in the page object for the temp save
-          flag = defined?(SketchUp::Page::PAGE_USE_STYLE) ? SketchUp::Page::PAGE_USE_STYLE : 128
-          page.update(flag)
-          return { original_style: original_style }
-        end
-      rescue StandardError => e
-        puts "[DEBUG] Error page prepare: #{e.message}"
-      end
-      {}
-    end
-
-    def restore_rendering_options(pages, settings_saved, page_settings)
-      return unless pages && settings_saved
-
-      if settings_saved[@skpModel]
-        # Restore active view
-        opts = settings_saved[@skpModel]
-        begin
-          page = @skpModel
-          @skpModel.rendering_options.each do |k, v|
-            # Map logical keys to RenderingOptions keys if needed, assuming direct map
-            # Original code used distinct keys like :edgeDisplayMode vs "EdgeDisplayMode"
-            # Simplified restore:
-          end
-          page.rendering_options["EdgeDisplayMode"] = opts[:edgeDisplayMode]
-          page.rendering_options["DrawSilhouettes"] = opts[:drawSilhouettes]
-          page.rendering_options["DrawDepthQue"] = opts[:drawDepthQue]
-          page.rendering_options["DrawLineEnds"] = opts[:drawLineEnds]
-          page.rendering_options["JitterEdges"] = opts[:jitterEdges]
-          page.rendering_options["ExtendLines"] = opts[:extendLines]
-          page.rendering_options["SilhouetteWidth"] = opts[:silhouetteWidth]
-          page.rendering_options["DepthQueWidth"] = opts[:depthQueWidth]
-          page.rendering_options["LineExtension"] = opts[:lineExtension]
-          page.rendering_options["LineEndWidth"] = opts[:lineEndWidth]
-          page.rendering_options["DisplayText"] = opts[:displayText]
-          page.rendering_options["SectionCutWidth"] = opts[:sectionCutWidth]
-          page.rendering_options["RenderMode"] = opts[:renderMode]
-          page.rendering_options["Texture"] = opts[:texture]
-          page.rendering_options["DisplayColorByLayer"] = opts[:displayColorByLayer]
-          page.rendering_options["EdgeColorMode"] = opts[:EdgeColorMode]
-        rescue StandardError
-        end
-      end
-
-      pages.each do |page|
-        next if page == @skpModel
-        next unless settings_saved[page]
-
-        old_style = settings_saved[page][:original_style]
-        next unless old_style
-
-        if page.respond_to?(:use_style=)
-          page.use_style = old_style
-        elsif page.respond_to?(:style=)
-          page.style = old_style
-        end
-
-        flag = defined?(SketchUp::Page::PAGE_USE_STYLE) ? SketchUp::Page::PAGE_USE_STYLE : 128
-        page.update(flag)
-      end
-    end
+    # Removed apply_style_overrides and prepare_page_for_temp_save
+    # Logic moved to C++ application (setup_reversed_scene.cpp)
 
     def load_rear_view_definition(page = @skpModel)
       page_name = page.is_a?(Sketchup::Page) ? page.name : "Model"
@@ -1045,7 +854,10 @@ module Skalp
       plane = sectionplane.skpSectionPlane.get_plane
 
       vector = Geom::Vector3d.new(plane[0], plane[1], plane[2])
-      vector.length = -2 * Skalp.tolerance
+      # Fix for Reversed View:
+      # Revert to -2.0 * Skalp.tolerance logic.
+      # User reported +2.0 made it disappear.
+      vector.length = -2.0 * Skalp.tolerance
       new_trans = Geom::Transformation.translation(vector)
 
       center = Skalp.active_model.skpModel.bounds.center
