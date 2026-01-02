@@ -95,21 +95,27 @@ module Skalp
 
       # Enforce correct live settings:
       # 1. Thinnest possible line (1)
-      object.rendering_options["SectionCutWidth"] = 1
+      object.rendering_options["SectionCutWidth"] = 1 if object.rendering_options["SectionCutWidth"] != 1
 
       # 2. Transparent color (invisible backup)
-      object.rendering_options["SectionDefaultCutColor"] = Sketchup::Color.new(0, 0, 0, 0)
+      # Check alpha to avoid redundant creation
+      if object.rendering_options["SectionDefaultCutColor"].alpha != 0
+        object.rendering_options["SectionDefaultCutColor"] = Sketchup::Color.new(0, 0, 0, 0)
+      end
 
       # 3. Hide edges completely (primary method)
       # SPECIAL HANDLING: SectionCutDrawEdges can only be set if SectionCutFilled is TRUE
-      if object.rendering_options.keys.include?("SectionCutDrawEdges") && object.rendering_options.keys.include?("SectionCutFilled")
+      if object.rendering_options.keys.include?("SectionCutDrawEdges") &&
+         object.rendering_options.keys.include?("SectionCutFilled") &&
+         object.rendering_options["SectionCutDrawEdges"] != false
+
         object.rendering_options["SectionCutFilled"] = true
         object.rendering_options["SectionCutDrawEdges"] = false
         object.rendering_options["SectionCutFilled"] = false
       end
 
       # 4. Color By Material (necessary for colored centerlines)
-      object.rendering_options["EdgeColorMode"] = 0
+      object.rendering_options["EdgeColorMode"] = 0 if object.rendering_options["EdgeColorMode"] != 0
 
       Skalp.block_observers = observer_status
     end
