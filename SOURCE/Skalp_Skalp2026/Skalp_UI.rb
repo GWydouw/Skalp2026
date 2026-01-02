@@ -598,6 +598,10 @@ module Skalp
 
     tool_menu = skalp_menu.add_submenu(translate("Tools"))
 
+    tool_menu.add_item(translate("Create Skalp Scrapbook")) do
+      Skalp.create_layout_scrapbook
+    end
+
     tool_menu.add_item(translate("Deactivate on this computer")) do
       deactivate
     end

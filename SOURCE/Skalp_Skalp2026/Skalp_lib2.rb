@@ -690,6 +690,30 @@ module Skalp
     default
   end
 
+  def create_layout_scrapbook_C_API(skp_path, layout_path)
+    require "Skalp_Skalp2026/shellwords/shellwords"
+    path = Skalp::Shellwords.escape(SKALP_PATH + "lib/")
+
+    command = if OS == :WINDOWS
+                %("#{path[1..-2]}Skalp.exe" "create_layout_scrapbook" "#{skp_path}" "#{layout_path}")
+              else
+                %(#{path}Skalp "create_layout_scrapbook" "#{skp_path}" "#{layout_path}")
+              end
+
+    puts "Running C++ Command: #{command}" if defined?(DEBUG) && DEBUG
+
+    stdin, stdout, stderr, wait_thr = Open3.popen3(command)
+    result = stdout.read
+    error = stderr.read
+
+    if defined?(DEBUG) && DEBUG
+      puts "C++ STDOUT: #{result}"
+      puts "C++ STDERR: #{error}"
+    end
+
+    wait_thr.value.success?
+  end
+
   def get_exploded_entities(temp_dir, height, index_array, scale_array, perspective_array, target_array, rear_view,
                             progress_weight = 1.0, scene_names = [])
     require "Skalp_Skalp2026/shellwords/shellwords"

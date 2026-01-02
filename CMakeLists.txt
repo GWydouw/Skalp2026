@@ -16,6 +16,7 @@ set(SOURCES
     ce_src_app/model_style.cpp
     ce_src_app/skalp_convert.cpp
     ce_src_app/create_layer_materials.cpp
+    ce_src_app/skalp_layout_connection.cpp
     ce_src_app/base64/base64.cpp
 )
 

@@ -1,4 +1,5 @@
 module Skalp
+  require "Skalp_Skalp2026/Skalp_layout"
   require "sketchup"
   require "fileutils"
   require "base64"

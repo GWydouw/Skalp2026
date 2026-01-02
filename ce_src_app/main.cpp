@@ -7,6 +7,7 @@
 // Internal project headers
 #include "base64/base64.h"
 #include "skalp_convert.h"
+#include "skalp_layout_connection.h"
 #include "sketchup.h"
 
 // Define platform-specific flags
@@ -206,6 +207,22 @@ int main(int argc, const char *argv[]) {
         }
         std::cout << "*E*" << std::endl;
       }
+    }
+  }
+
+  // --- Command: create_layout_scrapbook ---
+  if (command == "create_layout_scrapbook") {
+    if (argc > 3) {
+      std::string output_path = argv[3];
+      std::string paper_size = (argc > 4) ? argv[4] : "A4";
+
+      bool result =
+          create_layout_scrapbook(path, output_path, paper_size, true);
+
+      if (result)
+        std::cout << "true";
+      else
+        std::cout << "false";
     }
   }
 
