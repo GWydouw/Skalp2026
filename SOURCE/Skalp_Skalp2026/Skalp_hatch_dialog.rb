@@ -540,14 +540,24 @@ module Skalp
       # Create richer settings hash for JS
       # Try to use @tile formatted strings if available (set in pre_compute)
       # If not set, calculate usage
-      @tile.calculate(s[:user_x], :x) if !@tile.x_value && s[:user_x]
+      # Always calculate from material attributes to ensure correct units are loaded
+      @tile.calculate(s[:user_x], :x) if s[:user_x]
 
       # Robust formatting helper using Skalp.inch2pen to match dropdown options
       # s[:section_cut_width] is likely float in inches (e.g. 0.0137...)
       # pen_val is likely float in inches.
 
-      pen_val = s[:pen].to_f
-      sc_val = s[:section_cut_width].to_f
+      pen_val = if s[:pen].is_a?(String)
+                  Skalp::Distance.new(s[:pen]).to_inch
+                else
+                  s[:pen].to_f
+                end
+
+      sc_val = if s[:section_cut_width].is_a?(String)
+                 Skalp::Distance.new(s[:section_cut_width]).to_inch
+               else
+                 s[:section_cut_width].to_f
+               end
 
       pen_formatted = Skalp.inch2pen(pen_val, true)
       sc_formatted = Skalp.inch2pen(sc_val, true)
@@ -559,8 +569,10 @@ module Skalp
       puts "[Skalp DEBUG] sc_width raw: #{s[:section_cut_width].inspect}, formatted: #{sc_formatted.inspect}"
       puts "[Skalp DEBUG] pen raw: #{s[:pen].inspect}, formatted: #{pen_formatted.inspect}"
 
-      # Ensure pattern is in list if not found
-      full_list << pat_selection unless full_list.include?(pat_selection)
+      # Ensure pattern is in list if not found (but only if it's reasonably a pattern name, not just a material name fallback)
+      # We check if it's an AutoCAD pattern or known Skalp pattern type
+      is_known_pattern = SkalpHatch.hatchdefs.any? { |h| h.name.to_s.upcase == pat_name_raw.upcase }
+      full_list << pat_selection if is_known_pattern && !full_list.include?(pat_selection)
       full_list.sort! if full_list.respond_to?(:sort!)
 
       ui_settings = s.merge({
@@ -590,8 +602,7 @@ module Skalp
 
                               slider: "60",
                               priority: s[:drawing_priority],
-                              unify: s[:unify],
-                              section_line_color: s[:section_line_color]
+                              unify: s[:unify]
                             })
 
       raw_data = {
@@ -797,21 +808,24 @@ module Skalp
         script("$('#unify_material').prop('checked', #{unify});")
         script("$('#zindex').val('#{drawing_priority}');")
 
+        zoom_factor ||= 1.0
+
         pattern_info = @hatch.create_png({
                                            solid_color: solidcolor,
                                            type: :preview,
-                                           gauge: true, # TODO: waarom edit mode? moet dit niet iets totaal anders zijn?
+                                           gauge: true,
                                            width: PREVIEW_X_SIZE,
                                            height: PREVIEW_Y_SIZE,
                                            line_color: pattern_string[:line_color],
                                            fill_color: pattern_string[:fill_color],
-                                           pen: penwidth.to_inch, # pen_width in inch (1pt = 1.0 / 72) was: 1.0 / SCREEN_DPI
-                                           section_cut_width: pattern_string[:section_cut_width].to_f, # mm_or_pts_to_inch(vars[10]), # pen_width in inch (1pt = 1.0 / 72) was: 1.0 / SCREEN_DPI
+                                           pen: penwidth.to_inch,
+                                           section_cut_width: pattern_string[:section_cut_width].to_f,
                                            resolution: SCREEN_DPI,
-                                           print_scale: drawing_scale, # TODO: wat met de schaal?
+                                           print_scale: drawing_scale,
                                            zoom_factor: zoom_factor,
                                            user_x: @tile.x_value,
-                                           space: pattern_string[:space]
+                                           space: pattern_string[:space],
+                                           section_line_color: pattern_string[:section_line_color] || "rgb(0,0,0)"
                                          })
 
         @tile.gauge = pattern_info[:gauge_ratio]
@@ -1062,7 +1076,8 @@ module Skalp
                                          resolution: PRINT_DPI,
                                          print_scale: 1,
                                          user_x: @tile.x_value,
-                                         space: vars[2].to_s.to_sym
+                                         space: vars[2].to_s.to_sym,
+                                         section_line_color: vars[12] || "rgb(0,0,0)"
                                        })
 
       unless pattern_info
@@ -1108,8 +1123,9 @@ module Skalp
         pattern_array = ["*#{pattern_name_to_use}"] + pattern_array unless first_line.start_with?("*")
       end
 
+      # Use the pattern name (first part of vars[0]) NOT the material name (vars[11])
       new_pattern_info = {
-        name: Skalp.utf8(vars[11]),
+        name: Skalp.utf8(vars[0]).split(",").first.strip,
         pattern: pattern_array,
         print_scale: 1,
         resolution: PRINT_DPI,

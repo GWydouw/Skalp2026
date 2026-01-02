@@ -1262,7 +1262,13 @@ module Skalp
   end
 
   def self.color_from_name(colorname)
-    color = Sketchup::Color.new(colorname)
+    # Handle descriptive prefix for line colors
+    cleaned_name = colorname.to_s.gsub("Skalp linecolor - ", "")
+    return cleaned_name if cleaned_name.start_with?("rgb")
+
+    color = Sketchup::Color.new(cleaned_name)
+    return nil unless color
+
     "rgb(#{color.red}, #{color.green}, #{color.blue})"
   rescue StandardError
     nil

@@ -155,7 +155,7 @@ module Skalp
 
             by_material.each do |mat_name, sections|
               su_mat = materials[mat_name]
-              unify = su_mat ? Skalp.skalp_material_info(su_mat, :unify_section) == true : false
+              unify = su_mat ? Skalp.skalp_material_info(su_mat, :unify) == true : false
               final_polygons = []
 
               if unify && sections.size > 1
@@ -180,10 +180,22 @@ module Skalp
 
                 slice_mask = Skalp::MultiPolygon.new
                 lineweight_groups_by_priority[priority].each do |_, group_secs|
-                  group_secs.each do |sec|
-                    # Only include if relevant to this material? No, global masking.
-                    w = get_lineweight_width(sec, type)
-                    slice_mask.union!(sec.to_mpoly.outline(w * scale)) if w > 0.0
+                  by_mat_mask = Hash.new { |h, k| h[k] = [] }
+                  group_secs.each { |sec| by_mat_mask[skalp_style_material(sec, type)] << sec }
+
+                  by_mat_mask.each do |m_name, m_sections|
+                    s_mat = materials[m_name]
+                    u = s_mat ? Skalp.skalp_material_info(s_mat, :unify) == true : false
+                    width = get_lineweight_width(m_sections.first, type)
+                    next unless width > 0.0
+
+                    if u && m_sections.size > 1
+                      u_poly = Skalp::MultiPolygon.new
+                      m_sections.each { |sec| u_poly.union!(sec.to_mpoly) }
+                      slice_mask.union!(u_poly.outline(width * scale))
+                    else
+                      m_sections.each { |sec| slice_mask.union!(sec.to_mpoly.outline(width * scale)) }
+                    end
                   end
                 end
 
@@ -194,8 +206,12 @@ module Skalp
                 end
 
                 # Centerlines (from original polygon)
-                centerline_loops << polygon.outerloop
-                centerline_loops.concat(polygon.innerloops)
+                # Store section info to derive material later
+                centerline_data = { loop: polygon.outerloop, section: sections.first }
+                centerline_loops << centerline_data
+                polygon.innerloops.each do |il|
+                  centerline_loops << { loop: il, section: sections.first }
+                end
 
                 poly_to_process.each do |p|
                   outerloop = if has_offset
@@ -236,24 +252,87 @@ module Skalp
               end
             end
 
-            # C. RENDER LINEWEIGHTS (Per Color)
             lineweight_groups_by_priority[priority].each do |color_name, group_sections|
               group_mask = Skalp::MultiPolygon.new
+
+              # Group segments by material to handle Unify
+              by_mat = Hash.new { |h, k| h[k] = [] }
               group_sections.each do |sec|
-                w = get_lineweight_width(sec, type)
-                group_mask.union!(sec.to_mpoly.outline(w * scale)) if w > 0.0
+                mat = skalp_style_material(sec, type)
+                by_mat[mat] << sec
               end
 
-              inner_collection = []
-              outer_mask = group_mask.clone
-              group_sections.each do |sec|
-                inner_collection << sec.to_mpoly.intersection(group_mask)
-                outer_mask.difference!(sec.to_mpoly)
+              by_mat.each do |mat_name, sections|
+                su_mat = materials[mat_name]
+                unify = su_mat ? Skalp.skalp_material_info(su_mat, :unify) == true : false
+                w = get_lineweight_width(sections.first, type)
+                next unless w > 0.0
+
+                if unify && sections.size > 1
+                  union_poly = Skalp::MultiPolygon.new
+                  sections.each { |sec| union_poly.union!(sec.to_mpoly) }
+                  group_mask.union!(union_poly.outline(w * scale))
+                else
+                  sections.each do |sec|
+                    group_mask.union!(sec.to_mpoly.outline(w * scale))
+                  end
+                end
               end
 
-              line_mat = materials[color_name] || materials["Skalp linecolor"]
+              all_polys_to_draw = []
 
-              inner_collection.each do |mpoly|
+              # If we have unified sections in this specific color group?
+              # Note: group_sections can contain mixed materials if they share the same Line Color!
+              # So we can't assume GLOBAL unification. We must continue to respect by_material grouping.
+
+              # Re-iterate by material to decide drawing strategy
+              by_mat.each do |mat_name, sections|
+                su_mat = materials[mat_name]
+                unify = su_mat ? Skalp.skalp_material_info(su_mat, :unify) == true : false
+                w = get_lineweight_width(sections.first, type)
+                next unless w > 0.0
+
+                if unify && sections.size > 1
+                  # 1. Calculate the Unified Mask for this material
+                  union_poly = Skalp::MultiPolygon.new
+                  sections.each { |sec| union_poly.union!(sec.to_mpoly) }
+                  unified_outline = union_poly.outline(w * scale)
+
+                  # 2. Add to drawing list directly (No intersection needed if it's the source!)
+                  # Wait, group_mask is the Union of ALL materials in this color group.
+                  # If we just draw `unified_outline`, it might overlap with other materials in the same color group?
+                  # Since they are same color, overlap is fine visually!
+                  # BUT z-fighting? No, same plane.
+
+                  # Actually, let's keep it simple:
+                  # Calculate the exact shape for these sections.
+                  # For Unify: It is the Outline of the Union.
+                  all_polys_to_draw << unified_outline
+                else
+                  # For Non-Unify:
+                  # It is the Union of Outlines (which mimics individual outlines merged)
+                  # But we previously did: (Section INTERSECT Mask) + (Mask DIFF Sections)
+                  # This was to handle "Inner" vs "Outer".
+
+                  # Simpler approach for same-color group:
+                  # Just draw the outline of each section!
+                  sections.each do |sec|
+                    all_polys_to_draw << sec.to_mpoly.outline(w * scale)
+                  end
+                end
+              end
+
+              # Improved naming: Skalp linecolor for black, Skalp linecolor - [color] for others
+              line_mat_name = if ["rgb(0,0,0)", "rgb(0, 0, 0)"].include?(color_name)
+                                "Skalp linecolor"
+                              else
+                                "Skalp linecolor - #{color_name}"
+                              end
+
+              line_mat = Skalp.create_su_material(line_mat_name) || materials["Skalp linecolor"]
+
+              # Flatten and draw
+              all_polys_to_draw.each do |mpoly|
                 mpoly.polygons.polygons.each do |p|
                   next if p.outerloop.vertices.size < 3
 
@@ -261,15 +340,14 @@ module Skalp
                 end
               end
 
-              outer_mask.polygons.polygons.each do |p|
-                next if p.vertices.size < 3
-
-                draw_lineweight_face(builder, p, line_mat, transparent, has_offset, transform_vec, color_name)
-              end
+              # Removed previous complex drawing loop
             end
 
             # D. CENTERLINES
-            centerline_loops.each do |loop|
+            centerline_loops.each do |data|
+              loop = data[:loop]
+              section = data[:section]
+
               verts = has_offset ? loop.vertices.map { |v| v.offset(transform_vec) } : loop.vertices
               for n in 0..verts.size - 1
                 pt1 = verts[n - 1]
@@ -277,6 +355,20 @@ module Skalp
                 next unless pt1.distance(pt2) > 0.01
 
                 edge = builder.add_edge(pt1, pt2)
+
+                # Assign Material for Colored Edges
+                if section
+                  # Re-derive color material name
+                  c_name = get_section_line_color_name(section, type)
+                  mat_line_name = if ["rgb(0,0,0)", "rgb(0, 0, 0)"].include?(c_name)
+                                    "Skalp linecolor"
+                                  else
+                                    "Skalp linecolor - #{c_name}"
+                                  end
+                  l_mat = Skalp.create_su_material(mat_line_name) || materials["Skalp linecolor"]
+                  edge.material = l_mat
+                end
+
                 edge.smooth = edge.soft = edge.hidden = false
               end
             rescue ArgumentError
@@ -337,6 +429,14 @@ module Skalp
 
       val = Skalp.skalp_material_info(su_mat, :section_cut_width)
       val ? val.to_f : 0.0
+    end
+
+    def get_section_line_color_name(section2d, type)
+      mat_name = skalp_style_material(section2d, type)
+      su_mat = Sketchup.active_model.materials[mat_name]
+      return "rgb(0,0,0)" unless su_mat
+
+      Skalp.skalp_material_info(su_mat, :section_line_color) || "rgb(0,0,0)"
     end
 
     def draw_lineweight_face(builder, polygon, material, back_material, has_offset, transform_vec, layer_suffix)
