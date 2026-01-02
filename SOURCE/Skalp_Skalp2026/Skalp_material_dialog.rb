@@ -409,9 +409,13 @@ module Skalp
         append_thumbnails_from_library(lib)
       end
 
+      return unless @materialdialog
+
       @materialdialog.execute_script("load_materials(#{type}, #{@materials.to_json})")
 
       return if @return_webdialog
+
+      return unless @materialdialog
 
       @materialdialog.execute_script("unselect()")
     end
