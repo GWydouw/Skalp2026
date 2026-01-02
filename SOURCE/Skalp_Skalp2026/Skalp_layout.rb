@@ -94,11 +94,22 @@ module Skalp
 
           sister.use_hidden_layers = true
 
-          # Isolate Skalp layers
+          # 1. Hide all non-Skalp layers
           model.layers.each do |layer|
             is_skalp = layer.get_attribute("Skalp", "ID") || layer.name.include?("Skalp") ||
                        layer.name.include?("Skalp Scene Sections")
             sister.set_visibility(layer, is_skalp)
+          end
+
+          # 2. Hide all non-Skalp top-level entities (for Untagged/loose geometry)
+          model.entities.each do |ent|
+            next unless ent.is_a?(Sketchup::Drawingelement)
+
+            is_skalp_ent = ent.get_attribute("Skalp", "ID") ||
+                           ent.get_attribute("Skalp", "section_result_group") ||
+                           ent.get_attribute("Skalp", "name")
+
+            sister.set_drawingelement_visibility(ent, false) unless is_skalp_ent
           end
         end
 
