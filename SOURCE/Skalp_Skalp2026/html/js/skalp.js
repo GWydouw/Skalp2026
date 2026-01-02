@@ -525,6 +525,8 @@ function create_hatch() {
             pen_model,
             line_color,
             fill_color,
+            slider,
+            "0",
             aligned,
             section_cut_width,
             utf8(name),
