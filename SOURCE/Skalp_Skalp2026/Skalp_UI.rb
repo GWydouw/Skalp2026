@@ -573,7 +573,7 @@ module Skalp
     skalp_menu = menu.add_submenu("Skalp")
 
     skalp_menu.add_item(translate("Info Dialog")) do
-      startup_check(:info)
+      Skalp.startup_check(:info)
     end
 
     skalp_menu.add_separator
@@ -841,7 +841,7 @@ module Skalp
   end
 
   @skalp_pattern_designer = UI::Command.new("Skalp #{translate('Pattern Designer')}") do
-    startup_check(:patternDesignerTool)
+    Skalp.startup_check(:patternDesignerTool)
   end
 
   if OS == :MAC
