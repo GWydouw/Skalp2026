@@ -97,6 +97,13 @@ module Skalp
       # 1. Thinnest possible line (1)
       object.rendering_options["SectionCutWidth"] = 1 if object.rendering_options["SectionCutWidth"] != 1
 
+      # 2. "Almost" Transparent color (Alpha 1 hack for LayOut)
+      # Setting alpha to 0 causes LayOut to render white lines.
+      # Setting alpha to 1 (0.1% opacity) tricks it into rendering "invisible" black lines.
+      if object.rendering_options["SectionDefaultCutColor"].alpha != 1
+        object.rendering_options["SectionDefaultCutColor"] = Sketchup::Color.new(0, 0, 0, 1)
+      end
+
       # 3. Hide edges completely (primary method)
       # SPECIAL HANDLING: SectionCutDrawEdges can only be set if SectionCutFilled is TRUE
       if object.rendering_options.keys.include?("SectionCutDrawEdges") &&
