@@ -241,7 +241,7 @@ module Skalp
       # SIZE ###############################
       @webdialog.add_action_callback("change_tile_x") do |webdialog, params|
         vars = params.split(";")
-        @tile.calculate(vars[0], :y)
+        @tile.calculate(vars[0], :x)
 
         if @tile.unit == "feet"
           script("$('#tile_y').val(\"#{@tile.y_string}\");")
@@ -256,7 +256,7 @@ module Skalp
 
       @webdialog.add_action_callback("change_tile_y") do |webdialog, params|
         vars = params.split(";")
-        @tile.calculate(vars[0], :x)
+        @tile.calculate(vars[0], :y)
 
         if @tile.unit == "feet"
           script("$('#tile_y').val(\"#{@tile.y_string}\");")
