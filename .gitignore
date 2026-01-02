@@ -21,9 +21,8 @@ Thumbs.db
 # Development licenses (keep in separate dir)
 dev_licenses/
 
-# License server (if running locally)
+# License server (blocked to prevent accidental commit of local copies)
 skalp-license-server/
-
 # C/C++ build artifacts
 ce_src_app/build/
 ce_src_skalpc/build/
@@ -55,6 +54,31 @@ node_modules/
 # macOS rgloader
 rgloader/
 
-# Visual Studio cache
+# CMake
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Xcode
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+*.xcworkspace/
+*.xccheckout
+*.mode1v3
+*.mode2v3
+*.movestue
+*.pbxuser
+*.perspectivev3
+
+# Visual Studio (Enhanced)
 .vs/
 *.ipch
+*.suo
+*.ntvs*
+*.njsproj
+*.sln.docstates
+*.db
+*.sdf
+*.opensdf
