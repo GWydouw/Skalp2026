@@ -371,7 +371,8 @@ module Skalp
 
     # ...
     def self.add_material(name, image_top, text_top, source)
-      @materials << { name: name, source: source }
+      @materials << name
+      @materials << source
     end
 
     def self.create_thumbnails(lib = "Skalp materials in model")
