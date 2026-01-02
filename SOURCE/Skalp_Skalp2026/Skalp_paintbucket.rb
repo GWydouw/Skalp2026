@@ -134,11 +134,31 @@ module Skalp
           Skalp.style_update = true
           Skalp.dialog.webdialog.execute_script("save_style(false)")
         when :ByObject
-          object = node_value.skpEntity
-          Skalp.dialog.define_sectionmaterial(Skalp::Material_dialog.selected_material, object)
+          # Handle multiple IDs (comma separated) for Unified faces
+          ids = face.get_attribute("Skalp", "from_sub_object").to_s.split(",")
+          ids.each do |id_str|
+            node_v = Skalp.active_model.entity_strings[id_str]
+            if node_v
+              object = node_v.skpEntity
+              Skalp.dialog.define_sectionmaterial(Skalp::Material_dialog.selected_material, object) if object
+            end
+          end
         when :ByTag
-          tag = Sketchup.active_model.layers[node_value.layer]
-          Skalp.define_layer_material(tag, Skalp::Material_dialog.selected_material) if tag
+          # If unified, pick the first one's tag or iterate all?
+          # Usually, unified faces are from objects on different tags.
+          # For ByTag, it's safer to apply to all unique tags involved.
+          ids = face.get_attribute("Skalp", "from_sub_object").to_s.split(",")
+          processed_tags = []
+          ids.each do |id_str|
+            node_v = Skalp.active_model.entity_strings[id_str]
+            next unless node_v && node_v.layer
+
+            tag = Sketchup.active_model.layers[node_v.layer]
+            if tag && !processed_tags.include?(tag)
+              Skalp.define_layer_material(tag, Skalp::Material_dialog.selected_material)
+              processed_tags << tag
+            end
+          end
         when :ByTexture
           UI.messagebox("When using the ByTexture rule, you need to paint the object with the SketchUp Paint Tool to change the section.")
         when :Label

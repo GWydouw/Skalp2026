@@ -162,8 +162,11 @@ module Skalp
                 union_poly = Skalp::MultiPolygon.new
                 sections.each { |sec| union_poly.union!(sec.to_mpoly) }
                 final_polygons = union_poly.polygons.polygons
+                # Map contributing IDs for this material group
+                contributing_ids = sections.map { |sec| sec.node.value.to_s }.join(",")
               else
-                sections.each { |sec| final_polygons.concat(sec.polygons) }
+                final_polygons = sections.map { |sec| { poly: sec.polygons, sec: sec } }.flatten
+                contributing_ids = nil
               end
 
               # B. GENERATE FACES
@@ -205,15 +208,32 @@ module Skalp
                   poly_to_process = mp.polygons.polygons
                 end
 
-                # Centerlines (from original polygon)
-                # Store section info to derive material later
                 centerline_data = { loop: polygon.outerloop, section: sections.first }
                 centerline_loops << centerline_data
                 polygon.innerloops.each do |il|
                   centerline_loops << { loop: il, section: sections.first }
                 end
 
-                poly_to_process.each do |p|
+                # If final_polygons is structured (non-unified), we need to extract poly
+                # If simplified (unified), final_polygons is just polygons.
+                # Let's normalize finally.
+                polys_to_draw = if unify && sections.size > 1
+                                  poly_to_process.map { |p| { poly: p, ids: contributing_ids } }
+                                else
+                                  # For non-unified, poly_to_process is from concatenated sections.
+                                  # Wait, the logic above for poly_to_process is already subtracted by slice_mask.
+                                  # This needs care. If non-unified, poly_to_process might contain multiple sections' fragments.
+                                  # Actually, the original concat approach lost the mapping.
+                                  # Let's fix the non-unified path to preserve the mapping.
+                                  # Fallback
+                                  poly_to_process.map do |p|
+                                    { poly: p, ids: sections.first.node.value.to_s }
+                                  end
+                                end
+
+                polys_to_draw.each do |data|
+                  p = data[:poly]
+                  ids = data[:ids]
                   outerloop = if has_offset
                                 p.outerloop.vertices.map do |v|
                                   v.offset(transform_vec)
@@ -233,12 +253,14 @@ module Skalp
                              builder.add_face(outerloop,
                                               holes: innerloops)
                            end
-                    if sections.size == 1
+                    if ids
+                      face.set_attribute("Skalp", "from_sub_object", ids)
+                      # Top parent? For unified, it's mixed. Just use "Unified" for from_object.
+                      face.set_attribute("Skalp", "from_object", "Unified")
+                    else
                       s = sections.first
                       face.set_attribute("Skalp", "from_object", s.node.value.top_parent.value.to_s)
                       face.set_attribute("Skalp", "from_sub_object", s.node.value.to_s)
-                    else
-                      face.set_attribute("Skalp", "from_object", "Unified")
                     end
                     face.material = Skalp.create_su_material(mat_name)
                     correct_UV_material(face)
