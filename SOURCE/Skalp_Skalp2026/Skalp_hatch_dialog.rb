@@ -360,7 +360,8 @@ module Skalp
                                          print_scale: drawing_scale,
                                          zoom_factor: 1.0 / ((105 - 60) * 5.0 / 100.0), # Default slider value = 60
                                          user_x: @tile.x_value,
-                                         space: pattern_string[:space]
+                                         space: pattern_string[:space],
+                                         section_line_color: pattern_string[:section_line_color] || "rgb(0,0,0)"
                                        })
 
       @initial_preview_base64 = pattern_info[:png_base64] if pattern_info
