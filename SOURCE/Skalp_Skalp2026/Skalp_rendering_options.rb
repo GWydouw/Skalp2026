@@ -59,11 +59,12 @@ module Skalp
       observer_status = Skalp.block_observers
       Skalp.block_observers = true
       object.rendering_options["RenderMode"] = @stored_hiddenline_rendering_options[object]["RenderMode"]
-      object.rendering_options["DisplayColorByLayer"] = @stored_hiddenline_rendering_options[object]["DisplayColorByLayer"]
+      object.rendering_options["DisplayColorByLayer"] =
+        @stored_hiddenline_rendering_options[object]["DisplayColorByLayer"]
       Skalp.block_observers = observer_status
 
-      #if reset doesn't change anything, we turn off color by layer and set the rendermode to textures
-      if object.rendering_options["DisplayColorByLayer"] == true  &&  object.rendering_options["RenderMode"] == 1
+      # if reset doesn't change anything, we turn off color by layer and set the rendermode to textures
+      if object.rendering_options["DisplayColorByLayer"] == true && object.rendering_options["RenderMode"] == 1
         object.rendering_options["DisplayColorByLayer"] = false
         object.rendering_options["RenderMode"] = 2
       end
@@ -71,19 +72,34 @@ module Skalp
       Skalp.dialog.set_hiddenline_mode_inactive if Skalp.dialog
     end
 
-    def set_section_cut_width_mode(object = @model, color = 'black')
+    def set_section_cut_width_mode(object = @model, color = "black")
       return if object.class == Sketchup::Page && !object.use_rendering_options?
 
       active_rendering_options = {}
       active_rendering_options["SectionDefaultCutColor"] = object.rendering_options["SectionDefaultCutColor"]
       active_rendering_options["SectionCutWidth"] = object.rendering_options["SectionCutWidth"]
+      if object.rendering_options.keys.include?("SectionCutDrawEdges")
+        active_rendering_options["SectionCutDrawEdges"] =
+          object.rendering_options["SectionCutDrawEdges"]
+      end
 
       @stored_section_cut_width_rendering_options[object] = active_rendering_options
 
       observer_status = Skalp.block_observers
       Skalp.block_observers = true
-      object.rendering_options["SectionDefaultCutColor"] = color
+
+      # Enforce correct live settings:
+      # 1. Thinnest possible line (1)
       object.rendering_options["SectionCutWidth"] = 1
+
+      # 2. Transparent color (invisible backup)
+      object.rendering_options["SectionDefaultCutColor"] = Sketchup::Color.new(0, 0, 0, 0)
+
+      # 3. Hide edges completely (primary method)
+      if object.rendering_options.keys.include?("SectionCutDrawEdges")
+        object.rendering_options["SectionCutDrawEdges"] = false
+      end
+
       Skalp.block_observers = observer_status
     end
 
@@ -120,8 +136,16 @@ module Skalp
 
       observer_status = Skalp.block_observers
       Skalp.block_observers = true
-      object.rendering_options["SectionDefaultCutColor"] = @stored_section_cut_width_rendering_options[object]["SectionDefaultCutColor"]
-      object.rendering_options["SectionCutWidth"] = @stored_section_cut_width_rendering_options[object]["SectionCutWidth"]
+      object.rendering_options["SectionDefaultCutColor"] =
+        @stored_section_cut_width_rendering_options[object]["SectionDefaultCutColor"]
+      object.rendering_options["SectionCutWidth"] =
+        @stored_section_cut_width_rendering_options[object]["SectionCutWidth"]
+
+      if @stored_section_cut_width_rendering_options[object].key?("SectionCutDrawEdges")
+        object.rendering_options["SectionCutDrawEdges"] =
+          @stored_section_cut_width_rendering_options[object]["SectionCutDrawEdges"]
+      end
+
       Skalp.block_observers = observer_status
     end
 
@@ -137,7 +161,7 @@ module Skalp
 
       observer_status = Skalp.block_observers
       Skalp.block_observers = true
-      object.rendering_options['DisplayFog'] = true
+      object.rendering_options["DisplayFog"] = true
       object.rendering_options["FogEndDist"] = endDist
       object.rendering_options["FogStartDist"] = startDist
       Skalp.block_observers = observer_status
@@ -187,12 +211,14 @@ module Skalp
     def hiddenline_style_active?(object = Sketchup.active_model)
       return false unless object.class == Sketchup::Page || object == Sketchup.active_model
       return false unless object.rendering_options
+
       object.rendering_options["RenderMode"] == 1 && object.rendering_options["DisplayColorByLayer"] == true
     end
 
     def color_by_layer_active?(object = Sketchup.active_model)
       return false unless object.class == Sketchup::Page || object == Sketchup.active_model
       return false unless object.rendering_options
+
       object.rendering_options["DisplayColorByLayer"] == true
     end
   end
