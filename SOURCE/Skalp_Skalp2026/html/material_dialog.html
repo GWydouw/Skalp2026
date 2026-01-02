@@ -77,12 +77,12 @@
             style="display:none; position:absolute; background:#fff; border:1px solid #ccc; z-index:1000;"
             @mouseleave="hide_context_menu" onmouseenter="event.stopPropagation()">
             <ul style="list-style:none; margin:0; padding:5px;">
-                <li onclick="context_paint_material(event)" data-only-model>Paint to Section...</li>
                 <li onclick="context_edit_material(event)" data-only-model>Edit</li>
                 <li onclick="context_rename_material(event)">Rename</li>
                 <li onclick="context_remove_material(event)">Delete</li>
                 <li class="separator"></li>
                 <li onclick="context_create_based_on(event)">Create new based on this</li>
+                <li onclick="context_paint_material(event)" data-only-model>Paint to Section...</li>
                 <li onclick="context_merge_material(event)" data-only-model>Replace with...</li>
                 <li class="separator"></li>
                 <li onclick="context_copy_material(event)">Copy to Library</li>

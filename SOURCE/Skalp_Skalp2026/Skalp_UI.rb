@@ -875,7 +875,7 @@ module Skalp
 
   @skalp_paint_tool = UI::Command.new("Skalp #{translate('Skalp Paint Bucket')}") do
     if @status == 1
-      Sketchup.active_model.select_tool(@skalp_paint) unless Skalp::Material_dialog.materialdialog
+      Sketchup.active_model.select_tool(@skalp_paint)
       paintbucketbutton_on
     else
       UI.messagebox("Please open Skalp before using the Skalp Paint Tool.")

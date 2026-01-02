@@ -715,7 +715,7 @@ module Skalp
                     :clipper, :clipperOffset, :block_observers, :skalp_layout_export, :skalp_dwg_export,
                     :observer_check, :observer_check_result, :info_dialog, :info_dialog_active, :skalp_activate, :skalp_toolbar, :skalp_dwg_export, :set_bugtracking,
                     :isolate_UI_loaded, :new_pattern_layer_list, :timer_started, :converter_started,
-                    :new_sectionplane, :block_color_by_layer, :skalp_paint, :progress_dialog
+                    :new_sectionplane, :block_color_by_layer, :skalp_paint, :skalp_paint_tool, :progress_dialog
 
       attr_reader :transformation_down
     end
