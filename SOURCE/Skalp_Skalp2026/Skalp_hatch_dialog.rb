@@ -1058,7 +1058,7 @@ module Skalp
       end
 
       Skalp.active_model.start("Skalp - create new material")
-      Sketchup.active_model.materials[name] || hatch_material = Sketchup.active_model.materials.add(name)
+      hatch_material = Sketchup.active_model.materials[name] || Sketchup.active_model.materials.add(name)
 
       hatch_material.texture = Skalp::IMAGE_PATH + "tile.png"
       # Guard against NaN/Infinity in texture size to prevent FloatDomainError
