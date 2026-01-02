@@ -54,7 +54,7 @@
                 @contextmenu.prevent="show_empty_context_menu($event)">
                 <div class="material-div" v-for="material in materials"
                     :class="{ 'selected': selected_material === material.name }" @click="selectmaterial(material.name)"
-                    @dblclick="context_paint_material(event)" @mouseenter="hide_context_menu"
+                    @dblclick="context_paint_material(event, material.name)" @mouseenter="hide_context_menu"
                     @contextmenu.stop.prevent="show_context_menu($event, material.name)" :title="material.name">
 
                     <!-- Preview Box -->
@@ -373,9 +373,9 @@
             sketchup.material_menu('edit', current_context_material);
         }
 
-        function context_paint_material(event) {
+        function context_paint_material(event, name) {
             if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
-            const target = current_context_material || event.currentTarget.title;
+            const target = name || current_context_material || (event && event.currentTarget && event.currentTarget.title);
             if (!target) return;
             sketchup.material_menu('paint_to_section', target);
             hide_context_menu();

@@ -882,6 +882,8 @@ module Skalp
     end
   end
 
+  Skalp.skalp_paint_tool = @skalp_paint_tool
+
   if OS == :MAC
     small_icon = "paint_icon.pdf"
     large_icon = "paint_icon.pdf"

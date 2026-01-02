@@ -326,6 +326,11 @@ module Skalp
         w = Sketchup.read_default("Skalp_Paint_dialog", "w").to_i
         h = Sketchup.read_default("Skalp_Paint_dialog", "h").to_i
 
+        if @materialdialog.visible?
+          @materialdialog.bring_to_front
+          return
+        end
+
         if ((x + w) < section_x) || (x > (section_x + section_w)) || (y > (section_y + section_h)) || ((y + h) < section_y)
           @materialdialog.set_position(x, y)
         else
