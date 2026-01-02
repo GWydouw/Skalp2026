@@ -1,5 +1,6 @@
 #include "skalp_layout_connection.h"
 #include "sketchup.h"
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <string>
@@ -7,14 +8,34 @@
 
 // LayOut API
 #include <LayOutAPI/layout.h>
+#include <LayOutAPI/model/document.h>
+#include <LayOutAPI/model/group.h>
+#include <LayOutAPI/model/page.h>
+#include <LayOutAPI/model/pageinfo.h>
+#include <LayOutAPI/model/sketchupmodel.h>
 
 // SketchUp API
 #include <SketchUpAPI/model/attribute_dictionary.h>
 #include <SketchUpAPI/model/camera.h>
+#include <SketchUpAPI/model/drawing_element.h>
+#include <SketchUpAPI/model/entities.h>
+#include <SketchUpAPI/model/group.h>
 #include <SketchUpAPI/model/layer.h>
 #include <SketchUpAPI/model/model.h>
 #include <SketchUpAPI/model/scene.h>
 #include <SketchUpAPI/model/typed_value.h>
+
+struct SceneExportInfo {
+  std::string name;
+  std::string id;
+  int orig_index;
+  int sister_index;
+  SUSceneRef orig_ref;
+  SUSceneRef sister_ref;
+  double scale;
+  double model_w_in;
+  double model_h_in;
+};
 
 // Helper to check for Skalp Scene
 bool is_skalp_scene(SUSceneRef page) {
@@ -24,7 +45,6 @@ bool is_skalp_scene(SUSceneRef page) {
   if (res != SU_ERROR_NONE || SUIsInvalid(dictionary))
     return false;
 
-  // Check for ID
   SUTypedValueRef val = SU_INVALID;
   SUTypedValueCreate(&val);
   res = SUAttributeDictionaryGetValue(dictionary, "ID", &val);
@@ -33,23 +53,39 @@ bool is_skalp_scene(SUSceneRef page) {
   return has_id;
 }
 
-// Convert SUString to std::string helper (assumed generic or implemented
-// locally) If not available in "sketchup.h", implementing here locally to be
-// safe. Wait, user provided file (Step 3312) had su_string_to_std_string. It
-// was used in line 100. I should ensure it's available or define it. Assuming
-// it is in headers or I reuse previous def if it was there? Step 3312 showed
-// line 100 `su_string_to_std_string(name_ref)`. It must be in a header or I
-// missed its definition in the file view? It was NOT defined in lines 1-241. So
-// it must be in "sketchup.h" or "skalp_layout_connection.h"? I'll assume it
-// exists.
+// Helper to find the section group for a scene
+SUGroupRef find_scene_section_group(SUModelRef model,
+                                    const std::string &scene_id) {
+  SUEntitiesRef model_entities = SU_INVALID;
+  SUModelGetEntities(model, &model_entities);
 
-struct SceneExportInfo {
-  std::string name;
-  int orig_index;
-  int sister_index;
-  SUSceneRef orig_ref;
-  SUSceneRef sister_ref;
-};
+  size_t num_groups = 0;
+  SUEntitiesGetNumGroups(model_entities, &num_groups);
+  std::vector<SUGroupRef> groups(num_groups);
+  SUEntitiesGetGroups(model_entities, num_groups, &groups[0], &num_groups);
+
+  for (SUGroupRef root_group : groups) {
+    std::string is_result = get_attribute(SUGroupToEntity(root_group), "Skalp",
+                                          "section_result_group");
+    if (is_result == "true") {
+      SUEntitiesRef child_entities = SU_INVALID;
+      SUGroupGetEntities(root_group, &child_entities);
+      size_t num_children = 0;
+      SUEntitiesGetNumGroups(child_entities, &num_children);
+      std::vector<SUGroupRef> children(num_children);
+      SUEntitiesGetGroups(child_entities, num_children, &children[0],
+                          &num_children);
+
+      for (SUGroupRef child : children) {
+        std::string id = get_attribute(SUGroupToEntity(child), "Skalp", "ID");
+        if (id == scene_id) {
+          return child;
+        }
+      }
+    }
+  }
+  return SU_INVALID;
+}
 
 bool create_layout_scrapbook(std::string source_skp_path,
                              std::string output_layout_path,
@@ -58,31 +94,20 @@ bool create_layout_scrapbook(std::string source_skp_path,
   if (show_debug)
     std::cout << "Starting create_layout_scrapbook..." << std::endl;
 
-  // 1. Initialize APIs
   SUInitialize();
   LOInitialize();
 
   SUModelRef model = SU_INVALID;
   SUResult res = SUModelCreateFromFile(&model, source_skp_path.c_str());
   if (res != SU_ERROR_NONE) {
-    std::cerr << "Failed to load SKP model: " << source_skp_path << std::endl;
+    std::cerr << "Failed to load SKP model." << std::endl;
     SUTerminate();
     LOTerminate();
     return false;
   }
 
-  // 2. Identify Skalp Scenes
   size_t num_pages = 0;
   SUModelGetNumScenes(model, &num_pages);
-  if (num_pages == 0) {
-    if (show_debug)
-      std::cout << "No scenes found." << std::endl;
-    SUModelRelease(&model);
-    SUTerminate();
-    LOTerminate();
-    return false;
-  }
-
   std::vector<SUSceneRef> all_pages(num_pages);
   SUModelGetScenes(model, num_pages, &all_pages[0], &num_pages);
 
@@ -94,114 +119,135 @@ bool create_layout_scrapbook(std::string source_skp_path,
       info.orig_index = (int)i;
       info.orig_ref = all_pages[i];
 
-      SUStringRef name_ref = SU_INVALID;
-      SUStringCreate(&name_ref);
-      SUSceneGetName(all_pages[i], &name_ref);
-      // Assuming su_string_to_std_string is available
-      // If not, I'll use a local lambda/macro?
-      // I'll trust the previous code context.
-      size_t len = 0;
-      SUStringGetUTF8Length(name_ref, &len);
-      std::vector<char> buffer(len + 1);
-      SUStringGetUTF8(name_ref, len + 1, &buffer[0], &len);
-      info.name = std::string(&buffer[0]);
-      SUStringRelease(&name_ref);
+      SUEntityRef ent = SUSceneToEntity(all_pages[i]);
+      info.id = get_attribute(ent, "Skalp", "ID");
+      info.name = get_attribute(ent, "Skalp", "name");
+      if (info.name.empty()) {
+        SUStringRef s_name = SU_INVALID;
+        SUStringCreate(&s_name);
+        SUSceneGetName(all_pages[i], &s_name);
+        info.name = su_string_to_std_string(s_name);
+        SUStringRelease(&s_name);
+      }
+
+      // Read Scale
+      std::string scale_str = get_attribute(ent, "Skalp", "ss_drawing_scale");
+      if (scale_str.empty()) {
+        // Fallback to model attribute dictionary directly
+        SUAttributeDictionaryRef m_dict = SU_INVALID;
+        SUModelGetAttributeDictionary(model, "Skalp", &m_dict);
+        if (SUIsValid(m_dict)) {
+          SUTypedValueRef m_val = SU_INVALID;
+          SUTypedValueCreate(&m_val);
+          if (SUAttributeDictionaryGetValue(m_dict, "ss_drawing_scale",
+                                            &m_val) == SU_ERROR_NONE) {
+            SUTypedValueType m_type;
+            SUTypedValueGetType(m_val, &m_type);
+            if (m_type == SUTypedValueType_Double) {
+              double d;
+              SUTypedValueGetDouble(m_val, &d);
+              scale_str = std::to_string((int)d);
+            } else if (m_type == SUTypedValueType_String) {
+              SUStringRef s = SU_INVALID;
+              SUStringCreate(&s);
+              SUTypedValueGetString(m_val, &s);
+              scale_str = su_string_to_std_string(s);
+              SUStringRelease(&s);
+            }
+          }
+          SUTypedValueRelease(&m_val);
+        }
+      }
+      info.scale = scale_str.empty() ? 50.0 : std::stod(scale_str);
+
+      // Find Bounds
+      SUGroupRef sect_group = find_scene_section_group(model, info.id);
+      if (SUIsValid(sect_group)) {
+        SUBoundingBox3D bbox;
+        SUDrawingElementGetBoundingBox(SUGroupToDrawingElement(sect_group),
+                                       &bbox);
+        double dx = std::abs(bbox.max_point.x - bbox.min_point.x);
+        double dy = std::abs(bbox.max_point.y - bbox.min_point.y);
+        double dz = std::abs(bbox.max_point.z - bbox.min_point.z);
+
+        std::vector<double> dims = {dx, dy, dz};
+        std::sort(dims.begin(), dims.end());
+        info.model_w_in = dims[2];
+        info.model_h_in = dims[1];
+      } else {
+        info.model_w_in = 100.0;
+        info.model_h_in = 100.0;
+      }
 
       scenes_to_process.push_back(info);
     }
   }
 
-  if (show_debug)
-    std::cout << "Found " << scenes_to_process.size() << " Skalp scenes."
-              << std::endl;
-
-  // Prepare Layer Lookup
+  // 1.5 Create Sister Scenes
   size_t num_layers = 0;
   SUModelGetNumLayers(model, &num_layers);
   std::vector<SULayerRef> layers(num_layers);
   SUModelGetLayers(model, num_layers, &layers[0], &num_layers);
-
   SULayerRef section_layer = SU_INVALID;
   for (size_t i = 0; i < num_layers; i++) {
-    SUStringRef name_ref = SU_INVALID;
-    SUStringCreate(&name_ref);
-    SULayerGetName(layers[i], &name_ref);
-    // Manual string conversion to be safe
-    size_t len = 0;
-    SUStringGetUTF8Length(name_ref, &len);
-    std::vector<char> buffer(len + 1);
-    SUStringGetUTF8(name_ref, len + 1, &buffer[0], &len);
-    std::string name(&buffer[0]);
-    SUStringRelease(&name_ref);
-
-    if (name == "Skalp Scene Sections" ||
-        name == "\uFEFFSkalp Scene Sections") {
+    SUStringRef n_ref = SU_INVALID;
+    SUStringCreate(&n_ref);
+    SULayerGetName(layers[i], &n_ref);
+    std::string n = su_string_to_std_string(n_ref);
+    SUStringRelease(&n_ref);
+    if (n == "Skalp Scene Sections" || n == "\uFEFFSkalp Scene Sections") {
       section_layer = layers[i];
       break;
     }
   }
 
-  if (SUIsInvalid(section_layer) && show_debug) {
-    std::cout << "Warning: 'Skalp Scene Sections' layer not found."
-              << std::endl;
-  }
-
-  // Add Sister Scenes
   for (auto &info : scenes_to_process) {
-    SUSceneRef sister_page = SU_INVALID;
-    SUSceneCreate(&sister_page);
-
-    std::string sister_name = info.name + "_Section";
-    SUSceneSetName(sister_page, sister_name.c_str());
-
-    // Copy Camera
+    SUSceneRef sister = SU_INVALID;
+    SUSceneCreate(&sister);
+    SUSceneSetName(sister, (info.name + "_Section").c_str());
     SUCameraRef camera = SU_INVALID;
     SUCameraCreate(&camera);
     SUSceneGetCamera(info.orig_ref, &camera);
-    SUSceneSetCamera(sister_page, camera);
-    // Note: SUSceneSetCamera copies the data, so we can/should release our temp
-    // camera? Actually documentation implies ownership transfer OR copy.
-    // Usually safe to release if we created it.
-    // Assuming standard behavior.
-
-    // Isolate Layer
+    SUSceneSetCamera(sister, camera);
     if (SUIsValid(section_layer)) {
-      SUSceneSetUseHiddenLayers(sister_page, true);
+      SUSceneSetUseHiddenLayers(sister, true);
       for (SULayerRef layer : layers) {
         if (layer.ptr == section_layer.ptr)
           continue;
-        SUSceneAddLayer(sister_page, layer);
+        SUSceneAddLayer(sister, layer);
       }
     }
-
-    // Add to model (appends to end)
     int out_idx = -1;
-    SUModelAddScene(model, -1, sister_page, &out_idx);
+    SUModelAddScene(model, -1, sister, &out_idx);
     info.sister_index = out_idx;
-    info.sister_ref = sister_page;
   }
 
-  // Save modified SKP
   SUModelSaveToFile(model, source_skp_path.c_str());
   SUModelRelease(&model);
 
-  if (show_debug)
-    std::cout << "SKP modified and saved. Generating LayOut..." << std::endl;
-
-  // 3. Create LayOut Document
+  // 3. Generate LayOut
   LODocumentRef doc = SU_INVALID;
   LODocumentCreateEmpty(&doc);
 
-  // Get Default Layer (usually "Default" or "Layer 1" at index 0)
+  // Calculate Paper Size
+  double max_p_w_pt = 200.0;
+  double max_p_h_pt = 150.0;
+  for (const auto &info : scenes_to_process) {
+    double w_pt = (info.model_w_in * 72.0) / info.scale;
+    double h_pt = (info.model_h_in * 72.0) / info.scale;
+    max_p_w_pt = std::max(max_p_w_pt, w_pt);
+    max_p_h_pt = std::max(max_p_h_pt, h_pt);
+  }
+  max_p_w_pt += 60.0; // Margin
+  max_p_h_pt += 60.0;
+
+  LOPageInfoRef page_info = SU_INVALID;
+  LODocumentGetPageInfo(doc, &page_info);
+  LOPageInfoSetWidth(page_info, max_p_w_pt);
+  LOPageInfoSetHeight(page_info, max_p_h_pt);
+
   LOLayerRef lo_layer = SU_INVALID;
   LODocumentGetLayerAtIndex(doc, 0, &lo_layer);
-
-  double paper_w = 400.0; // Points?
-  double paper_h = 300.0;
-  // TODO: Get actual paper size from doc?
-  // LOPageInfoRef page_info = SU_INVALID; LODocumentGetPageInfo(doc,
-  // &page_info); LOPageInfoGetPaperWidth(page_info, &paper_w); ... Skipping for
-  // brevity/robustness now.
 
   bool first_page = true;
   for (const auto &info : scenes_to_process) {
@@ -214,47 +260,26 @@ bool create_layout_scrapbook(std::string source_skp_path,
     }
     LOPageSetName(page, info.name.c_str());
 
-    // Create Viewports
-    // Bounds: x, y, w, h
-    LOAxisAlignedRect2D bounds = {{10, 10}, {paper_w - 20, paper_h - 20}};
-    // Note: Rect is {Point upper_left, Point lower_right}?
-    // Documentation says: { {x, y}, {width, height} } ??
-    // Check geometry.h if possible.
-    // Usually { Point2D position, Size2D size } or { Point2D min, Point2D max
-    // }. If it is Min/Max: {10,10} to {390, 290} is correct. If it is Pos/Size:
-    // {10,10} with {380, 280} is correct. Most 2D rects are Pos/Size. But
-    // LOAxisAlignedRect2D implies Min/Max usually in SU. Wait,
-    // "AxisAlignedRect2D" usually implies Min/Max. "Rect2D" might be Pos/Size.
-    // I'll stick to assumptions or check previously working code?
-    // Previous code had: {{10, 10}, {paper_w/2 - 20, paper_h - 20}} (Wait, /2?)
-    // I'll use {10, 10} and {100, 100} just to see SOMETHING.
-    // Safe bounds: { {10, 10}, {200, 200} }.
+    // Viewport Bounds
+    double vp_w = (info.model_w_in * 72.0) / info.scale;
+    double vp_h = (info.model_h_in * 72.0) / info.scale;
+    LOAxisAlignedRect2D bounds = {{30, 30}, {30 + vp_w, 30 + vp_h}};
 
-    // Viewport 1 (Original)
+    // Create Viewports
     LOSketchUpModelRef vp1 = SU_INVALID;
     LOSketchUpModelCreate(&vp1, source_skp_path.c_str(), &bounds);
-    LOSketchUpModelSetCurrentScene(vp1, info.orig_index); // 0-based index
-    // API documentation for LOSketchUpModelSetCurrentScene takes index.
-    // Usually 1-based in LayOut UI, but C API?
-    // Let's assume 1-based as per common LO behavior (Page match).
-    // If 0-based, +1 might select wrong scene.
-    // I'll try +1.
+    LOSketchUpModelSetCurrentScene(vp1, info.orig_index);
+    LOSketchUpModelSetScale(vp1, 1.0 / info.scale);
+    LOSketchUpModelSetPreserveScaleOnResize(vp1, true);
 
-    // Viewport 2 (Sister)
     LOSketchUpModelRef vp2 = SU_INVALID;
     LOSketchUpModelCreate(&vp2, source_skp_path.c_str(), &bounds);
     LOSketchUpModelSetCurrentScene(vp2, info.sister_index);
+    LOSketchUpModelSetScale(vp2, 1.0 / info.scale);
+    LOSketchUpModelSetPreserveScaleOnResize(vp2, true);
 
-    // Set Render Mode? Raster/Vector/Hybrid?
-    // LOSketchUpModelSetRenderMode(vp2, LOSketchUpModelRenderMode_Vector);
-
-    // Add to Page
     LODocumentAddEntity(doc, LOSketchUpModelToEntity(vp1), lo_layer, page);
     LODocumentAddEntity(doc, LOSketchUpModelToEntity(vp2), lo_layer, page);
-
-    // Grouping?
-    // LOGroupCreate({vp1, vp2}) -> Not easily available without lists.
-    // Skipping grouping for now. Just placing on top is verified manually.
 
     LOSketchUpModelRelease(&vp1);
     LOSketchUpModelRelease(&vp2);
