@@ -391,6 +391,7 @@ module Skalp
                        zoom_factor: 0.444,
                        user_x: Skalp.unit_string_to_inch(pattern_string[:user_x]),
                        space: space,
+                       section_line_color: pattern_string[:section_line_color] || "rgb(0,0,0)",
                        # Lineweights
                        lineweight_model: (if space == "modelspace"
                                             pen_formatted
