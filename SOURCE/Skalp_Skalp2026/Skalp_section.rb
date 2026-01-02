@@ -158,19 +158,29 @@ module Skalp
               unify = su_mat ? Skalp.skalp_material_info(su_mat, :unify) == true : false
               final_polygons = []
 
+              final_polygons = []
               if unify && sections.size > 1
                 union_poly = Skalp::MultiPolygon.new
                 sections.each { |sec| union_poly.union!(sec.to_mpoly) }
-                final_polygons = union_poly.polygons.polygons
-                # Map contributing IDs for this material group
                 contributing_ids = sections.map { |sec| sec.node.value.to_s }.join(",")
+                union_poly.polygons.polygons.each do |p|
+                  final_polygons << { poly: p, ids: contributing_ids, sec: sections.first }
+                end
               else
-                final_polygons = sections.map { |sec| { poly: sec.polygons, sec: sec } }.flatten
-                contributing_ids = nil
+                sections.each do |sec|
+                  sec_id = sec.node.value.to_s
+                  sec.polygons.each do |p|
+                    final_polygons << { poly: p, ids: sec_id, sec: sec }
+                  end
+                end
               end
 
               # B. GENERATE FACES
-              final_polygons.each do |polygon|
+              final_polygons.each do |data|
+                polygon = data[:poly]
+                current_ids = data[:ids]
+                current_section = data[:sec]
+
                 # Subtract specific lineweight mask
                 poly_to_process = [polygon]
 
@@ -208,32 +218,13 @@ module Skalp
                   poly_to_process = mp.polygons.polygons
                 end
 
-                centerline_data = { loop: polygon.outerloop, section: sections.first }
+                centerline_data = { loop: polygon.outerloop, section: current_section }
                 centerline_loops << centerline_data
                 polygon.innerloops.each do |il|
-                  centerline_loops << { loop: il, section: sections.first }
+                  centerline_loops << { loop: il, section: current_section }
                 end
 
-                # If final_polygons is structured (non-unified), we need to extract poly
-                # If simplified (unified), final_polygons is just polygons.
-                # Let's normalize finally.
-                polys_to_draw = if unify && sections.size > 1
-                                  poly_to_process.map { |p| { poly: p, ids: contributing_ids } }
-                                else
-                                  # For non-unified, poly_to_process is from concatenated sections.
-                                  # Wait, the logic above for poly_to_process is already subtracted by slice_mask.
-                                  # This needs care. If non-unified, poly_to_process might contain multiple sections' fragments.
-                                  # Actually, the original concat approach lost the mapping.
-                                  # Let's fix the non-unified path to preserve the mapping.
-                                  # Fallback
-                                  poly_to_process.map do |p|
-                                    { poly: p, ids: sections.first.node.value.to_s }
-                                  end
-                                end
-
-                polys_to_draw.each do |data|
-                  p = data[:poly]
-                  ids = data[:ids]
+                poly_to_process.each do |p|
                   outerloop = if has_offset
                                 p.outerloop.vertices.map do |v|
                                   v.offset(transform_vec)
@@ -253,14 +244,14 @@ module Skalp
                              builder.add_face(outerloop,
                                               holes: innerloops)
                            end
-                    if ids
-                      face.set_attribute("Skalp", "from_sub_object", ids)
-                      # Top parent? For unified, it's mixed. Just use "Unified" for from_object.
+
+                    face.set_attribute("Skalp", "from_sub_object", current_ids)
+                    if current_ids.include?(",")
+                      # Unified: mixed
                       face.set_attribute("Skalp", "from_object", "Unified")
                     else
-                      s = sections.first
-                      face.set_attribute("Skalp", "from_object", s.node.value.top_parent.value.to_s)
-                      face.set_attribute("Skalp", "from_sub_object", s.node.value.to_s)
+                      # Single object: use top parent
+                      face.set_attribute("Skalp", "from_object", current_section.node.value.top_parent.value.to_s)
                     end
                     face.material = Skalp.create_su_material(mat_name)
                     correct_UV_material(face)

@@ -115,9 +115,9 @@ module Skalp
       ph.do_pick(x, y)
       face = ph.picked_face
 
-      return unless face && Skalp.active_model.entity_strings
-
-      node_value = Skalp.active_model.entity_strings[face.get_attribute("Skalp", "from_sub_object")]
+      sub_obj_attr = face.get_attribute("Skalp", "from_sub_object").to_s
+      first_id = sub_obj_attr.split(",").first
+      node_value = Skalp.active_model.entity_strings[first_id]
 
       return unless node_value
 
