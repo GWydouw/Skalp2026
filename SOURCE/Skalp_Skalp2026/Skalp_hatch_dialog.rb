@@ -241,7 +241,7 @@ module Skalp
       # SIZE ###############################
       @webdialog.add_action_callback("change_tile_x") do |webdialog, params|
         vars = params.split(";")
-        @tile.calculate(vars[0], :y)
+        @tile.calculate(vars[0], :x)
 
         if @tile.unit == "feet"
           script("$('#tile_y').val(\"#{@tile.y_string}\");")
@@ -256,7 +256,7 @@ module Skalp
 
       @webdialog.add_action_callback("change_tile_y") do |webdialog, params|
         vars = params.split(";")
-        @tile.calculate(vars[0], :x)
+        @tile.calculate(vars[0], :y)
 
         if @tile.unit == "feet"
           script("$('#tile_y').val(\"#{@tile.y_string}\");")
@@ -360,7 +360,8 @@ module Skalp
                                          print_scale: drawing_scale,
                                          zoom_factor: 1.0 / ((105 - 60) * 5.0 / 100.0), # Default slider value = 60
                                          user_x: @tile.x_value,
-                                         space: pattern_string[:space]
+                                         space: pattern_string[:space],
+                                         section_line_color: pattern_string[:section_line_color] || "rgb(0,0,0)"
                                        })
 
       @initial_preview_base64 = pattern_info[:png_base64] if pattern_info
@@ -1061,6 +1062,27 @@ module Skalp
       # 13: unify
       # 14: drawingPriority
       # -----------------------------------------------------------------------
+
+      # Resolve correct pattern name if a material name was passed
+      # This prevents the pattern definition from being named after the material
+      pattern_ref = Skalp.utf8(vars[0]).split(",").first.strip
+
+      # Check if pattern_ref is a known pattern (ignoring SOLID_COLOR)
+      # SkalpHatch.hatchdefs is an array of HatchDefinition objects
+      is_known_pattern = SkalpHatch.hatchdefs.any? { |h| h.name.to_s.upcase == pattern_ref.upcase }
+
+      if !is_known_pattern && pattern_ref != "SOLID_COLOR"
+        # Not a standard pattern. Check if it's a material.
+        other_mat = Sketchup.active_model.materials[pattern_ref]
+        if other_mat && other_mat.get_attribute("Skalp", "pattern_info")
+          other_info = Skalp.get_pattern_info(other_mat)
+          if other_info && other_info[:name]
+            # Update vars[0] to the real pattern name so it gets saved correctly
+            # We reconstruct the string to keep format consistent if needed, though split used simple name
+            vars[0] = other_info[:name]
+          end
+        end
+      end
 
       name = Skalp.utf8(vars[11])
       pen_width = if vars[2].to_sym == :modelspace

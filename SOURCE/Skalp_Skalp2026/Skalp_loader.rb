@@ -56,6 +56,7 @@ module Skalp
       # puts "Skalp Debug: user_x raw: #{user_x_val}"
       converted_x = Skalp.unit_string_to_inch(user_x_val)
       # puts "Skalp Debug: user_x converted: #{converted_x}"
+      # puts "Skalp Debug: user_x converted: #{converted_x}"
 
       result = hatch.create_png({
                                   type: :thumbnail,

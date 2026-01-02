@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
 
     <script src='js/jquery.js?v=20260101'> </script>
-    <script src='js/skalp.js?v=20260101'> </script>
+    <script src='js/skalp.js?v=20260102_fix'> </script>
     <link rel='stylesheet' href='css/hatch_dialog.css?v=20260101' />
 
     <link href="css/jquery-ui-1.10.4.custom.min.css?v=20260101" rel="stylesheet" />
@@ -187,13 +187,13 @@
                 </div>
 
                 <!-- Pattern Line Color -->
-                <div class="field-row">
+                <div class="field-row" id="pattern_line_color_row">
                     <label id="translate_17">Line Color:</label>
                     <div id="line_color_block" class="color-block" style="background-color: rgb(0, 0, 0);"></div>
                 </div>
 
                 <!-- Pattern Line Width Paper -->
-                <div class="field-row">
+                <div class="field-row" id="pattern_line_width_row">
                     <label id="translate_08">Line Width:</label>
                     <select id='lineweight_paper' onchange="$('#update_preview').show();create_preview(0);">
                         <option value='0.04 mm'>0.04 mm</option>
