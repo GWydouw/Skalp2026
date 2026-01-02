@@ -97,12 +97,6 @@ module Skalp
       # 1. Thinnest possible line (1)
       object.rendering_options["SectionCutWidth"] = 1 if object.rendering_options["SectionCutWidth"] != 1
 
-      # 2. Transparent color (invisible backup)
-      # Check alpha to avoid redundant creation
-      if object.rendering_options["SectionDefaultCutColor"].alpha != 0
-        object.rendering_options["SectionDefaultCutColor"] = Sketchup::Color.new(0, 0, 0, 0)
-      end
-
       # 3. Hide edges completely (primary method)
       # SPECIAL HANDLING: SectionCutDrawEdges can only be set if SectionCutFilled is TRUE
       if object.rendering_options.keys.include?("SectionCutDrawEdges") &&

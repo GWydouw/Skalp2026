@@ -774,6 +774,7 @@ module Skalp
 
     def toggle_lineweights_command(params)
       set_lineweights_switch(Skalp.to_boolean(params))
+      check_SU_style
       update_active_sectionplane
       settings_to_active_page_if_save_settings_is_on
     end
