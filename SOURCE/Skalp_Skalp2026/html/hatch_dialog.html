@@ -184,16 +184,12 @@
                 <div class="field-row">
                     <label id="translate_06">Fill Color:</label>
                     <div id="fill_color_block" class="color-block" style="background-color: rgb(255, 255, 255);"></div>
-                    <input type="text" id="fill_color_input" class="spectrum-picker" value="rgb(255,255,255)"
-                        style="display:none;">
                 </div>
 
                 <!-- Pattern Line Color -->
                 <div class="field-row">
                     <label id="translate_17">Line Color:</label>
                     <div id="line_color_block" class="color-block" style="background-color: rgb(0, 0, 0);"></div>
-                    <input type="text" id="line_color_input" class="spectrum-picker" value="rgb(0,0,0)"
-                        style="display:none;">
                 </div>
 
                 <!-- Pattern Line Width Paper -->
@@ -240,8 +236,6 @@
                     <label id="translate_section_line_color">Line Color:</label>
                     <div id="section_line_color_block" class="color-block" style="background-color: rgb(0, 0, 0);">
                     </div>
-                    <input type="text" id="section_line_color_input" class="spectrum-picker" value="rgb(0,0,0)"
-                        style="display:none;">
                 </div>
 
                 <!-- Section Line Width -->
@@ -319,6 +313,13 @@
     <div class="dialog-footer">
         <button class="btn-cancel" onclick="cancel_edit()">CANCEL</button>
         <button class="btn-save" onclick="save_material()">SAVE</button>
+    </div>
+
+    <!-- Hidden Input Container for Spectrum Pickers (Moved here to prevent UI artifacts in field-rows) -->
+    <div style="display:none;">
+        <input type="text" id="fill_color_input" class="spectrum-picker" value="rgb(255,255,255)">
+        <input type="text" id="line_color_input" class="spectrum-picker" value="rgb(0,0,0)">
+        <input type="text" id="section_line_color_input" class="spectrum-picker" value="rgb(0,0,0)">
     </div>
 
     <script>
