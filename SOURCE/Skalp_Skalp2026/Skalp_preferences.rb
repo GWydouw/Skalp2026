@@ -1,11 +1,11 @@
 module Skalp
-  require 'Skalp_Skalp2026/Skalp_lib2.rb'
+  require "Skalp_Skalp2026/Skalp_lib2"
   Dir.chdir(SU_USER_PATH)
 
-  #SECTION OFFSET DISTANCE
+  # SECTION OFFSET DISTANCE
 
   def self.tolerance
-    Sketchup.read_default('Skalp', 'tolerance2').to_f
+    Sketchup.read_default("Skalp", "tolerance2").to_f
   end
 
   def self.set_tranformation_down
@@ -14,41 +14,46 @@ module Skalp
 
   def self.set_section_offset
     # remark: 7 extra 'space' characters needed after first string to avoid UI dialog visibility clipping bug.
-    input = UI.inputbox(["#{Skalp.translate('Section Offset Distance:')}       "], [Sketchup.format_length(Sketchup.read_default('Skalp', 'tolerance2').to_f)], "Skalp #{Skalp.translate('Preference')}")
+    Skalp.inputbox_custom(["#{Skalp.translate('Section Offset Distance:')}       "],
+                          [Sketchup.format_length(Sketchup.read_default("Skalp", "tolerance2").to_f)], "Skalp #{Skalp.translate('Preference')}") do |input|
+      next unless input
 
-    return if input == false
+      measure = input[0].gsub(" ", "")
+      measure_string = correct_decimal(measure.to_s)
 
-    measure = input[0].gsub(' ', '')
-    measure_string = correct_decimal(measure.to_s)
-
-    unless input == false
-      Sketchup.write_default('Skalp', 'tolerance2', Skalp.to_inch(measure_string).to_s)
+      Sketchup.write_default("Skalp", "tolerance2", Skalp.to_inch(measure_string).to_s)
       set_tranformation_down
-      Skalp.active_model.active_sectionplane.calculate_section if Skalp.active_model && Skalp.active_model.active_sectionplane
+      if Skalp.active_model && Skalp.active_model.active_sectionplane
+        Skalp.active_model.active_sectionplane.calculate_section
+      end
     end
   end
 
-  unless Sketchup.read_default('Skalp', 'tolerance2') then
-    Sketchup.write_default('Skalp', 'tolerance2', '0.0394')
-  end
+  Sketchup.write_default("Skalp", "tolerance2", "0.0394") unless Sketchup.read_default("Skalp", "tolerance2")
 
   set_tranformation_down
 
-  #DRAWING SCALE
+  # DRAWING SCALE
   def self.default_drawing_scale
-    Sketchup.read_default('Skalp', 'drawing_scale').to_f
+    Sketchup.read_default("Skalp", "drawing_scale").to_f
   end
 
   def self.set_default_drawing_scale(scale = nil)
-    unless scale
-      input = UI.inputbox(["#{Skalp.translate('Set Default Drawing Scale')} 1:"], [Sketchup.read_default('Skalp', 'drawing_scale').to_s], "Skalp")
-      scale = input[0].to_s
+    if scale
+      scale_val = scale.to_s
+      scale_val = 50.0.to_s if scale_val.to_f == 0.0
+      Sketchup.write_default("Skalp", "drawing_scale", scale_val)
+    else
+      Skalp.inputbox_custom(["#{Skalp.translate('Set Default Drawing Scale')} 1:"],
+                            [Sketchup.read_default("Skalp", "drawing_scale").to_s], "Skalp") do |input|
+        next unless input
+
+        scale = input[0].to_s
+        scale = 50.0.to_s if scale.to_f == 0.0
+        Sketchup.write_default("Skalp", "drawing_scale", scale)
+      end
     end
-    scale = 50.0.to_s if scale.to_f == 0.0
-    Sketchup.write_default('Skalp', 'drawing_scale', scale) unless (input == false && scale == nil)
   end
 
-  unless Sketchup.read_default('Skalp', 'drawing_scale') then
-    Sketchup.write_default('Skalp', 'drawing_scale', '50')
-  end
+  Sketchup.write_default("Skalp", "drawing_scale", "50") unless Sketchup.read_default("Skalp", "drawing_scale")
 end

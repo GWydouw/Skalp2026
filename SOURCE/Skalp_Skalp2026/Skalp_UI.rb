@@ -212,24 +212,23 @@ module Skalp
   def self.hiddenline_style_dialog
     hiddenline_style = Sketchup.read_default("Skalp", "hiddenline_style") || "Skalp"
 
-    result = UI.inputbox(["Mode:", "Ask again?"], ["#{hiddenline_style}", "yes"], ["Skalp|SketchUp", "yes|no"],
-                         "Hidden Line Style")
-    return unless result
+    Skalp.inputbox_custom(["Mode:", "Ask again?"], ["#{hiddenline_style}", "yes"], ["Skalp|SketchUp", "yes|no"],
+                          "Hidden Line Style") do |result|
+      next unless result
 
-    if result[1] == "yes"
-      Sketchup.write_default("Skalp", "hiddenline_style_dialog", true)
-    else
-      Sketchup.write_default("Skalp", "hiddenline_style_dialog", false)
+      if result[1] == "yes"
+        Sketchup.write_default("Skalp", "hiddenline_style_dialog", true)
+      else
+        Sketchup.write_default("Skalp", "hiddenline_style_dialog", false)
+      end
+
+      hiddenline_style = result[0]
+      Sketchup.write_default("Skalp", "hiddenline_style", hiddenline_style)
+
+      if hiddenline_style == "SketchUp" && Sketchup.active_model.rendering_options["RenderMode"] == 1
+        Sketchup.active_model.rendering_options["DisplayColorByLayer"] = false
+      end
     end
-
-    hiddenline_style = result[0]
-    Sketchup.write_default("Skalp", "hiddenline_style", hiddenline_style)
-
-    if hiddenline_style == "SketchUp" && Sketchup.active_model.rendering_options["RenderMode"] == 1
-      Sketchup.active_model.rendering_options["DisplayColorByLayer"] = false
-    end
-
-    result
   end
 
   attr_reader :layers_hash
@@ -460,8 +459,6 @@ module Skalp
                     pattern_info[:png_blob] = thumb
                     mat.set_attribute("Skalp", "pattern_info",
                                       "eval(Sketchup.active_model.get_attribute('Skalp', 'version_check').to_s);#{pattern_info.inspect}")
-                  elsif defined?(DEBUG) && DEBUG
-                    puts "Skalp Debug: Failed to create thumbnail for #{mat_name}"
                   end
                 rescue StandardError => e
                   puts "Skalp Debug: Error creating thumbnail: #{e.message}" if defined?(DEBUG) && DEBUG
@@ -1108,6 +1105,138 @@ module Skalp
     node_info = Skalp.active_model.tree.find_nodes_by_id(id).compact.uniq.first.value
     multi_tags = node_info.multi_tags
     sectionmaterial = node_info.multi_tags_hatch
+  end
+
+  #################
+  # CUSTOM INPUTBOX
+  #################
+  class InputBox
+    require "json"
+
+    def initialize(prompts, defaults, title, lists = nil, &block)
+      @prompts = prompts
+      @defaults = defaults
+      @title = title
+      @lists = lists
+      @block = block
+      @dialog = nil
+      show
+    end
+
+    def show
+      width = 450
+      height = [250 + (@prompts.length * 60), 800].min
+
+      # Use STYLE_UTILITY for typical inputbox feel (always on top of SketchUp)
+      style = UI::HtmlDialog::STYLE_UTILITY
+
+      # Generate a unique key based on title to prevent size conflicts between different input boxes
+      # e.g. "com.skalp.inputbox.SectionPlane" vs "com.skalp.inputbox.ExportScenes"
+      safe_title = @title.to_s.gsub(/[^0-9a-zA-Z]/, "")
+      pref_key = "com.skalp.inputbox.#{safe_title}"
+
+      width = 380
+      # Adaptive height: compact for single input, expansive for multiple
+      height = if @prompts.length == 1
+                 130
+               else
+                 [140 + (@prompts.length * 60), 800].min
+               end
+
+      @dialog = UI::HtmlDialog.new({
+                                     dialog_title: @title,
+                                     preferences_key: pref_key,
+                                     scrollable: true,
+                                     resizable: true,
+                                     width: width,
+                                     height: height,
+                                     style: style
+                                   })
+
+      # Locate the html file
+      # Assuming standard structure: Plugins/Skalp_Skalp2026/ui/inputbox.html
+      html_path = File.join(File.dirname(__FILE__), "ui", "inputbox.html")
+      unless File.exist?(html_path)
+        # Fallback search if current file is not deeper
+        html_path = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/ui/inputbox.html"
+      end
+
+      @dialog.set_file(html_path)
+
+      @dialog.add_action_callback("ready") do |action_context|
+        data = {
+          prompts: @prompts,
+          defaults: @defaults,
+          lists: @lists
+        }
+        # Ensure data is clean (utf-8 etc potentially needed, but start simple)
+        @dialog.execute_script("init(#{data.to_json})")
+      end
+
+      @dialog.add_action_callback("submit") do |action_context, results|
+        # results from JS is an array of strings
+        # We need to type-cast based on defaults?
+        # UI.inputbox returns types matching defaults (Length, String, Integer, Float)
+        # But generic inputbox JS returns strings.
+        # For now, let's return strings and let caller handle, OR try to cast.
+        # Standard UI.inputbox casts inputs to defaults types.
+
+        final_results = results.map.with_index do |res, i|
+          default = @defaults[i]
+          if default.is_a?(Length)
+            # Use Sketchup unit parsing
+            res.to_l
+          elsif default.is_a?(Integer)
+            res.to_i
+          elsif default.is_a?(Float)
+            res.to_f
+          elsif default.is_a?(TrueClass) || default.is_a?(FalseClass)
+            # Checkboxes usually return true/false but here we might get "true"/"false" strings
+            # However, our JS uses input text for everything currently?
+            # JS inputbox.html uses <select> for lists, <input type=text> for others.
+            # Does it handle booleans/checkboxes?
+            # JS code: "const val = data.defaults[index]..." "input.value = val"
+            # It treats everything as text input unless it's a list.
+            # If default is boolean, inputbox.html shows "true" text input?
+            # Limitation: Original generic inputbox might expect specific types.
+            # user said "we created custom input...".
+            # For boolean/checkbox default, standard inputbox uses dropdown Yes/No usually?
+            # Skalp code often uses ["yes|no"] list for booleans.
+
+            # If we get a string "true"/"false" and default is boolean:
+            res == "true"
+          else
+            res
+          end
+        end
+
+        @dialog.close
+        @block.call(final_results) if @block
+      end
+
+      @dialog.add_action_callback("cancel") do |action_context|
+        @dialog.close
+        @block.call(false) if @block
+      end
+
+      @dialog.center
+      @dialog.show
+    end
+  end
+
+  def self.inputbox_custom(prompts, defaults, lists_or_title = nil, title = "Skalp", &)
+    # Handle optional arguments
+    lists = nil
+
+    if lists_or_title.is_a?(String)
+      # inputbox(prompts, defaults, title)
+      title = lists_or_title
+    elsif lists_or_title.is_a?(Array)
+      # inputbox(prompts, defaults, lists, title)
+      lists = lists_or_title
+    end
+
+    InputBox.new(prompts, defaults, title, lists, &)
   end
 
   file_loaded("skalp_UI.rb")

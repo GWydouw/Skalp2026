@@ -2,27 +2,108 @@
 <html>
 
 <head>
+    <script>var SKALP_INITIAL_DATA = null;</script>
     <meta http-equiv="X-UA-Compatible" content="IE=10" />
     <meta http-equiv="MSThemeCompatible" content="Yes" />
     <meta charset="utf-8" />
 
-    <script src='js/jquery.js'> </script>
-    <script src='js/skalp.js'> </script>
-    <link rel='stylesheet' href='css/hatch_dialog.css' />
+    <script src='js/jquery.js?v=20260101'> </script>
+    <script src='js/skalp.js?v=20260101'> </script>
+    <link rel='stylesheet' href='css/hatch_dialog.css?v=20260101' />
 
-    <link href="css/jquery-ui-1.10.4.custom.min.css" rel="stylesheet" />
-    <script type="text/javascript" src="js/jquery-ui.min.js"></script>
+    <link href="css/jquery-ui-1.10.4.custom.min.css?v=20260101" rel="stylesheet" />
+    <script type="text/javascript" src="js/jquery-ui.min.js?v=20260101"></script>
 
-    <link rel="stylesheet" type="text/css" href="css/jscslider.css">
-    <script type="text/javascript" src="js/jscslider.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/jscslider.css?v=20260101">
+    <script type="text/javascript" src="js/jscslider.js?v=20260101"></script>
 
     <!-- Spectrum Color Picker -->
-    <link rel="stylesheet" type="text/css" href="css/spectrum.css">
-    <script type="text/javascript" src="js/spectrum.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/spectrum.css?v=20260101">
+    <script type="text/javascript" src="js/spectrum.js?v=20260101"></script>
 
     <title>Skalp Pattern Designer</title>
 
 </head>
+<script>
+    function initializeFromData() {
+        if (!window.SKALP_INITIAL_DATA) return;
+        var data = SKALP_INITIAL_DATA;
+
+        // Name
+        if (data.hatch_name) $('#hatch_name').val(data.hatch_name);
+
+        // Patterns List
+        var $patList = $('#acad_pattern_list');
+        if (data.pattern_list && $patList.length) {
+            $patList.empty();
+            data.pattern_list.forEach(function (pat) {
+                $patList.append(new Option(pat, pat));
+            });
+        }
+
+        // Settings
+        if (data.settings) {
+            var s = data.settings;
+
+            // Colors (update input value AND color block for initialization)
+            if (s.line_color) {
+                $('#line_color_input').val(s.line_color);
+                $('#line_color_block').css('background-color', s.line_color);
+            }
+            if (s.fill_color) {
+                $('#fill_color_input').val(s.fill_color);
+                $('#fill_color_block').css('background-color', s.fill_color);
+            }
+            if (s.section_line_color) {
+                var c = s.section_line_color || 'rgb(0,0,0)';
+                $('#section_line_color_input').val(c);
+                $('#section_line_color_block').css('background-color', c);
+            }
+
+            // Dropdowns & Inputs
+            if (s.space) $('#units').val(s.space);
+
+            // Tile sizes (Pre-formatted from Ruby)
+            if (s.tile_x) $('#tile_x').val(s.tile_x);
+            if (s.tile_y) $('#tile_y').val(s.tile_y);
+
+            // Lineweights
+            if (s.lineweight_model) $('#lineweight_model').val(s.lineweight_model);
+            if (s.lineweight_paper) $('#lineweight_paper').val(s.lineweight_paper);
+
+            // Section Cut Width
+            if (s.sectioncut_linewidth) $('#sectioncut_linewidth').val(s.sectioncut_linewidth);
+
+            // Align
+            if (s.aligned) $("#align_pattern").prop('checked', s.aligned === 'true' || s.aligned === true);
+
+            // Unify
+            if (s.unify) $("#unify_material").prop('checked', s.unify === 'true' || s.unify === true);
+
+            // Priority
+            if (s.priority) $('#zindex').val(s.priority);
+
+            // Selected Pattern
+            if (data.pattern_name) {
+                $patList.val(data.pattern_name);
+            }
+        }
+
+        // Preview
+        if (data.preview_base64) {
+            var img = document.getElementById('hatch_preview');
+            if (img) {
+                img.src = "data:image/png;base64," + data.preview_base64;
+                img.style.opacity = 1;
+            }
+        }
+    }
+
+    // Run as soon as DOM is ready, before other scripts ideally
+    $(document).ready(function () {
+        initializeFromData();
+    });
+</script>
 
 <body onload="ready_hatch()" onfocus="onfocus_hatch()" scroll="no" style="OVERFLOW: hidden">
 
@@ -34,10 +115,23 @@
 
     <!-- Preview with inline zoom slider -->
     <div id="preview_container">
-        <img class="preview" id="hatch_preview" src="icons/skalp_empty.png">
+        <img class="preview" id="hatch_preview" src="icons/skalp_empty.png" style="opacity:0;"
+            onload="this.style.opacity=1; is_busy=false;">
         <div id="preview_zoom_row">
             <h2 id="translate_03">Preview Zoom:</h2>
-            <input type="range" min="5" max="100" value="60" class="slider" id="slider" onchange="create_preview(0)">
+            <input type="range" min="5" max="100" value="60" class="slider" id="slider"
+                style="position: relative; left: 93px;" oninput="debounced_create_preview(0)"
+                onchange="debounced_create_preview(0)">
+            <style>
+                /* Adjusted slider position */
+                .jscslider,
+                #id_jscslider_0 {
+                    left: 0px !important;
+                    margin: 0 auto !important;
+                    position: relative !important;
+                    display: block !important;
+                }
+            </style>
         </div>
     </div>
 
@@ -248,7 +342,7 @@
 
         function updateWindowHeight() {
             var body = document.body;
-            var height = body.scrollHeight + 5; // Use scrollHeight + small buffer
+            var height = body.scrollHeight + 40; // larger buffer to ensure footer visibility
             var width = 235; // Target fixed width inclusive of 10px margins
             if (typeof sketchup !== 'undefined' && sketchup.resize_window) {
                 sketchup.resize_window(width, height);
@@ -286,11 +380,14 @@
                 }
             });
 
-            // Link native blocks to spectrum
-            $(".color-block").click(function () {
+            // Link native blocks to spectrum (Event Delegation)
+            $(document).on("click", ".color-block", function () {
                 var inputId = $(this).attr('id').replace('_block', '_input');
                 $("#" + inputId).spectrum("toggle");
             });
+
+            // Force hide replacers to prevent artifacts
+            $(".sp-replacer").hide();
         });
 
         // Convert hex color to rgb string for Ruby compatibility
@@ -319,30 +416,14 @@
             return color.toRgbString();
         }
 
-        // Color picker functions are now handled by Spectrum's change event
-        function save_material() {
-            var materialName = document.getElementById('hatch_name').value;
-            if (!materialName || materialName.trim() === '') {
-                alert('Please enter a material name');
-                return;
-            }
-            sketchup.save_material(materialName);
-        }
-
-        function cancel_edit() {
-            if (typeof sketchup !== 'undefined' && sketchup.cancel_edit) {
-                sketchup.cancel_edit();
-            } else {
-                window.location = 'skp:cancel_edit@';
-            }
-        }
-
-        function create_preview(force) {
+        // Helper to gather all params (Shared by create_preview and save_material)
+        function get_current_params(force) {
             var pattern = document.getElementById('acad_pattern_list') ? document.getElementById('acad_pattern_list').value : '';
             var tile_x = document.getElementById('tile_x') ? document.getElementById('tile_x').value : '';
             var tile_y = document.getElementById('tile_y') ? document.getElementById('tile_y').value : '';
 
             // Get colors from Spectrum pickers (with alpha support)
+            // Use .try-catch based resilience or checks because Spectrum might not be fully init if accessed too early
             var lineColorObj = $("#line_color_input").spectrum("get");
             var fillColorObj = $("#fill_color_input").spectrum("get");
             var sectionLineColorObj = $("#section_line_color_input").spectrum("get");
@@ -363,12 +444,12 @@
             var unify = document.getElementById('unify_material') && document.getElementById('unify_material').checked ? 'true' : 'false';
             var drawingPriority = document.getElementById('zindex') ? document.getElementById('zindex').value : '0';
 
-            var params = [
+            return [
                 pattern,            // 0
                 tile_x,             // 1
                 units,              // 2
-                lineweight,         // 3 - lineweight_paper
-                lineweight_model,   // 4 - lineweight_model
+                lineweight,         // 3
+                lineweight_model,   // 4
                 lineColor,          // 5
                 fillColor,          // 6
                 slider,             // 7
@@ -380,7 +461,69 @@
                 unify,              // 13
                 drawingPriority     // 14
             ].join(';');
+        }
 
+        // Color picker functions are now handled by Spectrum's change event
+        function save_material() {
+            var materialName = document.getElementById('hatch_name').value;
+            if (!materialName || materialName.trim() === '') {
+                alert('Please enter a material name');
+                return;
+            }
+
+            // 1. Force a CREATE HATCH (with force=1 to be safe) to save the parameters to Ruby
+            var params = get_current_params(1);
+            sketchup.create_hatch(params);
+
+            // 2. Then call save logic (which closes dialog)
+            // Wait slightly to ensure order or assume sequential execution queue in SketchUp
+            // We give it a tiny delay to allow Ruby to digest created_hatch
+            setTimeout(function () {
+                sketchup.save_material(materialName);
+            }, 200);
+        }
+
+        function cancel_edit() {
+            if (typeof sketchup !== 'undefined' && sketchup.cancel_edit) {
+                sketchup.cancel_edit();
+            } else {
+                window.location = 'skp:cancel_edit@';
+            }
+        }
+
+        // Instant CSS Zoom
+        function preview_zoom(val) {
+            // Map slider (10-200) to scale (0.5 - 2.0)
+            // base is 60 -> 1.0
+            var scale = val / 60.0;
+            var img = document.getElementById('hatch_preview');
+            // We scale the image via CSS transform for instant feedback
+            img.style.transform = "scale(" + scale + ")";
+        }
+
+        // Debounce utility - only execute function after delay since last call
+        var preview_timeout = null;
+        function debounced_create_preview(force) {
+            if (preview_timeout) {
+                clearTimeout(preview_timeout);
+            }
+            preview_timeout = setTimeout(function () {
+                create_preview(force);
+            }, 100); // 100ms debounce
+        }
+
+        // Helper to update UI selection without triggering Ruby round-trip
+        function select_material_ui_only(materialName) {
+            if ($('#acad_pattern_list').length) {
+                $('#acad_pattern_list').val(materialName);
+            }
+            if ($('#hatch_name').length) {
+                $('#hatch_name').val(materialName);
+            }
+        }
+
+        function create_preview(force) {
+            var params = get_current_params(force);
             sketchup.create_preview(params);
         }
     </script>

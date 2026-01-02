@@ -159,67 +159,50 @@ module Skalp
           if ["Skalp materials in model", "SketchUp materials in model"].include?(@active_library)
             mat = Sketchup.active_model.materials[materialname]
             if mat
-              new_name = UI.inputbox(["New Name"], ["#{materialname} copy"], "Duplicate Material")
-              if new_name && !new_name[0].empty?
-                new_mat = Sketchup.active_model.materials.add(new_name[0])
-                new_mat.texture = mat.texture
-                new_mat.color = mat.color
-                new_mat.alpha = mat.alpha
-                if mat.attribute_dictionaries
-                  mat.attribute_dictionaries.each do |dict|
-                    next if dict.name == "Skalp_memory_attributes"
+              Skalp.inputbox_custom(["New Name"], ["#{materialname} copy"], "Duplicate Material") do |new_name|
+                if new_name && !new_name[0].empty?
+                  new_mat = Sketchup.active_model.materials.add(new_name[0])
+                  new_mat.texture = mat.texture
+                  new_mat.color = mat.color
+                  new_mat.alpha = mat.alpha
+                  if mat.attribute_dictionaries
+                    mat.attribute_dictionaries.each do |dict|
+                      next if dict.name == "Skalp_memory_attributes"
 
-                    dict.each do |k, v|
-                      new_mat.set_attribute(dict.name, k, v)
+                      dict.each do |k, v|
+                        new_mat.set_attribute(dict.name, k, v)
+                      end
                     end
                   end
+                  create_thumbnails(@active_library)
                 end
-                create_thumbnails(@active_library)
               end
             end
           else
             Skalp::Material_dialog.duplicate_material_in_library(@active_library, materialname)
-            create_thumbnails(@active_library)
           end
         when "replace_confirmed"
-          # materialname is "old|||new"
-          if materialname.include?("|||")
-            parts = materialname.split("|||")
-            old = parts[0]
-            new = parts[1]
-            if Skalp::Material_dialog.respond_to?(:replace_material)
-              Skalp::Material_dialog.replace_material(old, new)
-              create_thumbnails(@active_library)
-            end
-          end
+          # ... existing code ...
         when "merge"
-          # kept for fallback or legacy calls, though UI now uses 'replace_confirmed' via picker
-          if Skalp::Material_dialog.respond_to?(:replace_material)
-            Skalp::Material_dialog.replace_material(materialname)
-            create_thumbnails(@active_library)
-          else
-            UI.messagebox("Replace/Merge functionality not yet loaded.")
-          end
+        # ... existing code ...
         when "rename"
           if ["Skalp materials in model", "SketchUp materials in model"].include?(@active_library)
             mat = Sketchup.active_model.materials[materialname]
             if mat
-              new_name = UI.inputbox(["New name"], [materialname], "Rename Material")
-              if new_name && !new_name[0].empty?
-                begin
-                  mat.name = new_name[0]
-                  create_thumbnails(@active_library)
-                rescue ArgumentError => e
-                  UI.messagebox("Name already exists or is invalid. Please choose another name.")
+              Skalp.inputbox_custom(["New name"], [materialname], "Rename Material") do |new_name|
+                if new_name && !new_name[0].empty?
+                  begin
+                    mat.name = new_name[0]
+                    create_thumbnails(@active_library)
+                  rescue ArgumentError => e
+                    UI.messagebox("Name already exists or is invalid. Please choose another name.")
+                  end
                 end
               end
             end
-          else
-            if Skalp.respond_to?(:rename_material_in_library)
-              Skalp.rename_material_in_library(@active_library,
-                                               materialname)
-            end
-            create_thumbnails(@active_library)
+          elsif Skalp.respond_to?(:rename_material_in_library)
+            Skalp.rename_material_in_library(@active_library,
+                                             materialname)
           end
         when "save_all"
           Skalp.save_all_skalp_materials_to_new_library if Skalp.respond_to?(:save_all_skalp_materials_to_new_library)
@@ -233,21 +216,19 @@ module Skalp
       @materialdialog.add_action_callback("library_menu") do |action_context, action|
         case action
         when "new"
-          new_lib = Skalp.create_library if Skalp.respond_to?(:create_library)
-          load_libraries
-          if new_lib
-            @active_library = new_lib
-            @materialdialog.execute_script("library('#{new_lib}')")
-            create_thumbnails(@active_library)
+          if Skalp.respond_to?(:create_library)
+            Skalp.create_library do |new_lib|
+              load_libraries
+              if new_lib
+                @active_library = new_lib
+                @materialdialog.execute_script("library('#{new_lib}')")
+                create_thumbnails(@active_library)
+              end
+            end
           end
         when "rename"
-          new_lib = Skalp::Material_dialog.rename_library(@active_library)
-          load_libraries
-          if new_lib
-            @active_library = new_lib
-            @materialdialog.execute_script("library('#{new_lib}')")
-            create_thumbnails(@active_library)
-          end
+        when "rename"
+          Skalp::Material_dialog.rename_library(@active_library)
         when "delete"
           if Skalp::Material_dialog.delete_library(@active_library)
             load_libraries
@@ -476,7 +457,9 @@ module Skalp
       require "base64"
 
       # Path to the old grey skalp logo
-      logo_path = Sketchup.find_support_file("skalp_empty.png", "Plugins/Skalp_Skalp2026/html/icons")
+      logo_path = File.join(Skalp::SKALP_PATH, "html/icons/skalp_empty.png")
+      puts "Skalp Debug: create_none_thumbnail logo_path: #{logo_path}" if defined?(DEBUG) && DEBUG
+      puts "Skalp Debug: logo_path exists? #{File.exist?(logo_path)}" if defined?(DEBUG) && DEBUG
 
       if logo_path && File.exist?(logo_path)
         Base64.encode64(File.binread(logo_path)).gsub("\n", "")

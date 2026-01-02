@@ -336,25 +336,25 @@ module Skalp
     old_name = styles.selected_style.name.gsub("[", "").gsub("]", "")
     old_description = styles.selected_style.description.gsub("[", "").gsub("]", "")
 
-    result = UI.inputbox(["Style changed"], ["Update the selected style"],
-                         ["Update the selected style|Save as a new style"], "Warning - Scenes and Styles")
+    Skalp.inputbox_custom(["Style changed"], ["Update the selected style"],
+                          ["Update the selected style|Save as a new style"], "Warning - Scenes and Styles") do |result|
+      next unless result
 
-    return false unless result
+      if result[0] == "Save as a new style"
+        default = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/resources/SUStyles/default.style"
+        styles.add_style(default, true)
+        hash_to_rendering_options(active_rendering_options)
+      end
 
-    if result[0] == "Save as a new style"
-      default = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/resources/SUStyles/default.style"
-      styles.add_style(default, true)
-      hash_to_rendering_options(active_rendering_options)
+      styles.update_selected_style
+
+      if result[0] == "Save as a new style"
+        styles.selected_style.name = unique_style_name(old_name)
+        styles.selected_style.description = old_description
+      end
+
+      true
     end
-
-    styles.update_selected_style
-
-    if result[0] == "Save as a new style"
-      styles.selected_style.name = unique_style_name(old_name)
-      styles.selected_style.description = old_description
-    end
-
-    true
   end
 
   def equal_cameras?(cam1, cam2)
@@ -980,23 +980,23 @@ module Skalp
     end
   end
 
-  def inch2pen(num)
-    return "0.1 pt" unless num
+  def inch2pen(num, formatted = false)
+    return "0.18 mm" unless num
     return "0.00 mm" if num == 0.0
 
     case num
     when 0.0..0.00148
-      "0.1 pt"
+      formatted ? "0.00 mm" : "0.04 mm"
     when 0.00148..0.00216
       "0.04 mm"
     when 0.00216..0.00276
       "0.07 mm"
     when 0.00276..0.00394
-      "0.2 pt"
+      "0.07 mm"
     when 0.00394..0.0054
       "0.13 mm"
     when 0.0054001..0.0069
-      "0.4 pt"
+      "0.13 mm"
     when 0.0069001..0.0079
       "0.18 mm"
     when 0.0079001..0.009
@@ -1583,8 +1583,7 @@ module Skalp
     return unless material && material.get_attribute("Skalp", "ID")
 
     if Skalp.hatch_dialog
-      Skalp.hatch_dialog.show
-      Skalp.hatch_dialog.script("select_material('#{hatchname}');")
+      Skalp.hatch_dialog.update_material(hatchname)
     else
       Skalp.hatch_dialog = Hatch_dialog.new(hatchname)
       Skalp.hatch_dialog.show

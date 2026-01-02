@@ -296,10 +296,10 @@ module Skalp
         end
 
         draw_section_cut(png, section_cut_width) if %i[preview thumbnail].include?(@opts[:type])
-        save_png(png, hatchdefinition.name) if %i[preview tile].include?(@opts[:type])
+        save_png(png, hatchdefinition.name) if @opts[:type] == :tile # Only save to disk for tile type
         return to_base64_blob(png) if @opts[:type] == :thumbnail
 
-        return { gauge_ratio: @def_y / @def_x } if @opts[:type] == :preview
+        return { gauge_ratio: @def_y / @def_x, png_base64: to_base64_blob(png) } if @opts[:type] == :preview
 
         # puts  "user_x: #{user_x}", "def_x_or_y: #{def_x_or_y}"
         return unless @opts[:type] == :tile

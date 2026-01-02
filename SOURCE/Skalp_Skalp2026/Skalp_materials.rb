@@ -867,17 +867,19 @@ module Skalp
   def set_render_brightness
     brightness = Sketchup.read_default("Skalp", "render_brightness").to_f || 1.0
     brightness = 1.0 if brightness == 0.0
-    brightness = UI.inputbox(["Render Brightness Factor"], ["#{brightness}"], "Skalp")
-    return unless brightness
 
-    Sketchup.write_default("Skalp", "render_brightness", brightness.first.to_f)
-    set_thea_render_params
+    Skalp.inputbox_custom(["Render Brightness Factor"], ["#{brightness}"], "Skalp") do |input|
+      next unless input
+
+      Sketchup.write_default("Skalp", "render_brightness", input.first.to_f)
+      set_thea_render_params
+    end
   end
 
   def create_thumbnails_cache(thumbnails = false)
-    Skalp.active_model.start("Skalp - update png_blob in JSON", true)
     materials = Sketchup.active_model.materials
     updated = {}
+    any_updated = false
 
     materials.each do |material|
       next unless material.get_attribute("Skalp", "ID")
@@ -889,13 +891,18 @@ module Skalp
       end
       next unless pattern_info.is_a?(Hash)
 
-      unless pattern_info[:png_blob]
+      # Force regeneration once to clear old red X blobs
+      if true # was unless pattern_info[:png_blob]
         png_blob = begin
           Skalp.create_thumbnail(pattern_info, 81, 27)
         rescue StandardError
           nil
         end
         if png_blob
+          unless any_updated
+            Skalp.active_model.start("Skalp - update png_blob", true)
+            any_updated = true
+          end
           pattern_info[:png_blob] = png_blob
           material.set_attribute("Skalp", "pattern_info",
                                  "eval(Sketchup.active_model.get_attribute('Skalp', 'version_check').to_s);#{pattern_info.inspect}")
@@ -905,7 +912,7 @@ module Skalp
       updated[material.name] = pattern_info[:png_blob] if pattern_info[:png_blob]
     end
 
-    Skalp.active_model.commit
+    Skalp.active_model.commit if any_updated
     updated if thumbnails
   end
 
@@ -936,90 +943,49 @@ module Skalp
     defaults = [target_names.first]
     list = [target_names.join("|")]
 
-    input = UI.inputbox(prompts, defaults, list, Skalp.translate("Merge Material"))
-    return unless input
+    Skalp.inputbox_custom(prompts, defaults, list, Skalp.translate("Merge Material")) do |input|
+      next unless input
 
-    target_material_name = input[0]
-    target_material = materials[target_material_name]
-    return unless target_material
+      target_material_name = input[0]
+      target_material = materials[target_material_name]
+      next unless target_material
 
-    Skalp.active_model.start("Skalp - #{Skalp.translate('merge material')}", true)
-
-    begin
-      # Reassign in definitions
-      Sketchup.active_model.definitions.each do |d|
-        d.entities.grep(Sketchup::Drawingelement).each do |e|
-          # Standard materials
-          e.material = target_material if e.respond_to?(:material) && e.material == source_material
-          e.back_material = target_material if e.respond_to?(:back_material) && e.back_material == source_material
-
-          # Skalp attributes
-          if e.get_attribute("Skalp", "material") == source_material_name
-            e.set_attribute("Skalp", "material", target_material_name)
-          end
-
-          if e.get_attribute("Skalp", "sectionmaterial") == source_material_name
-            e.set_attribute("Skalp", "sectionmaterial", target_material_name)
-          end
-        end
-      end
-
-      # Reassign in model
-      Sketchup.active_model.entities.grep(Sketchup::Drawingelement).each do |e|
-        e.material = target_material if e.respond_to?(:material) && e.material == source_material
-        e.back_material = target_material if e.respond_to?(:back_material) && e.back_material == source_material
-
-        if e.get_attribute("Skalp", "material") == source_material_name
-          e.set_attribute("Skalp", "material", target_material_name)
-        end
-
-        if e.get_attribute("Skalp", "sectionmaterial") == source_material_name
-          e.set_attribute("Skalp", "sectionmaterial", target_material_name)
-        end
-      end
-
-      # Reassign in layers
-      Sketchup.active_model.layers.each do |layer|
-        if layer.get_attribute("Skalp", "material") == source_material_name
-          layer.set_attribute("Skalp", "material", target_material_name)
-        end
-      end
-
-      # Update Style Rules
-      replace_material_in_style_rules(source_material_name, target_material_name)
-
-      # Delete source
-      Sketchup.active_model.materials.remove(source_material)
-
-      Skalp.active_model.commit
-
-      # Refresh dialog
-      Skalp::Material_dialog.create_thumbnails("Skalp materials in model")
-    rescue StandardError => e
-      Skalp.active_model.abort_operation
-      UI.messagebox("Error merging materials: #{e.message}")
-      puts e.backtrace if defined?(DEBUG) && DEBUG
+      Skalp::Material_dialog.replace_material(source_material_name, target_material_name)
     end
   end
 
   def self.edit_material_pattern(material_name)
     # Check if model material
     su_material = Sketchup.active_model.materials[material_name]
+    # Fallback for whitespace issues
+    unless su_material
+      su_material = Sketchup.active_model.materials[material_name.strip]
+      material_name = material_name.strip if su_material
+    end
+
     unless su_material && su_material.get_attribute("Skalp", "ID")
+      puts "[Skalp DEBUG] edit_material_pattern failed for '#{material_name}'. Material found: #{!su_material.nil?}, Skalp ID: #{if su_material
+                                                                                                                                   su_material.get_attribute(
+                                                                                                                                     'Skalp', 'ID'
+                                                                                                                                   )
+                                                                                                                                 else
+                                                                                                                                   'nil'
+                                                                                                                                 end}"
       UI.messagebox("Only Skalp materials in the model can be edited in the Pattern Designer.")
       return
     end
 
     # Open or refresh Hatch Dialog
-    unless Skalp.hatch_dialog && Skalp.hatch_dialog.webdialog.visible?
-      # Ensure Hatch_dialog is defined (required in loader)
-      Skalp.hatch_dialog = Skalp::Hatch_dialog.new
+    # Open or refresh Hatch Dialog
+    if Skalp.hatch_dialog && Skalp.hatch_dialog.webdialog.visible?
+      Skalp.hatch_dialog.webdialog.bring_to_front
+      Skalp.hatch_dialog.hatchname = material_name
+      Skalp.hatch_dialog.load_patterns_and_materials
+    else
+      # Force new instance to ensure fresh HTML injection
+      Skalp.hatch_dialog = Skalp::Hatch_dialog.new(material_name)
+      Skalp.hatch_dialog.webdialog.show
     end
-    Skalp.hatch_dialog.webdialog.show
-
-    # Select the material in the dialog
-    Skalp.hatch_dialog.hatchname = material_name
-    Skalp.hatch_dialog.load_patterns_and_materials
   end
 end
 

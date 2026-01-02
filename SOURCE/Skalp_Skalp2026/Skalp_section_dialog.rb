@@ -454,18 +454,18 @@ module Skalp
       @webdialog.add_action_callback("set_linestyle_system") do |webdialog, params|
         active_setting = Sketchup.read_default("Skalp", "linestyles")
 
-        input = if active_setting == "Skalp"
-                  UI.inputbox(["Linestyles?"], ["Skalp"], ["Skalp|SketchUp"], "Set Linestyle System")
-                else
-                  UI.inputbox(["Linestyles?"], ["SketchUp"], ["Skalp|SketchUp"], "Set Linestyle System")
-                end
+        default_val = active_setting == "Skalp" ? "Skalp" : "SketchUp"
 
-        if input[0] == "SketchUp"
-          Sketchup.write_default("Skalp", "linestyles", "SketchUp")
-          script("$('#linestyles_div').show()")
-        else
-          Sketchup.write_default("Skalp", "linestyles", "Skalp")
-          script("$('#linestyles_div').hide()")
+        Skalp.inputbox_custom(["Linestyles?"], [default_val], ["Skalp|SketchUp"], "Set Linestyle System") do |input|
+          next unless input
+
+          if input[0] == "SketchUp"
+            Sketchup.write_default("Skalp", "linestyles", "SketchUp")
+            script("$('#linestyles_div').show()")
+          else
+            Sketchup.write_default("Skalp", "linestyles", "Skalp")
+            script("$('#linestyles_div').hide()")
+          end
         end
       end
 
@@ -804,16 +804,19 @@ module Skalp
         prompts = %w[Name Symbol]
         defaults = [sectionplane.name, sectionplane.symbol]
         list = ["", ""]
-        input = UI.inputbox(prompts, defaults, list, "Name Section Plane")
-
-        new_sectionplane = Sketchup.active_model.entities.add_section_plane(sectionplane.get_plane.map! { |i| -i })
-        new_sectionplane.name = input[0]
-        new_sectionplane.symbol = input[1][0..2]
-        new_sectionplane.activate
+        Skalp.inputbox_custom(prompts, defaults, list, "Name Section Plane") do |input|
+          if input
+            new_sectionplane = Sketchup.active_model.entities.add_section_plane(sectionplane.get_plane.map! { |i| -i })
+            new_sectionplane.name = input[0]
+            new_sectionplane.symbol = input[1][0..2]
+            new_sectionplane.activate
+          end
+          Sketchup.active_model.commit_operation
+        end
       else
         sectionplane.set_plane(sectionplane.get_plane.map! { |i| -i })
+        Sketchup.active_model.commit_operation
       end
-      Sketchup.active_model.commit_operation
     end
 
     def sectionplane_toggle_command
