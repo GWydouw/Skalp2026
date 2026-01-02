@@ -79,9 +79,18 @@ module Skalp
         # Add the new page
         sister = model.pages.add(sister_name)
 
-        # Match camera and flags
+        # Match camera settings (camera= does not exist for Page)
         sister.use_camera = true
-        sister.camera = scene.camera
+        c = sister.camera
+        s_c = scene.camera
+        c.set(s_c.eye, s_c.target, s_c.up)
+        c.perspective = s_c.perspective
+        if s_c.perspective?
+          c.focal_length = s_c.focal_length
+        else
+          c.height = s_c.height
+        end
+
         sister.use_hidden_layers = true
 
         # Isolate Skalp layers
