@@ -187,9 +187,8 @@ module Skalp
                   end
                 end
 
-                unless slice_mask.polygons.empty?
-                  mp = Skalp::MultiPolygon.new
-                  mp.add_polygon(polygon)
+                unless slice_mask.to_a.empty?
+                  mp = Skalp::MultiPolygon.new(polygon.to_a)
                   mp.difference!(slice_mask)
                   poly_to_process = mp.polygons.polygons
                 end
@@ -333,7 +332,7 @@ module Skalp
 
     def get_lineweight_width(section2d, type)
       mat_name = skalp_style_material(section2d, type)
-      su_mat = Skalp.active_model.materials[mat_name]
+      su_mat = Sketchup.active_model.materials[mat_name]
       return 0.0 unless su_mat
 
       val = Skalp.skalp_material_info(su_mat, :section_cut_width)

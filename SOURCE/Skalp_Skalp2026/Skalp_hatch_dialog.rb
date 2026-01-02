@@ -575,12 +575,23 @@ module Skalp
                               space: space,
 
                               # Lineweights
-                              lineweight_model: (space == "modelspace" ? pen_formatted : "0.35 mm"),
-                              lineweight_paper: (space == "paperspace" ? pen_formatted : "0.18 mm"),
+                              lineweight_model: (if space == "modelspace"
+                                                   s[:pen].is_a?(String) ? s[:pen] : pen_formatted
+                                                 else
+                                                   "0.35 mm"
+                                                 end),
+                              lineweight_paper: (if space == "paperspace"
+                                                   s[:pen].is_a?(String) ? s[:pen] : pen_formatted
+                                                 else
+                                                   "0.18 mm"
+                                                 end),
 
                               sectioncut_linewidth: sc_formatted.to_s.empty? || sc_formatted.to_s == "0.00 mm" ? "0.00 mm" : sc_formatted,
 
-                              slider: "60"
+                              slider: "60",
+                              priority: s[:drawing_priority],
+                              unify: s[:unify],
+                              section_line_color: s[:section_line_color]
                             })
 
       raw_data = {
@@ -1000,8 +1011,10 @@ module Skalp
       vars = params.split(";")
       if (Skalp.utf8(vars[0]) == "" || Skalp.utf8(vars[11]) == "") && vars[0] != "SOLID_COLOR, solid color without hatching"
         puts "[Skalp] create_hatch: Missing vars!"
-        return
       end
+
+      # Ensure tile is calculated from input params
+      @tile.calculate(vars[1], :x)
 
       # -----------------------------------------------------------------------
       # PARAMS MAPPING (Matches hatch_dialog.html v2026.01.01)
@@ -1096,11 +1109,6 @@ module Skalp
       end
 
       new_pattern_info = {
-        name: Skalp.utf8(vars[9]), # Aligned 'true'/'false' stored as name? No, this was wrong.
-        # But 'name' in pattern info might be different from material name.
-        # vars[9] is aligned.
-        # Actually, new_pattern_info[:name] is used where?
-        # It seems it was misused. Let's start with proper mapping.
         name: Skalp.utf8(vars[11]),
         pattern: pattern_array,
         print_scale: 1,
@@ -1140,7 +1148,13 @@ module Skalp
       select_last_pattern
 
       # Defer recalculation to on_close
-      if Skalp.active_model && Skalp.active_model.active_sectionplane && Skalp.dialog.lineweights_status && (old_pattern_info.nil? || (old_pattern_info[:section_cut_width].to_f - new_pattern_info[:section_cut_width].to_f).abs > 0.000001)
+      if Skalp.active_model && Skalp.active_model.active_sectionplane && Skalp.dialog.lineweights_status &&
+         (old_pattern_info.nil? ||
+          (old_pattern_info[:section_cut_width].to_f - new_pattern_info[:section_cut_width].to_f).abs > 0.000001 ||
+          old_pattern_info[:drawing_priority] != new_pattern_info[:drawing_priority] ||
+          old_pattern_info[:unify] != new_pattern_info[:unify] ||
+          old_pattern_info[:section_line_color] != new_pattern_info[:section_line_color])
+
         @recalc_section_needed = true
       end
       Skalp.set_thea_render_params(hatch_material)
