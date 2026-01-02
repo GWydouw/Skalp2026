@@ -790,8 +790,9 @@ module Skalp
                                                                "created_at" => Time.now.to_s })
         config[id] = box_config
         Data.save_config(model, config)
-        (Data.get_hierarchy(model) << { "id" => id,
-                                        "type" => "item" }) && Data.save_hierarchy(model, Data.get_hierarchy(model))
+        hierarchy = Data.get_hierarchy(model)
+        hierarchy << { "id" => id, "type" => "item" }
+        Data.save_hierarchy(model, hierarchy)
         @@manager.sync_data if @@manager
         activate(id)
         return unless mode == :modify
@@ -902,6 +903,14 @@ module Skalp
             current = wrapper
           end
           model.commit_operation
+
+          # Generate Skalp section fills for all 6 planes (delayed to ensure Skalp is ready)
+          if defined?(SkalpIntegration)
+            UI.start_timer(0.5, false) do
+              SkalpIntegration.update_all if Skalp.respond_to?(:active_model) && Skalp.active_model
+            end
+          end
+
           @@manager.sync_data if @@manager
         rescue StandardError => e
           model.abort_operation
@@ -913,6 +922,10 @@ module Skalp
         return unless active_box_id
 
         model = Sketchup.active_model
+
+        # Clean up Skalp section fills first
+        SkalpIntegration.cleanup if defined?(SkalpIntegration)
+
         root = model.entities.find do |e|
           e.get_attribute(DICTIONARY_NAME, "box_id") == active_box_id
         end; if root
@@ -1200,7 +1213,7 @@ module Skalp
     end
 
     class SectionBoxFrameChangeObserver
-      def frameChange(from_frame, to_frame)
+      def frameChange(from_page, to_page, percent_done)
         # Only react when scene transition starts (roughly 0.0 to small positive)
         # However, frameChange provides 0.0 to 1.0.
         # But we really want to catch the *event* of changing scenes.

@@ -25,6 +25,9 @@ module Skalp
       end
 
       if entity.is_a?(Sketchup::SectionPlane)
+        # Skip SectionBox planes - they are managed separately
+        return if entity.name&.include?("[SkalpSectionBox]")
+
         id = entity.get_attribute("Skalp", "ID")
 
         if Skalp.new_sectionplane == entity && [nil,
@@ -67,6 +70,9 @@ module Skalp
       return unless Skalp.models && Skalp.models[entities.model] && Skalp.models[entities.model].observer_active
 
       return if entity.get_attribute("Skalp", "ID") && entity.get_attribute("Skalp", "sectionplane_name").nil?
+
+      # Skip SectionBox planes - they are managed separately
+      return if entity.is_a?(Sketchup::SectionPlane) && entity.name&.include?("[SkalpSectionBox]")
 
       if @@watched_types.include?(entity.class)
         data = {
