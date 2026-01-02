@@ -30,8 +30,6 @@ struct SceneExportInfo {
   std::string id;
   int orig_index;
   int sister_index;
-  SUSceneRef orig_ref;
-  SUSceneRef sister_ref;
   double scale;
   double model_w_in;
   double model_h_in;
@@ -51,26 +49,6 @@ bool is_skalp_scene(SUSceneRef page) {
   bool has_id = (res == SU_ERROR_NONE);
   SUTypedValueRelease(&val);
   return has_id;
-}
-
-// Helper to check if a layer is a Skalp layer
-bool is_skalp_layer(SULayerRef layer) {
-  SUEntityRef ent = SULayerToEntity(layer);
-  // Skalp identifies its layers by having an ID in the "Skalp" dictionary
-  std::string id = get_attribute(ent, "Skalp", "ID");
-  if (!id.empty())
-    return true;
-
-  // Fallback: check name for common Skalp prefixes if metadata is missing
-  SUStringRef n_ref = SU_INVALID;
-  SUStringCreate(&n_ref);
-  SULayerGetName(layer, &n_ref);
-  std::string name = su_string_to_std_string(n_ref);
-  SUStringRelease(&n_ref);
-  if (name.find("Skalp") != std::string::npos)
-    return true;
-
-  return false;
 }
 
 // Helper to find the section group for a scene
@@ -131,23 +109,41 @@ bool create_layout_scrapbook(std::string source_skp_path,
   std::vector<SUSceneRef> all_scenes(num_scenes);
   SUModelGetScenes(model, num_scenes, &all_scenes[0], &num_scenes);
 
+  // Map to find scenes by name easily
+  std::map<std::string, int> scene_map;
+  for (size_t i = 0; i < num_scenes; i++) {
+    SUStringRef s_name = SU_INVALID;
+    SUStringCreate(&s_name);
+    SUSceneGetName(all_scenes[i], &s_name);
+    scene_map[su_string_to_std_string(s_name)] = (int)i;
+    SUStringRelease(&s_name);
+  }
+
   std::vector<SceneExportInfo> scenes_to_process;
   for (size_t i = 0; i < num_scenes; i++) {
     if (is_skalp_scene(all_scenes[i])) {
       SceneExportInfo info;
       info.orig_index = (int)i;
-      info.orig_ref = all_scenes[i];
+
       SUEntityRef ent = SUSceneToEntity(all_scenes[i]);
       info.id = get_attribute(ent, "Skalp", "ID");
-      info.name = get_attribute(ent, "Skalp", "name");
-      if (info.name.empty()) {
-        SUStringRef s_name = SU_INVALID;
-        SUStringCreate(&s_name);
-        SUSceneGetName(all_scenes[i], &s_name);
-        info.name = su_string_to_std_string(s_name);
-        SUStringRelease(&s_name);
+
+      SUStringRef s_name = SU_INVALID;
+      SUStringCreate(&s_name);
+      SUSceneGetName(all_scenes[i], &s_name);
+      info.name = su_string_to_std_string(s_name);
+      SUStringRelease(&s_name);
+
+      // Find the sister scene created by Ruby
+      std::string sister_name = info.name + "_Section";
+      if (scene_map.count(sister_name)) {
+        info.sister_index = scene_map[sister_name];
+      } else {
+        // Fallback to same scene if sister not found
+        info.sister_index = info.orig_index;
       }
 
+      // Read Scale
       std::string scale_str = get_attribute(ent, "Skalp", "ss_drawing_scale");
       if (scale_str.empty()) {
         SUAttributeDictionaryRef m_dict = SU_INVALID;
@@ -176,6 +172,7 @@ bool create_layout_scrapbook(std::string source_skp_path,
       }
       info.scale = scale_str.empty() ? 50.0 : std::stod(scale_str);
 
+      // Find Bounds (for page sizing)
       SUGroupRef sect_group = find_scene_section_group(model, info.id);
       if (SUIsValid(sect_group)) {
         SUBoundingBox3D bbox;
@@ -192,42 +189,12 @@ bool create_layout_scrapbook(std::string source_skp_path,
         info.model_w_in = 100.0;
         info.model_h_in = 100.0;
       }
+
       scenes_to_process.push_back(info);
     }
   }
 
-  // Identify all layers to decide which to hide in Sister Scenes
-  size_t num_layers = 0;
-  SUModelGetNumLayers(model, &num_layers);
-  std::vector<SULayerRef> layers(num_layers);
-  SUModelGetLayers(model, num_layers, &layers[0], &num_layers);
-
-  for (auto &info : scenes_to_process) {
-    SUSceneRef sister = SU_INVALID;
-    SUSceneCreate(&sister);
-    SUSceneSetName(sister, (info.name + "_Section").c_str());
-    SUCameraRef camera = SU_INVALID;
-    SUCameraCreate(&camera);
-    SUSceneGetCamera(info.orig_ref, &camera);
-    SUSceneSetCamera(sister, camera);
-
-    // Configure layer visibility: Hide all non-Skalp layers
-    SUSceneSetUseHiddenLayers(sister, true);
-    for (SULayerRef layer : layers) {
-      if (is_skalp_layer(layer)) {
-        // Keep Skalp layers visible
-        continue;
-      }
-      // Add non-Skalp layer to hidden list for this scene
-      SUSceneAddLayer(sister, layer);
-    }
-
-    int out_idx = -1;
-    SUModelAddScene(model, -1, sister, &out_idx);
-    info.sister_index = out_idx;
-  }
-
-  SUModelSaveToFile(model, source_skp_path.c_str());
+  // No modification of SKP needed anymore, Ruby already did it!
   SUModelRelease(&model);
 
   // Generate LayOut
