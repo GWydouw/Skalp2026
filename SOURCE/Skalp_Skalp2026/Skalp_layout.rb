@@ -68,44 +68,46 @@ module Skalp
       # 1. Use an operation + abort to create temporary scenes for the sidecar
       model.start_operation("Skalp LayOut Prepare", true)
 
-      skalp_scenes.each do |scene|
-        # Create a sister scene for the section view
-        sister_name = "#{scene.name}_Section"
+      begin
+        skalp_scenes.each do |scene|
+          # Create a sister scene for the section view
+          sister_name = "#{scene.name}_Section"
 
-        # Check if it exists (highly unlikely in a clean run, but stay safe)
-        existing = model.pages[sister_name]
-        model.pages.erase(existing) if existing
+          # Check if it exists (highly unlikely in a clean run, but stay safe)
+          existing = model.pages[sister_name]
+          model.pages.erase(existing) if existing
 
-        # Add the new page
-        sister = model.pages.add(sister_name)
+          # Add the new page
+          sister = model.pages.add(sister_name)
 
-        # Match camera settings (camera= does not exist for Page)
-        sister.use_camera = true
-        c = sister.camera
-        s_c = scene.camera
-        c.set(s_c.eye, s_c.target, s_c.up)
-        c.perspective = s_c.perspective
-        if s_c.perspective?
-          c.focal_length = s_c.focal_length
-        else
-          c.height = s_c.height
+          # Match camera settings (camera= does not exist for Page)
+          sister.use_camera = true
+          c = sister.camera
+          s_c = scene.camera
+          c.set(s_c.eye, s_c.target, s_c.up)
+          c.perspective = s_c.perspective?
+          if s_c.perspective?
+            c.focal_length = s_c.focal_length
+          else
+            c.height = s_c.height
+          end
+
+          sister.use_hidden_layers = true
+
+          # Isolate Skalp layers
+          model.layers.each do |layer|
+            is_skalp = layer.get_attribute("Skalp", "ID") || layer.name.include?("Skalp") ||
+                       layer.name.include?("Skalp Scene Sections")
+            sister.set_visibility(layer, is_skalp)
+          end
         end
 
-        sister.use_hidden_layers = true
-
-        # Isolate Skalp layers
-        model.layers.each do |layer|
-          is_skalp = layer.get_attribute("Skalp", "ID") || layer.name.include?("Skalp") ||
-                     layer.name.include?("Skalp Scene Sections")
-          sister.set_visibility(layer, is_skalp)
-        end
+        # 2. Save the model with these temporary scenes to the sidecar path
+        model.save_copy(source_skp_path)
+      ensure
+        # 3. Abort the operation so the live model stays clean
+        model.abort_operation
       end
-
-      # 2. Save the model with these temporary scenes to the sidecar path
-      model.save_copy(source_skp_path)
-
-      # 3. Abort the operation so the live model stays clean
-      model.abort_operation
 
       Sketchup.status_text = "Generating LayOut file via Skalp Engine..."
       puts "Calling C++ Engine: input=#{source_skp_path} output=#{doc_path}"
