@@ -355,6 +355,8 @@ module Skalp
     end
 
     def self.load_libraries
+      return unless @materialdialog
+
       libraries = ["Skalp materials in model", "SketchUp materials in model"]
       match = Sketchup.find_support_file("Plugins") + "/Skalp_Skalp2026/resources/materials/*.json"
       Dir[match].each do |file|
