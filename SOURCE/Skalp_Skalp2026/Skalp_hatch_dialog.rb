@@ -1063,6 +1063,27 @@ module Skalp
       # 14: drawingPriority
       # -----------------------------------------------------------------------
 
+      # Resolve correct pattern name if a material name was passed
+      # This prevents the pattern definition from being named after the material
+      pattern_ref = Skalp.utf8(vars[0]).split(",").first.strip
+
+      # Check if pattern_ref is a known pattern (ignoring SOLID_COLOR)
+      # SkalpHatch.hatchdefs is an array of HatchDefinition objects
+      is_known_pattern = SkalpHatch.hatchdefs.any? { |h| h.name.to_s.upcase == pattern_ref.upcase }
+
+      if !is_known_pattern && pattern_ref != "SOLID_COLOR"
+        # Not a standard pattern. Check if it's a material.
+        other_mat = Sketchup.active_model.materials[pattern_ref]
+        if other_mat && other_mat.get_attribute("Skalp", "pattern_info")
+          other_info = Skalp.get_pattern_info(other_mat)
+          if other_info && other_info[:name]
+            # Update vars[0] to the real pattern name so it gets saved correctly
+            # We reconstruct the string to keep format consistent if needed, though split used simple name
+            vars[0] = other_info[:name]
+          end
+        end
+      end
+
       name = Skalp.utf8(vars[11])
       pen_width = if vars[2].to_sym == :modelspace
                     Skalp::PenWidth.new(vars[4], vars[2],

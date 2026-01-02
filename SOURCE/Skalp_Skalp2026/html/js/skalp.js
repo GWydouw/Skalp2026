@@ -442,7 +442,10 @@ function solid_color(value) {
         $("#lineweight_model").attr('disabled', true);
         $("#lineweight_paper").attr('disabled', true);
         $("#align_pattern").attr('disabled', true);
-        $("#line_color").hide();
+
+        // Hide entire rows
+        $("#pattern_line_color_row").hide();
+        $("#pattern_line_width_row").hide();
 
         $("#tile_x").attr('disabled', true);
         $("#tile_y").attr('disabled', true);
@@ -452,18 +455,21 @@ function solid_color(value) {
         $("#tile_y").css('color', 'lightgrey');
 
         $("#translate_01").css('color', 'lightgrey'); // Section Line Width label? No, translate_01 is Line Width (Pattern)
-        $("#translate_05").css('color', 'lightgrey'); // Section Line Width
-        $("#translate_06").css('color', 'lightgrey'); // Fill Color
+        // $("#translate_05").css('color', 'lightgrey'); // Section Line Width - KEEP ACTIVE
+        // $("#translate_06").css('color', 'lightgrey'); // Fill Color - KEEP ACTIVE
         $("#translate_08").css('color', 'lightgrey'); // Line Width
         $("#translate_17").css('color', 'lightgrey'); // Line Color
         $("#translate_18").css('color', 'lightgrey'); // Align with objects
-        $("#translate_section_line_color").css('color', 'lightgrey');
+        // $("#translate_section_line_color").css('color', 'lightgrey'); // Section Line Color - KEEP ACTIVE
     } else {
         $("#units").attr('disabled', false);
         $("#lineweight_model").attr('disabled', false);
         $("#lineweight_paper").attr('disabled', false);
         $("#align_pattern").attr('disabled', false);
-        $("#line_color").show();
+
+        // Show rows
+        $("#pattern_line_color_row").show();
+        $("#pattern_line_width_row").show();
 
         $("#tile_x").attr('disabled', false);
         $("#tile_y").attr('disabled', false);
@@ -489,11 +495,22 @@ function select_pattern(value) {
     if (value === "----------------------") {
         return;
     }
+
+    // Check for SOLID_COLOR
+    if (value.indexOf("SOLID_COLOR") !== -1) {
+        solid_color(true);
+    } else {
+        solid_color(false);
+    }
+
     create_preview(1);
 }
 
 function select_material(value) {
     $('#hatch_name').val(value);
+    // Trigger SOLID_COLOR check if material uses it? 
+    // Usually pattern is selected separate from material name, 
+    // but loading a material might set pattern list.
     create_preview(1);
 }
 
