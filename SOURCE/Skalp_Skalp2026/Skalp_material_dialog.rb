@@ -75,8 +75,10 @@ module Skalp
       @materialdialog.add_action_callback("dialog_ready") do |action_context, params|
         load_dialog
         unless @return_webdialog
-          @selected_material = "Skalp default"
-          @materialdialog.execute_script("select('Skalp default');")
+          # Use selected_material if already set, otherwise default
+          material_to_select = @selected_material || "Skalp default"
+          @selected_material = material_to_select
+          @materialdialog.execute_script("select('#{material_to_select}');") if @materialdialog
         end
 
         if @library_actions
