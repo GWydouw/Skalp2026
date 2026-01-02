@@ -134,13 +134,7 @@ module Skalp
         when "paint_to_section"
           Skalp::Material_dialog.selected_material = materialname
           # Activate Skalp Paint tool
-          if Skalp.skalp_paint_tool
-            Skalp.skalp_paint_tool.execute
-          else
-            Sketchup.active_model.select_tool(Skalp.skalp_paint) if Skalp.skalp_paint
-            Skalp.paintbucketbutton_on
-          end
-          # Final sync just in case
+          Sketchup.active_model.select_tool(Skalp.skalp_paint) if Skalp.skalp_paint
           Skalp.paintbucketbutton_on if Skalp.respond_to?(:paintbucketbutton_on)
         when "move"
           if Skalp.respond_to?(:save_pattern_to_library)
