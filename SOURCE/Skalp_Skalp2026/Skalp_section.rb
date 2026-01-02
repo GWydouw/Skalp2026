@@ -79,70 +79,234 @@ module Skalp
       return unless @sectionplane.skpSectionPlane.valid?
 
       materials = Sketchup.active_model.materials
-      linecolor = materials["Skalp linecolor"]
       transparent = materials["Skalp transparent"]
 
       Skalp.linestyle_layer_visible
       Skalp.active_model.entity_strings = {}
-      if @section2Ds.size > 0
-        sectiongroup.entities.build do |builder|
-          type = @page || @skpModel
-          use_lineweight = Skalp.dialog.lineweights_status(type)
 
-          normal = Geom::Vector3d.new 0, 0, 1
-          result = false
+      return unless @section2Ds.size > 0
 
-          if use_lineweight
-            @lineweight_mask = Skalp::MultiPolygon.new
-            @inner_lineweight_collection = []
-            @outer_lineweight_mask = Skalp::MultiPolygon.new
-            create_lineweight_mask(type)
-            create_inner_lineweight_collection
-            create_outer_lineweight_mask
-          end
+      type = @page || @skpModel
+      use_lineweight = Skalp.dialog.lineweights_status(type)
+      scale = Skalp.dialog.drawing_scale(type)
+      normal = Geom::Vector3d.new 0, 0, 1
 
-          centerline_loops = []
+      sectiongroup.entities.build do |builder|
+        if use_lineweight
+          # -----------------------------------------------------------------------
+          # ADVANCED RENDER PIPELINE (Priority, Unify, Color)
+          # -----------------------------------------------------------------------
+          # Map: priority => [section2d, ...]
+          sections_by_priority = Hash.new { |h, k| h[k] = [] }
+          # Map: priority => { color => [section2d, ...] }
+          lineweight_groups_by_priority = Hash.new { |h, k| h[k] = Hash.new { |hh, kk| hh[kk] = [] } }
+          active_priorities = []
 
           @section2Ds.each do |section2d|
-            # fillup lookup table nodes
+            next unless section2d.node.value.visibility
+
+            # Determine Priority (-2 to +2, default 0)
+            mat = skalp_style_material(section2d, type)
+            su_mat = materials[mat] if mat
+            priority = 0
+            if su_mat
+              p_val = Skalp.skalp_material_info(su_mat, :drawing_priority)
+              priority = p_val.to_i if p_val
+            end
+
+            sections_by_priority[priority] << section2d
+            active_priorities << priority unless active_priorities.include?(priority)
+
+            # Determine Line Color
+            line_color_str = nil
+            line_color_str = Skalp.skalp_material_info(su_mat, :section_line_color) if su_mat
+            line_color_str = "Skalp linecolor" if line_color_str.nil? || line_color_str.empty?
+
+            lineweight_groups_by_priority[priority][line_color_str] << section2d
+
+            # Entity Strings
             unless Skalp.active_model.entity_strings[section2d.node.value.top_parent.value.to_s]
               Skalp.active_model.entity_strings[section2d.node.value.top_parent.value.to_s] =
                 section2d.node.value.top_parent.value
             end
             unless Skalp.active_model.entity_strings[section2d.node.value.to_s]
-              Skalp.active_model.entity_strings[section2d.node.value.to_s] =
-                section2d.node.value
+              Skalp.active_model.entity_strings[section2d.node.value.to_s] = section2d.node.value
+            end
+          end
+
+          active_priorities.sort!
+
+          active_priorities.each do |priority|
+            current_sections = sections_by_priority[priority]
+            next if current_sections.empty?
+
+            z_offset = priority * 0.001
+            transform_vec = Geom::Vector3d.new(0, 0, z_offset)
+            has_offset = z_offset.abs > 0.000001
+
+            # A. UNIFY LOGIC
+            by_material = Hash.new { |h, k| h[k] = [] }
+            current_sections.each do |sec|
+              mat = skalp_style_material(sec, type)
+              by_material[mat] << sec
             end
 
+            centerline_loops = []
+
+            by_material.each do |mat_name, sections|
+              su_mat = materials[mat_name]
+              unify = su_mat ? Skalp.skalp_material_info(su_mat, :unify_section) == true : false
+              final_polygons = []
+
+              if unify && sections.size > 1
+                union_poly = Skalp::MultiPolygon.new
+                sections.each { |sec| union_poly.union!(sec.to_mpoly) }
+                final_polygons = union_poly.polygons.polygons
+              else
+                sections.each { |sec| final_polygons.concat(sec.polygons) }
+              end
+
+              # B. GENERATE FACES
+              final_polygons.each do |polygon|
+                # Subtract specific lineweight mask
+                poly_to_process = [polygon]
+
+                # Check which sections contribute to this polygon to know colors?
+                # Complex with Unify. We iterate active color groups for this priority.
+                # Simplified: Subtract ALL lineweight masks for this priority.
+                # BUT this might subtract colors from other materials incorrectly?
+                # Actually, standard logic is: face - mask.
+                # We need to subtract the UNION of all lineweight masks of this priority slice.
+
+                slice_mask = Skalp::MultiPolygon.new
+                lineweight_groups_by_priority[priority].each do |_, group_secs|
+                  group_secs.each do |sec|
+                    # Only include if relevant to this material? No, global masking.
+                    w = get_lineweight_width(sec, type)
+                    slice_mask.union!(sec.to_mpoly.outline(w * scale)) if w > 0.0
+                  end
+                end
+
+                unless slice_mask.polygons.empty?
+                  mp = Skalp::MultiPolygon.new
+                  mp.add_polygon(polygon)
+                  mp.difference!(slice_mask)
+                  poly_to_process = mp.polygons.polygons
+                end
+
+                # Centerlines (from original polygon)
+                centerline_loops << polygon.outerloop
+                centerline_loops.concat(polygon.innerloops)
+
+                poly_to_process.each do |p|
+                  outerloop = if has_offset
+                                p.outerloop.vertices.map do |v|
+                                  v.offset(transform_vec)
+                                end
+                              else
+                                p.outerloop.vertices
+                              end
+                  innerloops = []
+                  p.innerloops.each do |loop|
+                    innerloops << (has_offset ? loop.vertices.map { |v| v.offset(transform_vec) } : loop.vertices)
+                  end
+
+                  begin
+                    face = if innerloops.empty?
+                             builder.add_face(outerloop)
+                           else
+                             builder.add_face(outerloop,
+                                              holes: innerloops)
+                           end
+                    if sections.size == 1
+                      s = sections.first
+                      face.set_attribute("Skalp", "from_object", s.node.value.top_parent.value.to_s)
+                      face.set_attribute("Skalp", "from_sub_object", s.node.value.to_s)
+                    else
+                      face.set_attribute("Skalp", "from_object", "Unified")
+                    end
+                    face.material = Skalp.create_su_material(mat_name)
+                    correct_UV_material(face)
+                    l_name = sections.first.layer_by_style(type, mat_name)
+                    layer = @skpModel.layers[l_name]
+                    face.layer = layer if layer && layer.valid?
+                    face.normal.dot(normal) < 0 ? face.reverse! : nil
+                  rescue ArgumentError
+                  end
+                end
+              end
+            end
+
+            # C. RENDER LINEWEIGHTS (Per Color)
+            lineweight_groups_by_priority[priority].each do |color_name, group_sections|
+              group_mask = Skalp::MultiPolygon.new
+              group_sections.each do |sec|
+                w = get_lineweight_width(sec, type)
+                group_mask.union!(sec.to_mpoly.outline(w * scale)) if w > 0.0
+              end
+
+              inner_collection = []
+              outer_mask = group_mask.clone
+              group_sections.each do |sec|
+                inner_collection << sec.to_mpoly.intersection(group_mask)
+                outer_mask.difference!(sec.to_mpoly)
+              end
+
+              line_mat = materials[color_name] || materials["Skalp linecolor"]
+
+              inner_collection.each do |mpoly|
+                mpoly.polygons.polygons.each do |p|
+                  next if p.outerloop.vertices.size < 3
+
+                  draw_lineweight_face(builder, p, line_mat, transparent, has_offset, transform_vec, color_name)
+                end
+              end
+
+              outer_mask.polygons.polygons.each do |p|
+                next if p.vertices.size < 3
+
+                draw_lineweight_face(builder, p, line_mat, transparent, has_offset, transform_vec, color_name)
+              end
+            end
+
+            # D. CENTERLINES
+            centerline_loops.each do |loop|
+              verts = has_offset ? loop.vertices.map { |v| v.offset(transform_vec) } : loop.vertices
+              for n in 0..verts.size - 1
+                pt1 = verts[n - 1]
+                pt2 = verts[n]
+                next unless pt1.distance(pt2) > 0.01
+
+                edge = builder.add_edge(pt1, pt2)
+                edge.smooth = edge.soft = edge.hidden = false
+              end
+            rescue ArgumentError
+            end
+          end # priority loop
+
+        else
+          # -----------------------------------------------------------------------
+          # LEGACY RENDER PIPELINE (No Lineweight)
+          # -----------------------------------------------------------------------
+          @section2Ds.each do |section2d|
             next unless section2d.node.value.visibility
 
-            if use_lineweight
-              polygons = section2d.to_mpoly.difference(@lineweight_mask).polygons.polygons
-
-              section2d.polygons.each do |polygon|
-                centerline_loops << polygon.outerloop
-                centerline_loops += polygon.innerloops
-              end
-            else
-              polygons = section2d.polygons
+            # Populate strings (same as before)
+            unless Skalp.active_model.entity_strings[section2d.node.value.top_parent.value.to_s]
+              Skalp.active_model.entity_strings[section2d.node.value.top_parent.value.to_s] =
+                section2d.node.value.top_parent.value
+            end
+            unless Skalp.active_model.entity_strings[section2d.node.value.to_s]
+              Skalp.active_model.entity_strings[section2d.node.value.to_s] = section2d.node.value
             end
 
-            polygons.each do |polygon|
+            section2d.polygons.each do |polygon|
               outerloop = polygon.outerloop.vertices
-
               innerloops = []
-              polygon.innerloops.each do |loop|
-                innerloops << loop.vertices
-              end
+              polygon.innerloops.each { |loop| innerloops << loop.vertices }
 
               begin
-                face = if innerloops && innerloops != []
-                         builder.add_face(outerloop, holes: innerloops)
-                       else
-                         builder.add_face(outerloop)
-                       end
-
-                # TODO: scale???? add_mesh(mesh, scale, section2d, type)
+                face = innerloops.empty? ? builder.add_face(outerloop) : builder.add_face(outerloop, holes: innerloops)
                 face.set_attribute("Skalp", "from_object", section2d.node.value.top_parent.value.to_s)
                 face.set_attribute("Skalp", "from_sub_object", section2d.node.value.to_s)
                 materialname = section2d.hatch_by_style(type).to_s
@@ -150,97 +314,14 @@ module Skalp
                 correct_UV_material(face)
                 layer = @skpModel.layers[section2d.layer_by_style(type, materialname)]
                 face.layer = layer if layer && layer.valid?
-                result ? normal != face.normal && face.reverse! : normal = face.normal
-                result = true
-              rescue ArgumentError => e
+                normal.dot(face.normal) < 0 ? face.reverse! : nil
+              rescue ArgumentError
               end
-            end
-          end
-
-          if use_lineweight
-            @inner_lineweight_collection.each do |mpoly|
-              mpoly.polygons.polygons.each do |polygon|
-                next if polygon.outerloop.vertices.size < 3
-
-                outerloop = polygon.outerloop.vertices
-                innerloops = []
-                polygon.innerloops.each do |loop|
-                  innerloops << loop.vertices
-                end
-
-                begin
-                  face = if innerloops && innerloops != []
-                           builder.add_face(outerloop, holes: innerloops)
-                         else
-                           builder.add_face(outerloop)
-                         end
-                rescue StandardError
-                  next
-                end
-
-                face.material = linecolor
-                face.back_material = transparent
-                @skpModel.layers["\uFEFF".encode("utf-8") + "Skalp Pattern Layer - Skalp linecolor"] ? layername = "\uFEFF".encode("utf-8") + "Skalp Pattern Layer - Skalp linecolor" : layername = "layer0"
-                face.layer = layername
-
-                result ? normal != face.normal && face.reverse! : normal = face.normal
-                result = true
-
-                face.edges.each do |edge|
-                  edge.smooth = true
-                  edge.soft = true
-                  edge.hidden = true
-                end
-              end
-            end
-
-            @outer_lineweight_mask.polygons.polygons.each do |polygon|
-              next if polygon.vertices.size < 3
-
-              outerloop = polygon.outerloop.vertices
-              innerloops = []
-              polygon.innerloops.each do |loop|
-                innerloops << loop.vertices
-              end
-              face = if innerloops && innerloops != []
-                       builder.add_face(outerloop, holes: innerloops)
-                     else
-                       builder.add_face(outerloop)
-                     end
-              face.material = linecolor
-              face.back_material = transparent
-              @skpModel.layers["\uFEFF".encode("utf-8") + "Skalp Pattern Layer - Skalp linecolor"] ? layername = "\uFEFF".encode("utf-8") + "Skalp Pattern Layer - Skalp linecolor" : layername = "layer0"
-              face.layer = layername
-
-              result ? normal != face.normal && face.reverse! : normal = face.normal
-              result = true
-
-              face.edges.each do |edge|
-                edge.smooth = true
-                edge.soft = true
-                edge.hidden = true
-              end
-            end
-
-            centerline_loops.each do |loop|
-              for n in 0..loop.vertices.size - 1
-                pt1 = loop.vertices[n - 1]
-                pt2 = loop.vertices[n]
-                next unless pt1.distance(pt2) > 0.01
-
-                edge = builder.add_edge(loop.vertices[n - 1], loop.vertices[n])
-                edge.smooth = false
-                edge.soft = false
-                edge.hidden = false
-              end
-            rescue ArgumentError => error
-              e = "#{error}, pt1: #{pt1}, pt2: #{pt2} "
-              Skalp.send_info("Add_ege duplicate points error")
-              Skalp.send_bug(e)
             end
           end
         end
-      end
+      end # builder
+
       transformation_inverse = @sectionplane.transformation.inverse
       place_rear_view_lines_in_model(sectiongroup) if Skalp.dialog.style_settings(@page)[:rearview_status]
       @model.section_result_group.locked = true
@@ -248,12 +329,49 @@ module Skalp
       return unless sectiongroup.valid?
 
       sectiongroup.transform! transformation_inverse * Skalp.transformation_down
+    end
 
-      # if skip_transform
-      #   sectiongroup.transform! transformation_inverse * Skalp.transformation_down
-      # else
-      #   sectiongroup.transform! transformation_inverse
-      # end
+    def get_lineweight_width(section2d, type)
+      mat_name = skalp_style_material(section2d, type)
+      su_mat = Skalp.active_model.materials[mat_name]
+      return 0.0 unless su_mat
+
+      val = Skalp.skalp_material_info(su_mat, :section_cut_width)
+      val ? val.to_f : 0.0
+    end
+
+    def draw_lineweight_face(builder, polygon, material, back_material, has_offset, transform_vec, layer_suffix)
+      outerloop = if has_offset
+                    polygon.outerloop.vertices.map do |v|
+                      v.offset(transform_vec)
+                    end
+                  else
+                    polygon.outerloop.vertices
+                  end
+      innerloops = []
+      polygon.innerloops.each do |loop|
+        innerloops << (has_offset ? loop.vertices.map { |v| v.offset(transform_vec) } : loop.vertices)
+      end
+
+      begin
+        face = innerloops.empty? ? builder.add_face(outerloop) : builder.add_face(outerloop, holes: innerloops)
+        face.material = material
+        face.back_material = back_material
+
+        l_name = "\uFEFF".encode("utf-8") + "Skalp Pattern Layer - " + layer_suffix.to_s
+        # Ensure fallback if specific color layer doesn't exist? (User request: Use legacy name if standard?)
+        # If suffix is "Skalp linecolor", it matches standard.
+
+        face.layer = @skpModel.layers[l_name] ? l_name : "layer0"
+
+        face.normal.dot(Geom::Vector3d.new(0, 0, 1)) < 0 ? face.reverse! : nil
+        face.edges.each do |e|
+          e.smooth = true
+          e.soft = true
+          e.hidden = true
+        end
+      rescue StandardError
+      end
     end
 
     def section_to_sectiongroup(sectiongroup, skip_transform = false)
