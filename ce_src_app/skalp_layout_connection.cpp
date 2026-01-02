@@ -9,6 +9,7 @@
 // LayOut API
 #include <LayOutAPI/layout.h>
 #include <LayOutAPI/model/document.h>
+#include <LayOutAPI/model/entitylist.h>
 #include <LayOutAPI/model/group.h>
 #include <LayOutAPI/model/page.h>
 #include <LayOutAPI/model/pageinfo.h>
@@ -33,9 +34,10 @@ struct SceneExportInfo {
   double scale;
   double model_w_in;
   double model_h_in;
+  bool is_ortho;
 };
 
-// Helper to check for Skalp Scene
+// Helper: Check for Skalp Scene
 bool is_skalp_scene(SUSceneRef page) {
   SUEntityRef entity = SUSceneToEntity(page);
   SUAttributeDictionaryRef dictionary = SU_INVALID;
@@ -51,12 +53,11 @@ bool is_skalp_scene(SUSceneRef page) {
   return has_id;
 }
 
-// Helper to find the section group for a scene
+// Helper: Find section group
 SUGroupRef find_scene_section_group(SUModelRef model,
                                     const std::string &scene_id) {
   SUEntitiesRef model_entities = SU_INVALID;
   SUModelGetEntities(model, &model_entities);
-
   size_t num_groups = 0;
   SUEntitiesGetNumGroups(model_entities, &num_groups);
   std::vector<SUGroupRef> groups(num_groups);
@@ -73,12 +74,9 @@ SUGroupRef find_scene_section_group(SUModelRef model,
       std::vector<SUGroupRef> children(num_children);
       SUEntitiesGetGroups(child_entities, num_children, &children[0],
                           &num_children);
-
       for (SUGroupRef child : children) {
-        std::string id = get_attribute(SUGroupToEntity(child), "Skalp", "ID");
-        if (id == scene_id) {
+        if (get_attribute(SUGroupToEntity(child), "Skalp", "ID") == scene_id)
           return child;
-        }
       }
     }
   }
@@ -96,9 +94,7 @@ bool create_layout_scrapbook(std::string source_skp_path,
   LOInitialize();
 
   SUModelRef model = SU_INVALID;
-  SUResult res = SUModelCreateFromFile(&model, source_skp_path.c_str());
-  if (res != SU_ERROR_NONE) {
-    std::cerr << "Failed to load SKP model." << std::endl;
+  if (SUModelCreateFromFile(&model, source_skp_path.c_str()) != SU_ERROR_NONE) {
     SUTerminate();
     LOTerminate();
     return false;
@@ -109,7 +105,6 @@ bool create_layout_scrapbook(std::string source_skp_path,
   std::vector<SUSceneRef> all_scenes(num_scenes);
   SUModelGetScenes(model, num_scenes, &all_scenes[0], &num_scenes);
 
-  // Map to find scenes by name easily
   std::map<std::string, int> scene_map;
   for (size_t i = 0; i < num_scenes; i++) {
     SUStringRef s_name = SU_INVALID;
@@ -124,7 +119,6 @@ bool create_layout_scrapbook(std::string source_skp_path,
     if (is_skalp_scene(all_scenes[i])) {
       SceneExportInfo info;
       info.orig_index = (int)i;
-
       SUEntityRef ent = SUSceneToEntity(all_scenes[i]);
       info.id = get_attribute(ent, "Skalp", "ID");
 
@@ -134,16 +128,10 @@ bool create_layout_scrapbook(std::string source_skp_path,
       info.name = su_string_to_std_string(s_name);
       SUStringRelease(&s_name);
 
-      // Find the sister scene created by Ruby
       std::string sister_name = info.name + "_Section";
-      if (scene_map.count(sister_name)) {
-        info.sister_index = scene_map[sister_name];
-      } else {
-        // Fallback to same scene if sister not found
-        info.sister_index = info.orig_index;
-      }
+      info.sister_index =
+          scene_map.count(sister_name) ? scene_map[sister_name] : (int)i;
 
-      // Read Scale
       std::string scale_str = get_attribute(ent, "Skalp", "ss_drawing_scale");
       if (scale_str.empty()) {
         SUAttributeDictionaryRef m_dict = SU_INVALID;
@@ -153,13 +141,13 @@ bool create_layout_scrapbook(std::string source_skp_path,
           SUTypedValueCreate(&m_val);
           if (SUAttributeDictionaryGetValue(m_dict, "ss_drawing_scale",
                                             &m_val) == SU_ERROR_NONE) {
-            SUTypedValueType m_type;
-            SUTypedValueGetType(m_val, &m_type);
-            if (m_type == SUTypedValueType_Double) {
+            SUTypedValueType type;
+            SUTypedValueGetType(m_val, &type);
+            if (type == SUTypedValueType_Double) {
               double d;
               SUTypedValueGetDouble(m_val, &d);
               scale_str = std::to_string((int)d);
-            } else if (m_type == SUTypedValueType_String) {
+            } else if (type == SUTypedValueType_String) {
               SUStringRef s = SU_INVALID;
               SUStringCreate(&s);
               SUTypedValueGetString(m_val, &s);
@@ -172,7 +160,6 @@ bool create_layout_scrapbook(std::string source_skp_path,
       }
       info.scale = scale_str.empty() ? 50.0 : std::stod(scale_str);
 
-      // Find Bounds (for page sizing)
       SUGroupRef sect_group = find_scene_section_group(model, info.id);
       if (SUIsValid(sect_group)) {
         SUBoundingBox3D bbox;
@@ -190,27 +177,39 @@ bool create_layout_scrapbook(std::string source_skp_path,
         info.model_h_in = 100.0;
       }
 
+      SUCameraRef camera = SU_INVALID;
+      SUSceneGetCamera(all_scenes[i], &camera);
+      bool perspective = true;
+      SUCameraGetPerspective(camera, &perspective);
+      info.is_ortho = !perspective;
+
       scenes_to_process.push_back(info);
     }
   }
-
-  // No modification of SKP needed anymore, Ruby already did it!
   SUModelRelease(&model);
 
   // Generate LayOut
   LODocumentRef doc = SU_INVALID;
   LODocumentCreateEmpty(&doc);
 
-  double max_p_w_pt = 200.0;
-  double max_p_h_pt = 150.0;
+  // Set Units: Decimal Centimeters, Precision 0.01 (2 decimal places)
+  LODocumentSetUnits(doc, LODocumentUnits_DecimalCentimeters, 0.01);
+
+  double max_vp_w = 0, max_vp_h = 0;
   for (const auto &info : scenes_to_process) {
-    double w_pt = (info.model_w_in * 72.0) / info.scale;
-    double h_pt = (info.model_h_in * 72.0) / info.scale;
-    max_p_w_pt = std::max(max_p_w_pt, w_pt);
-    max_p_h_pt = std::max(max_p_h_pt, h_pt);
+    if (info.is_ortho) {
+      max_vp_w = std::max(max_vp_w, (info.model_w_in * 72.0) / info.scale);
+      max_vp_h = std::max(max_vp_h, (info.model_h_in * 72.0) / info.scale);
+    }
   }
-  max_p_w_pt += 60.0;
-  max_p_h_pt += 60.0;
+  // Fallback if no ortho scenes
+  if (max_vp_w == 0) {
+    max_vp_w = 500.0;
+    max_vp_h = 400.0;
+  }
+
+  double max_p_w_pt = max_vp_w + 60.0; // Margin ~2cm
+  double max_p_h_pt = max_vp_h + 60.0;
 
   LOPageInfoRef page_info = SU_INVALID;
   LODocumentGetPageInfo(doc, &page_info);
@@ -220,38 +219,67 @@ bool create_layout_scrapbook(std::string source_skp_path,
   LOLayerRef lo_layer = SU_INVALID;
   LODocumentGetLayerAtIndex(doc, 0, &lo_layer);
 
-  bool first_page = true;
-  for (const auto &info : scenes_to_process) {
+  for (size_t i = 0; i < scenes_to_process.size(); i++) {
+    const auto &info = scenes_to_process[i];
     LOPageRef page = SU_INVALID;
-    if (first_page) {
+    if (i == 0)
       LODocumentGetPageAtIndex(doc, 0, &page);
-      first_page = false;
-    } else {
+    else
       LODocumentAddPage(doc, &page);
-    }
     LOPageSetName(page, info.name.c_str());
 
-    double vp_w = (info.model_w_in * 72.0) / info.scale;
-    double vp_h = (info.model_h_in * 72.0) / info.scale;
-    LOAxisAlignedRect2D bounds = {{30, 30}, {30 + vp_w, 30 + vp_h}};
+    double vp_w =
+        info.is_ortho ? (info.model_w_in * 72.0) / info.scale : max_vp_w;
+    double vp_h =
+        info.is_ortho ? (info.model_h_in * 72.0) / info.scale : max_vp_h;
+
+    // Position top-left (1mm = 2.835 pt margin)
+    double margin = 2.835;
+    LOAxisAlignedRect2D bounds = {{margin, margin},
+                                  {margin + vp_w, margin + vp_h}};
 
     LOSketchUpModelRef vp1 = SU_INVALID;
     LOSketchUpModelCreate(&vp1, source_skp_path.c_str(), &bounds);
     LOSketchUpModelSetCurrentScene(vp1, info.orig_index);
-    LOSketchUpModelSetScale(vp1, 1.0 / info.scale);
+    if (info.is_ortho) {
+      LOSketchUpModelSetPerspective(vp1, false);
+      LOSketchUpModelSetScale(vp1, 1.0 / info.scale);
+    } else {
+      LOSketchUpModelSetPerspective(vp1, true);
+    }
     LOSketchUpModelSetPreserveScaleOnResize(vp1, true);
+    LOSketchUpModelSetRenderMode(vp1, LOSketchUpModelRenderMode_Hybrid);
 
     LOSketchUpModelRef vp2 = SU_INVALID;
     LOSketchUpModelCreate(&vp2, source_skp_path.c_str(), &bounds);
     LOSketchUpModelSetCurrentScene(vp2, info.sister_index);
-    LOSketchUpModelSetScale(vp2, 1.0 / info.scale);
+    if (info.is_ortho) {
+      LOSketchUpModelSetPerspective(vp2, false);
+      LOSketchUpModelSetScale(vp2, 1.0 / info.scale);
+    } else {
+      LOSketchUpModelSetPerspective(vp2, true);
+    }
     LOSketchUpModelSetPreserveScaleOnResize(vp2, true);
 
-    LODocumentAddEntity(doc, LOSketchUpModelToEntity(vp1), lo_layer, page);
-    LODocumentAddEntity(doc, LOSketchUpModelToEntity(vp2), lo_layer, page);
+    // Set to Hybrid mode as requested
+    LOSketchUpModelSetRenderMode(vp2, LOSketchUpModelRenderMode_Hybrid);
+    LOSketchUpModelSetDisplayBackground(vp2, false);
 
+    // Create Group
+    LOEntityListRef list = SU_INVALID;
+    LOEntityListCreate(&list);
+    LOEntityListAddEntity(list, LOSketchUpModelToEntity(vp1));
+    LOEntityListAddEntity(list, LOSketchUpModelToEntity(vp2));
+
+    LOGroupRef group = SU_INVALID;
+    LOGroupCreate(&group, list); // Corrected argument order
+    LODocumentAddEntity(doc, LOGroupToEntity(group), lo_layer, page);
+
+    // Release refs
+    LOEntityListRelease(&list);
     LOSketchUpModelRelease(&vp1);
     LOSketchUpModelRelease(&vp2);
+    LOGroupRelease(&group);
   }
 
   LODocumentSaveToFile(doc, output_layout_path.c_str(),
