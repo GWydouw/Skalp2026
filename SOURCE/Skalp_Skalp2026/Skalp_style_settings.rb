@@ -60,10 +60,41 @@ module Skalp
     end
 
     def check_SU_style
+      # Check Hiddenline Mode
       if Skalp.active_model.rendering_options.hiddenline_style_active?
         set_hiddenline_mode_active
       else
         set_hiddenline_mode_inactive
+      end
+
+      # Check Section Widths Mode
+      check_section_cut_width_style
+    end
+
+    def check_section_cut_width_style
+      return unless Skalp.active_model && Skalp.active_model.rendering_options
+
+      # Determine context (Page or Model)
+      context = Sketchup.active_model.pages.selected_page || Sketchup.active_model
+
+      if lineweights_status(context)
+        # Force the settings if they are not active
+        # We pass 'transparent' as the color preference, although set_section_cut_width_mode enforces transparency now anyway
+        Skalp.active_model.rendering_options.set_section_cut_width_mode
+        lineweights_status_switch_on
+      else
+        # We only reset if we suspect it was previously active or to ensure standard state
+        # But be careful not to override standard user settings if not needed.
+        # Check if we need to reset?
+        # For now, let's just update the icon.
+        # Actually, if we switch OFF, we might want to reset.
+        # But 'reset_section_cut_width' restores previous state.
+
+        # If the current state matches "Skalp forced state", we might want to reset?
+        # Better: simpler logic -> Icon update happens in update_dialog.
+        # Here we just enforce the rendering mode if active.
+
+        lineweights_status_switch_off
       end
     end
 
