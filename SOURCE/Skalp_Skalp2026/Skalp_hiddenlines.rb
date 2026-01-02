@@ -364,12 +364,14 @@ module Skalp
           ro["LineExtension"] = 1
           ro["LineEndWidth"] = 1
           ro["DisplayText"] = false
-          ro["SectionCutWidth"] = 10
+          ro["SectionCutWidth"] = 1
           ro["RenderMode"] = 1 # Hidden Line
           ro["Texture"] = true
           ro["DisplayColorByLayer"] = true
           ro["EdgeColorMode"] = 0
           ro["DrawBackEdges"] = false
+          ro["SectionCutDrawEdges"] = false
+          ro["SectionDefaultCutColor"] = Sketchup::Color.new(0, 0, 0, 0)
         end
 
         # Prepare pages (styles, section planes, layers)
