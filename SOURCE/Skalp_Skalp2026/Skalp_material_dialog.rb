@@ -371,9 +371,7 @@ module Skalp
 
     # ...
     def self.add_material(name, image_top, text_top, source)
-      @materials << name
-      # Removed position data (image_top, text_top)
-      @materials << source
+      @materials << { name: name, source: source }
     end
 
     def self.create_thumbnails(lib = "Skalp materials in model")
