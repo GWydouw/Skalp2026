@@ -694,7 +694,7 @@ module Skalp
     require "Skalp_Skalp2026/Skalp_box_section"
     require "Skalp_Skalp2026/Skalp_box_section_tool"
     require "Skalp_Skalp2026/Skalp_UI"
-    Skalp.skalp_paint_tool = Skalp::UI.instance_variable_get(:@skalp_paint_tool)
+    Skalp.skalp_paint_tool = Skalp.instance_variable_get(:@skalp_paint_tool)
     require "Skalp_Skalp2026/Skalp_lib2"
     require "Skalp_Skalp2026/Skalp_geom2"
     require "Skalp_Skalp2026/Skalp_material_dialog"
