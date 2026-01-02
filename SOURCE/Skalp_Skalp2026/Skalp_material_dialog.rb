@@ -323,6 +323,8 @@ module Skalp
         h = Sketchup.read_default("Skalp_Paint_dialog", "h").to_i
 
         if @materialdialog.visible?
+          # Reload materials to ensure dialog isn't empty
+          load_dialog unless @return_webdialog
           @materialdialog.bring_to_front
           return
         end
