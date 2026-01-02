@@ -13,9 +13,9 @@ module Skalp
   NO_ACTIVE_SECTION_PLANE = Skalp.translate("no active Section Plane")
 
   # Missing method implementation to fix blank pattern column
-  def self.create_thumbnail(pattern_info)
-    # Return existing blob if present
-    return pattern_info[:png_blob] if pattern_info[:png_blob]
+  def self.create_thumbnail(pattern_info, w = 81, h = 27)
+    # Return existing blob if present - REMOVED to allow regeneration
+    # return pattern_info[:png_blob] if pattern_info[:png_blob]
 
     require "Skalp_Skalp2026/Skalp_hatch"
 
@@ -50,10 +50,6 @@ module Skalp
                    else
                      50
                    end
-
-      # Default w/h if not provided (UI dialog expects standard size)
-      w = 81
-      h = 27
 
       # Debug unit conversion
       user_x_val = pattern_info[:user_x]

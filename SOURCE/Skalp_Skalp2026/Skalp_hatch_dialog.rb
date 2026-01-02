@@ -565,10 +565,6 @@ module Skalp
       # Fallback defaults if conversion returns "0.00 mm" unexpectedly for non-zero inputs
       # (Though valid 0.0 should be "0.00 mm")
 
-      puts "[Skalp DEBUG] HatchDialog Init - Name: #{@hatchname}"
-      puts "[Skalp DEBUG] sc_width raw: #{s[:section_cut_width].inspect}, formatted: #{sc_formatted.inspect}"
-      puts "[Skalp DEBUG] pen raw: #{s[:pen].inspect}, formatted: #{pen_formatted.inspect}"
-
       # Ensure pattern is in list if not found (but only if it's reasonably a pattern name, not just a material name fallback)
       # We check if it's an AutoCAD pattern or known Skalp pattern type
       is_known_pattern = SkalpHatch.hatchdefs.any? { |h| h.name.to_s.upcase == pat_name_raw.upcase }
@@ -758,7 +754,24 @@ module Skalp
       select_last_pattern
     end
 
+    def ensure_hatchdefs
+      return if @hatchdefs
+
+      @hatchdefs = {}
+      SkalpHatch.hatchdefs.each do |hatchdef|
+        name = hatchdef.name.to_s.strip
+        if hatchdef.description && hatchdef.description.to_s.strip != ""
+          description = hatchdef.description.to_s.strip
+          key = "#{name}, #{description}"
+        else
+          key = name
+        end
+        @hatchdefs[key] = hatchdef
+      end
+    end
+
     def create_preview(params)
+      ensure_hatchdefs
       vars = params.split(";")
       new = vars[8].to_i == 1
       aligned = vars[9]

@@ -864,11 +864,11 @@ module Skalp
   end
 
   if OS == :MAC
-    small_icon = "skalp_hatch_small.pdf"
-    large_icon = "skalp_hatch.pdf"
+    small_icon = "icon skalp materials.svg"
+    large_icon = "icon skalp materials.svg"
   else
-    small_icon = "skalp_hatch_small_win.svg"
-    large_icon = "skalp_hatch.svg"
+    small_icon = "icon skalp materials.svg"
+    large_icon = "icon skalp materials.svg"
   end
 
   @skalp_pattern_designer.small_icon = IMAGE_PATH + small_icon

@@ -68,6 +68,7 @@ module Skalp
       @materialdialog.set_file(html_file)
       @materialdialog.set_on_closed do
         @materialdialog = nil
+        Skalp.patterndesignerbutton_off
         Sketchup.active_model.select_tool(nil) if Sketchup.active_model
       end
 

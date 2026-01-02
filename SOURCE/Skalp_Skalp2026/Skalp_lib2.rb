@@ -1099,6 +1099,10 @@ module Skalp
     unit
   end
 
+  def to_inch(value)
+    Skalp::Distance.new(value).to_inch
+  end
+
   def unit_string_to_inch(unit_string)
     # return unit_string.to_f if unit_string.to_f.to_s == unit_string
     tile = Tile_size.new

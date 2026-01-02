@@ -1,0 +1,33 @@
+<!-- Skalp Material Manager icon (2x2 swatches, top-left = pattern glyph) -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+     viewBox="0 0 24 24" fill="none">
+  <!-- tweak these if needed -->
+  <defs>
+    <style>
+      .stroke { stroke: #111; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+      .muted  { stroke: #111; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; opacity: .35; }
+      .accent { stroke: #C62828; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+
+    <!-- Clip so hatch stays inside the top-left tile -->
+    <clipPath id="clipTileTL">
+      <rect x="3" y="3" width="8" height="8" rx="1.6" />
+    </clipPath>
+  </defs>
+
+  <!-- Tiles (2x2) -->
+  <rect x="3"  y="3"  width="8" height="8" rx="1.6" class="accent"/>
+  <rect x="13" y="3"  width="8" height="8" rx="1.6" class="muted"/>
+  <rect x="3"  y="13" width="8" height="8" rx="1.6" class="muted"/>
+  <rect x="13" y="13" width="8" height="8" rx="1.6" class="muted"/>
+
+  <!-- Pattern-designer hint inside top-left tile -->
+  <g clip-path="url(#clipTileTL)">
+    <!-- diagonal hatch lines (3 lines, wider spacing for clarity) -->
+    <path d="M1.8 8.0 L8.0 1.8" class="accent"/>
+    <path d="M1.8 12.0 L12.0 1.8" class="accent" opacity=".85"/>
+    <path d="M1.8 16.0 L16.0 1.8" class="accent" opacity=".7"/>
+    <!-- subtle border reinforce (optional) -->
+    <rect x="3" y="3" width="8" height="8" rx="1.6" class="stroke" opacity=".0"/>
+  </g>
+</svg>
