@@ -82,6 +82,11 @@ module Skalp
         active_rendering_options["SectionCutDrawEdges"] =
           object.rendering_options["SectionCutDrawEdges"]
       end
+      active_rendering_options["EdgeColorMode"] = object.rendering_options["EdgeColorMode"]
+      if object.rendering_options.keys.include?("SectionCutFilled")
+        active_rendering_options["SectionCutFilled"] =
+          object.rendering_options["SectionCutFilled"]
+      end
 
       @stored_section_cut_width_rendering_options[object] = active_rendering_options
 
@@ -96,9 +101,15 @@ module Skalp
       object.rendering_options["SectionDefaultCutColor"] = Sketchup::Color.new(0, 0, 0, 0)
 
       # 3. Hide edges completely (primary method)
-      if object.rendering_options.keys.include?("SectionCutDrawEdges")
+      # SPECIAL HANDLING: SectionCutDrawEdges can only be set if SectionCutFilled is TRUE
+      if object.rendering_options.keys.include?("SectionCutDrawEdges") && object.rendering_options.keys.include?("SectionCutFilled")
+        object.rendering_options["SectionCutFilled"] = true
         object.rendering_options["SectionCutDrawEdges"] = false
+        object.rendering_options["SectionCutFilled"] = false
       end
+
+      # 4. Color By Material (necessary for colored centerlines)
+      object.rendering_options["EdgeColorMode"] = 0
 
       Skalp.block_observers = observer_status
     end
@@ -144,6 +155,15 @@ module Skalp
       if @stored_section_cut_width_rendering_options[object].key?("SectionCutDrawEdges")
         object.rendering_options["SectionCutDrawEdges"] =
           @stored_section_cut_width_rendering_options[object]["SectionCutDrawEdges"]
+      end
+
+      if @stored_section_cut_width_rendering_options[object].key?("EdgeColorMode")
+        object.rendering_options["EdgeColorMode"] = @stored_section_cut_width_rendering_options[object]["EdgeColorMode"]
+      end
+
+      if @stored_section_cut_width_rendering_options[object].key?("SectionCutFilled")
+        object.rendering_options["SectionCutFilled"] =
+          @stored_section_cut_width_rendering_options[object]["SectionCutFilled"]
       end
 
       Skalp.block_observers = observer_status
