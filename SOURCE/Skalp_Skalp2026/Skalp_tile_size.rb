@@ -94,6 +94,7 @@ module Skalp
     def process_string(string)
       string = "0" if ["", nil].include?(string)
 
+      string = string.downcase
       string.gsub!("feet", "'")
       @input_string = string
       find_unit
