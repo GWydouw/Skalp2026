@@ -54,7 +54,7 @@
                 @contextmenu.prevent="show_empty_context_menu($event)">
                 <div class="material-div" v-for="material in materials"
                     :class="{ 'selected': selected_material === material.name }" @click="selectmaterial(material.name)"
-                    @dblclick="context_paint_material(event, material.name)" @mouseenter="hide_context_menu"
+                    @dblclick="dblclick_paint_material(material.name)" @mouseenter="hide_context_menu"
                     @contextmenu.stop.prevent="show_context_menu($event, material.name)" :title="material.name">
 
                     <!-- Preview Box -->
@@ -379,6 +379,11 @@
             if (!target) return;
             sketchup.material_menu('paint_to_section', target);
             hide_context_menu();
+        }
+
+        function dblclick_paint_material(materialName) {
+            if (!materialName) return;
+            sketchup.material_menu('paint_to_section', materialName);
         }
 
         function context_copy_material(event) {
