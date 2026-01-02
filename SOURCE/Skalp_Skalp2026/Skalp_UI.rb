@@ -809,7 +809,7 @@ module Skalp
   @skalp_toolbar = UI::Toolbar.new "Skalp"
 
   @skalp_activate = UI::Command.new("Skalp") do
-    startup_check(:skalpTool)
+    Skalp.startup_check(:skalpTool)
   end
 
   if OS == :MAC
