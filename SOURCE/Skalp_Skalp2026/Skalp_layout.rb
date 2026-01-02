@@ -47,12 +47,20 @@ module Skalp
     doc_name = "Skalp Exported Sections.layout"
     doc_path = File.join(scrapbooks_dir, doc_name)
 
-    # If exists, maybe rename old? Or just overwrite?
-    # User said "Rename to..." implying a specific static name.
-    # But usually a scrapbook library is static.
-    # If we overwrite, we lose previous exports.
-    # I'll implement overwrite for now as requested.
-    # Or maybe append timestamp if strictly needed, but "Skalp Exported Sections" sounds like a library name.
+    # Ensure we overwrite by deleting the existing file first
+    # This also prevents LayOut from creating "Backup of..." files
+    backup_name = "Backup of #{doc_name}"
+    backup_path = File.join(scrapbooks_dir, backup_name)
+
+    [doc_path, backup_path].each do |p|
+      next unless File.exist?(p)
+
+      begin
+        File.delete(p)
+      rescue StandardError => e
+        puts "Could not delete existing file #{p}: #{e.message}"
+      end
+    end
 
     begin
       # 1. Save clean copy of current model to sidecar path
