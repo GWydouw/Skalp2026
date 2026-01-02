@@ -955,37 +955,55 @@ module Skalp
   end
 
   def self.edit_material_pattern(material_name)
+    return unless material_name
+
+    material_name = material_name.to_s.strip
+
+    # UI Checks (migrated from Skalp_UI.rb)
+    if Skalp.respond_to?(:info_dialog_active) && Skalp.info_dialog_active
+      UI.messagebox(Skalp.translate("Please close the Skalp Info Dialog to start using Skalp"), MB_OK)
+      return
+    end
+    Skalp.skalpTool if Skalp.respond_to?(:skalpTool) && Skalp.respond_to?(:status) && Skalp.status == 0
+
+    # Ensure Skalp default material is valid if targeted
+    Skalp.check_skalp_default_material if material_name.downcase.start_with?("skalp default")
+
     # Check if model material
     su_material = Sketchup.active_model.materials[material_name]
-    # Fallback for whitespace issues
-    unless su_material
-      su_material = Sketchup.active_model.materials[material_name.strip]
-      material_name = material_name.strip if su_material
-    end
 
-    unless su_material && su_material.get_attribute("Skalp", "ID")
-      puts "[Skalp DEBUG] edit_material_pattern failed for '#{material_name}'. Material found: #{!su_material.nil?}, Skalp ID: #{if su_material
+    # Allow if:
+    # 1. The material doesn't exist yet (this happens when CREATING a new material)
+    # 2. It's a known Skalp material (has ID or pattern_info)
+    # 3. It's a built-in Skalp material name (starts with Skalp)
+    is_skalp = su_material && (su_material.get_attribute("Skalp",
+                                                         "ID") || su_material.get_attribute("Skalp", "pattern_info"))
+    is_builtin = material_name.downcase.start_with?("skalp")
+
+    unless su_material.nil? || is_skalp || is_builtin
+      puts "[Skalp DEBUG] edit_material_pattern denied for '#{material_name}'. Material found: #{!su_material.nil?}, Skalp ID: #{if su_material
                                                                                                                                    su_material.get_attribute(
                                                                                                                                      'Skalp', 'ID'
                                                                                                                                    )
                                                                                                                                  else
-                                                                                                                                   'nil'
+                                                                                                                                   'N/A'
                                                                                                                                  end}"
       UI.messagebox("Only Skalp materials in the model can be edited in the Pattern Designer.")
       return
     end
 
     # Open or refresh Hatch Dialog
-    # Open or refresh Hatch Dialog
     if Skalp.hatch_dialog && Skalp.hatch_dialog.webdialog.visible?
       Skalp.hatch_dialog.webdialog.bring_to_front
       Skalp.hatch_dialog.hatchname = material_name
       Skalp.hatch_dialog.load_patterns_and_materials
+      Skalp.hatch_dialog.select_last_pattern if Skalp.hatch_dialog.respond_to?(:select_last_pattern)
     else
       # Force new instance to ensure fresh HTML injection
       Skalp.hatch_dialog = Skalp::Hatch_dialog.new(material_name)
       Skalp.hatch_dialog.webdialog.show
     end
+    Skalp.patterndesignerbutton_on if Skalp.respond_to?(:patterndesignerbutton_on)
   end
 end
 

@@ -14,27 +14,26 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
-            padding: 20px;
-            overflow: hidden;
+            padding: 15px;
             display: flex;
             flex-direction: column;
             height: 100vh;
             box-sizing: border-box;
+            overflow: hidden;
+            /* Prevent body from scrolling; only #container should scroll */
         }
 
         #container {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 10px;
             flex-grow: 1;
             overflow-y: auto;
-            min-height: 0;
-            /* Important for flex child scrolling */
-            padding-bottom: 10px;
+            min-height: 20px;
+            /* Reduced to allow shrinking if window is small */
+            padding-bottom: 5px;
         }
 
         .input-group {
@@ -43,8 +42,10 @@
             gap: 5px;
         }
 
-        label {
-            font-size: 13px;
+        .input-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 14px;
             font-weight: 500;
         }
 
@@ -56,8 +57,12 @@
             font-size: 14px;
             background-color: var(--input-bg);
             width: 100%;
+            min-height: 34px;
+            /* Ensure visibility */
             box-sizing: border-box;
             outline: none;
+            flex-shrink: 0;
+            /* Don't allow inputs to shrink to nothing */
         }
 
         input[type="text"]:focus,
@@ -70,7 +75,11 @@
             display: flex;
             justify-content: flex-end;
             gap: 10px;
-            margin-top: 20px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            flex-shrink: 0;
+            /* Keep footer size constant */
         }
 
         button {

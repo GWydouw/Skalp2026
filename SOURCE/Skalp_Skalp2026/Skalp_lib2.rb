@@ -961,12 +961,27 @@ module Skalp
     layers_to_delete.each { |layer| layers.remove(layer, true) }
   end
 
-  def to_inch(measure)
-    measure = measure.to_s.gsub(" ", "") # measure = measure.gsub(/[^\d(.|,)]/,"")
-    measure_string = correct_decimal(measure.to_s)
-    Sketchup.parse_length(measure_string)
-    # Sketchup.format_length(Sketchup.parse_length(measure_string)).to_l.to_inch
+  def to_inch(value)
+    return value.to_f if value.is_a?(Numeric)
+    return 0.0 if value.nil? || value.to_s.empty?
+
+    # Clean up string
+    val_str = value.to_s.strip
+
+    # Try Skalp::Distance (which handles custom unit logic)
+    begin
+      Skalp::Distance.new(val_str).to_inch
+    rescue StandardError
+      # Fallback to SketchUp's parser if distance class fails or is not robust for this input
+      begin
+        val_str = correct_decimal(val_str)
+        Sketchup.parse_length(val_str)
+      rescue StandardError
+        val_str.to_f
+      end
+    end
   end
+  module_function :to_inch
 
   def pen2inch(pen)
     if pen.class == Float
@@ -1099,9 +1114,7 @@ module Skalp
     unit
   end
 
-  def to_inch(value)
-    Skalp::Distance.new(value).to_inch
-  end
+  # Removed duplicate to_inch
 
   def unit_string_to_inch(unit_string)
     # return unit_string.to_f if unit_string.to_f.to_s == unit_string
@@ -1112,17 +1125,28 @@ module Skalp
   module_function :unit_string_to_inch
 
   def mm_or_pts_to_inch(pen)
-    return pen if pen.to_f.to_s == pen.to_s
+    return pen.to_f if pen.is_a?(Numeric)
+    return 0.0 if pen.nil? || pen.to_s.empty?
 
-    if pen.include?("mm") # pen_paper
-      pen_width = Skalp.to_inch(pen) # TODO: hier blijkt iets fouts te lopen
-      pen_width ||= 0.070866
+    # Clean up string
+    pen_str = pen.to_s.strip.downcase
+
+    # Direct parsing to avoid recursion with PenWidth.new
+    if pen_str.include?("mm")
+      val = pen_str.gsub("mm", "").strip.gsub(",", ".")
+      val.to_f / 25.4
+    elsif pen_str.include?("pt")
+      val = pen_str.gsub("pt", "").strip.gsub(",", ".")
+      val.to_f / 72.0
+    elsif pen_str.include?("cm")
+      val = pen_str.gsub("cm", "").strip.gsub(",", ".")
+      val.to_f / 2.54
     else
-      pen_width = pen.gsub(" pt", "").to_f / 72
-      pen_width ||= 0.070866
+      # If no explicit paper unit, use Skalp.to_inch which handles locale
+      to_inch(pen)
     end
-    pen_width
   end
+  module_function :mm_or_pts_to_inch
 
   def get_ID(entity)
     return unless entity && entity.is_a?(Sketchup::Entity) && entity.valid?

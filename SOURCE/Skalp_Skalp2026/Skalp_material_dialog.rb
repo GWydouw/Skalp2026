@@ -131,6 +131,12 @@ module Skalp
             delete_material_from_library(@active_library, materialname)
             create_thumbnails(@active_library)
           end
+        when "paint_to_section"
+          Skalp::Material_dialog.selected_material = materialname
+          # Activate Skalp Paint tool
+          Skalp.skalp_paint_tool.execute if Skalp.respond_to?(:skalp_paint_tool)
+          # Sync toolbar
+          Skalp.paintbucketbutton_on if Skalp.respond_to?(:paintbucketbutton_on)
         when "move"
           if Skalp.respond_to?(:save_pattern_to_library)
             saved_path = Skalp.save_pattern_to_library(materialname)

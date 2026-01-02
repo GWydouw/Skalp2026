@@ -54,8 +54,8 @@
                 @contextmenu.prevent="show_empty_context_menu($event)">
                 <div class="material-div" v-for="material in materials"
                     :class="{ 'selected': selected_material === material.name }" @click="selectmaterial(material.name)"
-                    @mouseenter="hide_context_menu" @contextmenu.stop.prevent="show_context_menu($event, material.name)"
-                    :title="material.name">
+                    @dblclick="context_paint_material(event)" @mouseenter="hide_context_menu"
+                    @contextmenu.stop.prevent="show_context_menu($event, material.name)" :title="material.name">
 
                     <!-- Preview Box -->
                     <div class="material-preview-box" :class="{ 'large': !skalp_materials }"
@@ -77,6 +77,7 @@
             style="display:none; position:absolute; background:#fff; border:1px solid #ccc; z-index:1000;"
             @mouseleave="hide_context_menu" onmouseenter="event.stopPropagation()">
             <ul style="list-style:none; margin:0; padding:5px;">
+                <li onclick="context_paint_material(event)" data-only-model>Paint to Section...</li>
                 <li onclick="context_edit_material(event)" data-only-model>Edit</li>
                 <li onclick="context_rename_material(event)">Rename</li>
                 <li onclick="context_remove_material(event)">Delete</li>
@@ -266,6 +267,12 @@
             event.preventDefault();
             const menu = document.getElementById("empty-zone-context-menu");
 
+            // Only show 'Create new' if in 'Skalp materials in model'
+            const currentLib = app.selected_library || "";
+            if (currentLib !== "Skalp materials in model") {
+                return;
+            }
+
             menu.style.opacity = "0";
             menu.style.display = "block";
 
@@ -364,6 +371,14 @@
             if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
             app.selectmaterial(current_context_material);
             sketchup.material_menu('edit', current_context_material);
+        }
+
+        function context_paint_material(event) {
+            if (event && event.currentTarget && event.currentTarget.classList.contains('disabled')) return;
+            const target = current_context_material || event.currentTarget.title;
+            if (!target) return;
+            sketchup.material_menu('paint_to_section', target);
+            hide_context_menu();
         }
 
         function context_copy_material(event) {
