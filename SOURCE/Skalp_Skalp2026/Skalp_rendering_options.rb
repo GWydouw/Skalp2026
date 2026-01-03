@@ -109,7 +109,8 @@ module Skalp
       end
 
       # 4. Color By Material (necessary for colored centerlines)
-      object.rendering_options["EdgeColorMode"] = 0 if object.rendering_options["EdgeColorMode"] != 0
+      # Don't force EdgeColorMode - preserve user's setting
+      # object.rendering_options["EdgeColorMode"] = 0 if object.rendering_options["EdgeColorMode"] != 0
 
       Skalp.block_observers = observer_status
     end
