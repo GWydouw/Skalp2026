@@ -2,180 +2,194 @@
 
 # Skalp SectionBox Integration
 # This module handles the generation of Skalp section fills for SectionBox planes.
-# It temporarily registers SectionBox planes with Skalp to generate sections.
 
 module Skalp
   module BoxSection
     module SkalpIntegration
-      SECTIONS_GROUP_NAME = "[SkalpSectionBox]-sections"
+      MODEL_GROUP_NAME = "[SkalpSectionBox-Model]"
+      SECTIONS_GROUP_NAME = "[SkalpSectionBox-Sections]"
 
-      @@temp_sectionplane = nil
+      # A lightweight wrapper to mimic Skalp::SectionPlane
+      class VirtualSectionPlane
+        attr_reader :skpSectionPlane, :skalpID, :normal, :plane, :name
+        attr_accessor :visibility # Added to support visibility inheritance
 
-      # Updates all SectionBox section fills by triggering Skalp's live section
-      def self.update_all
-        puts "[Skalp BoxSection] update_all called"
+        def initialize(skp_plane, name, point, normal)
+          @skpSectionPlane = skp_plane
+          @name = name
+          @skalpID = "VIRTUAL_#{skp_plane.entityID}"
+          @visibility = nil # Will be injected
 
-        unless Engine.active_box_id
-          puts "[Skalp BoxSection] No active box ID"
-          return
+          # Use coordinates provided (World Coordinates)
+          n = normal.normalize
+          d = -((n.x * point.x) + (n.y * point.y) + (n.z * point.z))
+          @plane = [n.x, n.y, n.z, d]
+          @normal = n
         end
 
-        unless Skalp.respond_to?(:active_model) && Skalp.active_model
-          puts "[Skalp BoxSection] No Skalp active model"
-          return
+        def valid?
+          true
         end
 
-        unless Skalp.live_section_ON
-          puts "[Skalp BoxSection] Live section is OFF"
-          return
+        def virtual?
+          true
         end
 
-        planes_data = Skalp::BoxSection.get_section_planes_data
-        puts "[Skalp BoxSection] Planes data: #{planes_data&.size || 0} planes"
-
-        unless planes_data && !planes_data.empty?
-          puts "[Skalp BoxSection] No planes data"
-          return
+        def sectionplane_name
+          @name
         end
 
-        # Get the outermost/active section plane (the one actually cutting the model)
-        active_plane_data = planes_data.find { |pd| pd[:plane]&.active? }
-        puts "[Skalp BoxSection] Active plane data: #{active_plane_data ? active_plane_data[:name] : 'NONE'}"
+        def transformation
+          # Standard Skalp transformation logic to align pattern with plane
+          # This returns the transform from Plane -> World Origin (canonical)
+          global_zaxis = Geom::Vector3d.new(0, 0, 1)
 
-        # If no active plane found, try the first one
-        active_plane_data ||= planes_data.first
+          # IMPORTANT: We use normal.reverse so the pattern faces OUTWARDS.
+          # This also means Skalp's transformation_down (negative Z shift)
+          # will move the geometry INWARDS into the box.
+          zaxis = @normal.reverse
 
-        unless active_plane_data
-          puts "[Skalp BoxSection] No active plane data found"
-          return
-        end
+          dist = @plane[3]
+          origin = Geom::Point3d.new(-@plane[0] * dist, -@plane[1] * dist, -@plane[2] * dist)
 
-        active_skp_plane = active_plane_data[:plane]
-        puts "[Skalp BoxSection] Active SketchUp plane: #{active_skp_plane&.name}, valid: #{active_skp_plane&.valid?}"
-
-        unless active_skp_plane && active_skp_plane.valid?
-          puts "[Skalp BoxSection] Invalid section plane"
-          return
-        end
-
-        begin
-          # Check if this plane is already registered with Skalp
-          existing_sp = Skalp.active_model.sectionplanes[active_skp_plane]
-          puts "[Skalp BoxSection] Existing Skalp::SectionPlane: #{existing_sp ? 'YES' : 'NO'}"
-
-          if existing_sp
-            # Already registered, just trigger update
-            puts "[Skalp BoxSection] Triggering calculate_section on existing"
-            existing_sp.calculate_section(true)
+          if zaxis.parallel? global_zaxis
+            xaxis = Geom::Vector3d.new(1, 0, 0)
+            yaxis = zaxis.cross xaxis
           else
-            # Temporarily register the SectionBox plane with Skalp
-            puts "[Skalp BoxSection] Registering temp sectionplane"
-            register_temp_sectionplane(active_skp_plane)
+            xaxis = global_zaxis.cross zaxis
+            yaxis = zaxis.cross xaxis
           end
-        rescue StandardError => e
-          puts "[Skalp BoxSection] Error in update_all: #{e.message}"
-          puts e.backtrace.first(5).join("\n")
+
+          # This matrix moves canonical XY to the Plane in World Coords
+          trans = Geom::Transformation.axes origin, xaxis, yaxis, zaxis
+          # Skalp expects the transform that moves Plane -> Origin, so we invert it
+          trans.invert!
         end
       end
 
-      # Registers a SectionBox plane temporarily with Skalp for section generation
-      def self.register_temp_sectionplane(skp_plane)
-        puts "[Skalp BoxSection] register_temp_sectionplane called"
+      # Finds the model group and its cumulative transformation
+      def self.get_model_context(entity, current_trans = Geom::Transformation.new)
+        return nil unless entity.respond_to?(:entities)
 
-        unless skp_plane && skp_plane.valid?
-          puts "[Skalp BoxSection] Invalid skp_plane"
-          return
-        end
-
-        unless Skalp.active_model
-          puts "[Skalp BoxSection] No Skalp.active_model in register_temp"
-          return
-        end
-
-        # Store original make_scene setting and disable it
-        original_make_scene = Skalp.active_model.make_scene
-        puts "[Skalp BoxSection] Original make_scene: #{original_make_scene}"
-        Skalp.active_model.make_scene = false
-
-        begin
-          # Give the plane a temporary Skalp name if it doesn't have one
-          unless skp_plane.get_attribute("Skalp", "sectionplane_name")
-            face_name = skp_plane.name.gsub("[SkalpSectionBox]-", "").capitalize
-            skp_plane.set_attribute("Skalp", "sectionplane_name", "SectionBox-#{face_name}")
-            puts "[Skalp BoxSection] Set sectionplane_name: SectionBox-#{face_name}"
+        # Check direct children
+        entity.entities.grep(Sketchup::Group).each do |g|
+          if g.name.include?(MODEL_GROUP_NAME)
+            return { group: g, world_trans: current_trans * g.transformation, parent_world_trans: current_trans }
           end
-
-          # Register the plane with Skalp (this creates a Skalp::SectionPlane object)
-          puts "[Skalp BoxSection] Calling add_sectionplane..."
-          Skalp.active_model.add_sectionplane(skp_plane, true)
-          puts "[Skalp BoxSection] add_sectionplane completed"
-
-          # Store reference for cleanup
-          @@temp_sectionplane = skp_plane
-
-          # Verify registration
-          sp = Skalp.active_model.sectionplanes[skp_plane]
-          puts "[Skalp BoxSection] Registered: #{sp ? 'YES' : 'NO'}"
-
-          if sp
-            puts "[Skalp BoxSection] Triggering calculate_section..."
-            sp.calculate_section(true)
-            puts "[Skalp BoxSection] calculate_section completed"
-          end
-        rescue StandardError => e
-          puts "[Skalp BoxSection] Error registering temp sectionplane: #{e.message}"
-          puts e.backtrace.first(5).join("\n")
-        ensure
-          # Restore original make_scene setting
-          Skalp.active_model.make_scene = original_make_scene
         end
+
+        # Recurse
+        entity.entities.grep(Sketchup::Group).each do |g|
+          res = get_model_context(g, current_trans * g.transformation)
+          return res if res
+        end
+        nil
       end
 
-      # Updates a single SectionBox section fill by face name
-      def self.update_single(face_name)
-        # For now, just trigger a full update
-        # Optimized single-face updates can be implemented later
-        update_all
-      end
+      # Updates all SectionBox section fills
+      def self.update_all
+        puts "[Skalp BoxSection] update_all started - Same Context Logic"
 
-      # Cleans up temporary Skalp registrations and section groups
-      def self.cleanup
+        return unless Engine.active_box_id
         return unless Skalp.respond_to?(:active_model) && Skalp.active_model
+        return unless Skalp.live_section_ON
 
-        begin
-          # Unregister any temporary SectionBox planes from Skalp
-          if @@temp_sectionplane && Skalp.active_model.sectionplanes
-            sp = Skalp.active_model.sectionplanes[@@temp_sectionplane]
-            if sp
-              # Remove observer to prevent issues
-              begin
-                sp.remove_observer
-              rescue StandardError
-                nil
-              end
-
-              # Remove from Skalp's registry (but don't delete the SketchUp plane)
-              Skalp.active_model.sectionplanes.delete(@@temp_sectionplane)
-
-              # Clean up any section groups created for this plane
-              if Skalp.active_model.respond_to?(:section_result_group) &&
-                 Skalp.active_model.section_result_group&.valid?
-                section_group = Skalp.active_model.section_result_group
-                section_group.locked = false
-                section_group.entities.grep(Sketchup::Group).each do |g|
-                  g.erase! if (g.get_attribute("Skalp", "ID") == sp&.skalpID) && g.valid?
-                end
-                section_group.locked = true
-              end
-            end
-          end
-
-          @@temp_sectionplane = nil
-
-          puts "[Skalp BoxSection] Cleanup completed" if $DEBUG
-        rescue StandardError => e
-          puts "[Skalp BoxSection] Error in cleanup: #{e.message}"
+        # 1. Find the SectionBox Root
+        root = Sketchup.active_model.entities.find { |e| e.get_attribute(Skalp::BoxSection::DICTIONARY_NAME, "box_id") == Engine.active_box_id }
+        unless root
+          puts "[Skalp BoxSection] ERROR: Active box root not found"
+          return
         end
+
+        # 2. Find target Model Group and its context
+        context = get_model_context(root, root.transformation)
+        unless context
+          puts "[Skalp BoxSection] ERROR: Could not find #{MODEL_GROUP_NAME}"
+          return
+        end
+
+        model_group = context[:group]
+        # Cumulative world transform of the PARENT of the model group
+        parent_world_trans = context[:parent_world_trans]
+        world_to_parent = parent_world_trans.inverse
+
+        # 3. Find or create sections group in the SAME context as the model group
+        parent_entities = model_group.parent.entities
+        sections_group = parent_entities.grep(Sketchup::Group).find { |g| g.name == SECTIONS_GROUP_NAME }
+        if sections_group
+          sections_group.entities.clear!
+          # Sections group should be at Identity relative to its parent
+          sections_group.transformation = Geom::Transformation.new
+        else
+          sections_group = parent_entities.add_group
+          sections_group.name = SECTIONS_GROUP_NAME
+        end
+
+        # 4. Initialize Visibility (respect scenes/layers/hidden)
+        visibility = Skalp::Visibility.new
+        visibility.update(Sketchup.active_model.pages.selected_page)
+
+        # 5. Get Plane Data (calculates world coords)
+        planes_data = Skalp::BoxSection.get_section_planes_data
+        return unless planes_data && !planes_data.empty?
+
+        # 6. Process each plane
+        planes_data.each do |pd|
+          skp_plane = pd[:plane]
+          next unless skp_plane && skp_plane.valid? && skp_plane.active?
+
+          process_single_plane(skp_plane, pd[:name], pd[:original_point], pd[:normal], sections_group, world_to_parent,
+                               visibility)
+        end
+
+        sections_group.visible = true
+      end
+
+      def self.process_single_plane(skp_plane, face_name, world_point, world_normal, sections_group, world_to_parent,
+                                    visibility)
+        # Create Virtual Plane (World Coords)
+        virtual_plane = VirtualSectionPlane.new(skp_plane, "SectionBox-#{face_name}", world_point, world_normal)
+        virtual_plane.visibility = visibility
+
+        # Create target group
+        face_group = sections_group.entities.add_group
+        face_group.name = "#{face_name}-sections"
+
+        # Generate!
+        # create_section will set face_group.transformation = T_plane_world
+        section_logic = Skalp::Section.new(virtual_plane)
+
+        # Force the visibility into the section instance
+        section_logic.instance_variable_set(:@visibility, visibility)
+
+        # Generate geometry
+        section_logic.create_section(face_group)
+
+        # KEY STEP: Correct the transformation
+        # Currently: World_Pos = Container_World * face_group.transformation
+        # Here face_group is child of the Parent of [SkalpSectionBox-Model].
+        # So: World_Pos = Parent_World * face_group.transformation
+        # We need: face_group.transformation = Parent_World.inverse * World_Plane_Target
+        face_group.transformation = world_to_parent * face_group.transformation
+
+        cnt = face_group.entities.length
+        puts "[Skalp BoxSection]   #{face_name}: #{cnt} entities."
+        face_group.visible = true
+      rescue StandardError => e
+        puts "[Skalp BoxSection] Error processing #{face_name}: #{e.message}"
+        puts e.backtrace.first(3).join("\n")
+      end
+
+      def self.cleanup
+        root = Sketchup.active_model.entities.find { |e| e.get_attribute(Skalp::BoxSection::DICTIONARY_NAME, "box_id") == Engine.active_box_id }
+        return unless root
+
+        context = get_model_context(root)
+        return unless context
+
+        model_group = context[:group]
+        sections_group = model_group.parent.entities.grep(Sketchup::Group).find { |g| g.name == SECTIONS_GROUP_NAME }
+        sections_group.erase! if sections_group
       end
     end
   end

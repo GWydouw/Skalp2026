@@ -160,7 +160,7 @@ module Skalp
         # We also check the pattern_type explicitly to prevent AutoCAD lines from showing up behind the X or Solid background
         suppress_hatch = @opts[:solid_color] == true || %w[solid cross
                                                            insulation].include?(@opts[:pattern_type].to_s)
-        puts "[SkalpHatch Debug] create_png: Suppress? #{suppress_hatch} (solid_color=#{@opts[:solid_color]}, type=#{@opts[:pattern_type]})"
+        # puts "[SkalpHatch Debug] create_png: Suppress? #{suppress_hatch} (solid_color=#{@opts[:solid_color]}, type=#{@opts[:pattern_type]})"
         unless suppress_hatch
           @hatchdefinition.hatchlines.each do |hl|
             hl.rotate!(angle) unless angle == 0

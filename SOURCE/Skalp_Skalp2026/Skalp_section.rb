@@ -38,10 +38,10 @@ module Skalp
       create_section
     end
 
-    def create_section
+    def create_section(target_group = nil)
       return unless Skalp.ready
 
-      Skalp.active_model.section_result_group.hidden = false
+      Skalp.active_model.section_result_group.hidden = false unless target_group
       get_section2Ds(Skalp.active_model.tree.root)
 
       return if @model.undoredo_action
@@ -53,7 +53,14 @@ module Skalp
 
       selected_page = @skpModel.pages.selected_page
 
-      if @page # update for layout
+      if target_group
+        # Decoupled generation: generate directly into provided group
+        sectiongroup = target_group
+        sectiongroup.entities.clear!
+        # Do not transform to origin; assume target_group is already correctly placed or will be transformed
+        # Actually sectionfaces_to_sectiongroup transforms it back by default.
+        sectionfaces_to_sectiongroup(sectiongroup, false, true)
+      elsif @page # update for layout
         sectiongroup = create_sectiongroup(@page)
         sectionfaces_to_sectiongroup(sectiongroup)
       elsif selected_page && Skalp.active_model.get_memory_attribute(selected_page, "Skalp", "ID")
@@ -72,11 +79,14 @@ module Skalp
       @model.commit
     end
 
-    def sectionfaces_to_sectiongroup(sectiongroup, skip_transform = false)
-      @model.section_result_group.locked = false
+    def sectionfaces_to_sectiongroup(sectiongroup, skip_transform = false, is_target_mode = false)
+      @model.section_result_group.locked = false unless is_target_mode
       return unless sectiongroup && sectiongroup.valid?
       return unless @sectionplane
-      return unless @sectionplane.skpSectionPlane.valid?
+      # Allow virtual planes (which might report invalid skpSectionPlane if simplified)
+      unless (@sectionplane.respond_to?(:virtual?) && @sectionplane.virtual?) || @sectionplane.skpSectionPlane.valid?
+        return
+      end
 
       materials = Sketchup.active_model.materials
       transparent = materials["Skalp transparent"]
@@ -507,7 +517,7 @@ module Skalp
 
       transformation_inverse = @sectionplane.transformation.inverse
       place_rear_view_lines_in_model(sectiongroup) if Skalp.dialog.style_settings(@page)[:rearview_status]
-      @model.section_result_group.locked = true
+      @model.section_result_group.locked = true unless is_target_mode
 
       return unless sectiongroup.valid?
 

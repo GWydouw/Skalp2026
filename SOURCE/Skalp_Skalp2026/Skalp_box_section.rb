@@ -214,9 +214,10 @@ module Skalp
         end
 
         def draw_status_text(view, text)
-          pt = [view.vpwidth - 180, 40]
+          # Higher (40 -> 25), More to the right (180 -> 120 offset), No bold
+          pt = [view.vpwidth - 120, 25]
           begin
-            view.draw_text(pt, text, color: "Black", size: 12, bold: true)
+            view.draw_text(pt, text, color: "Black", size: 12, bold: false)
           rescue StandardError; view.draw_text(pt, text)
           end
         end
@@ -305,7 +306,7 @@ module Skalp
           local_pos = Geom::Point3d.new(local_norm.x * -pa[3], local_norm.y * -pa[3], local_norm.z * -pa[3])
           world_pos = parent_trans * local_pos
           planes_data << { name: face_name, plane: found_plane, original_point: world_pos, normal: world_norm,
-                           parent_trans: parent_trans, local_point: local_pos }
+                           parent_trans: parent_trans, local_point: local_pos, parent_group: current_group }
         end
         break unless next_group
 
@@ -381,17 +382,20 @@ module Skalp
         @dialog.add_action_callback("ready") do
           defaults = Data.get_defaults
           scales = Data.get_scales
-          @dialog.execute_script("initScales(#{scales.to_json})")
+          UI.start_timer(0, false) { @dialog.execute_script("initScales(#{scales.to_json})") }
           if @default_name.is_a?(Hash)
 
-            @dialog.execute_script("loadDefaults(#{@default_name.to_json})")
-            @dialog.execute_script("setName(#{@default_name['name'].to_json})") if @default_name["name"]
-
-            @dialog.execute_script("setSubmitText('Save')")
+            UI.start_timer(0, false) do
+              @dialog.execute_script("loadDefaults(#{@default_name.to_json})")
+              @dialog.execute_script("setName(#{@default_name['name'].to_json})") if @default_name["name"]
+              @dialog.execute_script("setSubmitText('Save')")
+            end
           else
-            @dialog.execute_script("loadDefaults(#{defaults.to_json})")
-            @dialog.execute_script("setName(#{@default_name.to_json})")
-            @dialog.execute_script("setSubmitText('Create')")
+            UI.start_timer(0, false) do
+              @dialog.execute_script("loadDefaults(#{defaults.to_json})")
+              @dialog.execute_script("setName(#{@default_name.to_json})")
+              @dialog.execute_script("setSubmitText('Create')")
+            end
           end
         end
         @dialog.add_action_callback("save") do |d, json|
@@ -447,7 +451,7 @@ module Skalp
         @dialog.add_action_callback("ready") do
           scales = Data.get_scales
 
-          @dialog.execute_script("loadScales(#{scales.to_json})")
+          UI.start_timer(0, false) { @dialog.execute_script("loadScales(#{scales.to_json})") }
         end
         @dialog.add_action_callback("save_scales") do |d, data|
           Data.save_scales(data.is_a?(String) ? JSON.parse(data) : data)
@@ -456,7 +460,7 @@ module Skalp
           default_scales = ["1:1", "1:2", "1:5", "1:10", "1:20", "1:50", "1:100", "1:200", "1:500", "1:1000", "1\" = 1' (1:12)",
                             "1/8\" = 1' (1:96)", "1/4\" = 1' (1:48)", "1/2\" = 1' (1:24)", "3/4\" = 1' (1:16)", "3\" = 1' (1:4)"]
           Data.save_scales(default_scales)
-          @dialog.execute_script("loadScales(#{default_scales.to_json})")
+          UI.start_timer(0, false) { @dialog.execute_script("loadScales(#{default_scales.to_json})") }
         end
         @dialog.set_on_closed { @dialog = nil }
         @dialog.center
@@ -484,22 +488,16 @@ module Skalp
                                                                           @dialog.close
                                                                         end
         @dialog.add_action_callback("activate") do |d, id|
-          Fiber.new do
-            Engine.activate(id)
-          end.resume
+          Engine.activate(id)
         end; @dialog.add_action_callback("deactivate") do |d, id|
-               Fiber.new do
-                 Engine.deactivate_current
-               end.resume
+               Engine.deactivate_current
              end
         @dialog.add_action_callback("preview") do |d, id|
           Engine.preview(id)
         end; @dialog.add_action_callback("clear_preview") do |d, p|
                Engine.clear_preview
              end; @dialog.add_action_callback("modify") do |d, id|
-                    Fiber.new do
-                      Engine.modify(id)
-                    end.resume
+                    Engine.modify(id)
                   end
         @dialog.add_action_callback("add_box") do |d, p|
           Fiber.new do
@@ -511,28 +509,22 @@ module Skalp
                end.resume
              end
         @dialog.add_action_callback("toggle_folder") do |d, folder_id|
-          Fiber.new do
-            Engine.toggle_folder(folder_id)
-          end.resume
+          Engine.toggle_folder(folder_id)
         end; @dialog.add_action_callback("rename_folder") do |d, folder_id|
                Fiber.new do
                  Engine.rename_folder(folder_id)
                end.resume
              end
         @dialog.add_action_callback("edit") do |d, id|
-          Fiber.new do
-            Engine.edit(id)
-          end.resume
+          Engine.edit(id)
         end; @dialog.add_action_callback("rename") do |d, id|
                Fiber.new do
                  Engine.rename(id)
                end.resume
              end; @dialog.add_action_callback("delete") do |d, id|
-                    Fiber.new do
-                      Engine.delete(id)
-                    end.resume
+                    Engine.delete(id)
                   end
-        @dialog.add_action_callback("move_item") { |d, json| Fiber.new { Engine.move_item(json) }.resume }
+        @dialog.add_action_callback("move_item") { |d, json| Engine.move_item(json) }
         @dialog.set_on_closed { @dialog = nil }
         @dialog.show
       end
@@ -543,7 +535,9 @@ module Skalp
         model = Sketchup.active_model
 
         data = { boxes: Data.get_config(model), hierarchy: Data.get_hierarchy(model), active_id: Engine.active_box_id }
-        @dialog.execute_script("updateData(#{data.to_json})")
+        UI.start_timer(0, false) do
+          @dialog.execute_script("updateData(#{data.to_json})")
+        end
       end
 
       def visible?
@@ -575,6 +569,11 @@ module Skalp
 
       def self.observers_active?
         @@observers_active
+      end
+
+      @@is_processing ||= false
+      def self.is_processing?
+        @@is_processing
       end
 
       def self.run
@@ -869,6 +868,8 @@ module Skalp
         end
 
         model.start_operation("Activate", true)
+        old_processing = @@is_processing
+        @@is_processing = true
         begin
           @@active_box_id = id
           Data.save_active_id(model, id)
@@ -912,9 +913,8 @@ module Skalp
           end
 
           @@manager.sync_data if @@manager
-        rescue StandardError => e
-          model.abort_operation
-          puts "Err: #{e.message}"
+        ensure
+          @@is_processing = old_processing
         end
       end
 
@@ -926,28 +926,34 @@ module Skalp
         # Clean up Skalp section fills first
         SkalpIntegration.cleanup if defined?(SkalpIntegration)
 
-        root = model.entities.find do |e|
-          e.get_attribute(DICTIONARY_NAME, "box_id") == active_box_id
-        end; if root
-               model.start_operation("Deactivate", true)
-               (e_rec = lambda { |g|
-                 return unless g && g.valid?
+        old_processing = @@is_processing
+        @@is_processing = true
+        begin
+          root = model.entities.find do |e|
+            e.get_attribute(DICTIONARY_NAME, "box_id") == active_box_id
+          end; if root
+                 model.start_operation("Deactivate", true)
+                 (e_rec = lambda { |g|
+                   return unless g && g.valid?
 
-                 g.entities.grep(Sketchup::SectionPlane).each do |sp|
-                   sp.erase! if sp.name =~ /\[SkalpSectionBox\]/
-                 end
-                 child = g.entities.find do |e|
-                   e.is_a?(Sketchup::Group) && e.name =~ /\[SkalpSectionBox/
-                 end
-                 g.explode
-                 e_rec.call(child) if child
-               }).call(root)
-               model.commit_operation
-             end
+                   g.entities.grep(Sketchup::SectionPlane).each do |sp|
+                     sp.erase! if sp.name =~ /\[SkalpSectionBox\]/
+                   end
+                   child = g.entities.find do |e|
+                     e.is_a?(Sketchup::Group) && e.name =~ /\[SkalpSectionBox/
+                   end
+                   g.explode
+                   e_rec.call(child) if child
+                 }).call(root)
+                 model.commit_operation
+               end
 
-        exit_edit_inside_mode
-        @@active_box_id = nil
-        Data.save_active_id(model, nil)
+          exit_edit_inside_mode
+          @@active_box_id = nil
+          Data.save_active_id(model, nil)
+        ensure
+          @@is_processing = old_processing
+        end
         return unless @@manager
 
         @@manager.sync_data
