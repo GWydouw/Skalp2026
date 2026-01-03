@@ -1204,4 +1204,4 @@ end
 #   #Skalp.send :include, Skalp::Method_spoofer
 # end
 # Startup Debug Info
-puts ">>> Skalp Loaded: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')} - Build: #19"
+puts ">>> Skalp Loaded: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')} - Build: #20"

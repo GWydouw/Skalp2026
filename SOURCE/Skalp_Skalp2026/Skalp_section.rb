@@ -271,10 +271,9 @@ module Skalp
                         base_mat_name = mat_name + "_Base"
                         base_mat = Skalp.create_su_material(base_mat_name)
                         if base_mat
-                          # Fix: Use explicit Fill Color if available (solves mismatch between Texture-average and UI choice)
+                          # Fix: Use explicit Fill Color if available
                           fill_c = Skalp.skalp_material_info(su_mat, :fill_color)
-                          # Support hex or rgb strings if that's what is stored
-                          base_mat.color = fill_c && !fill_c.empty? ? fill_c : su_mat.color
+                          base_mat.color = Skalp.string_to_color(fill_c && !fill_c.empty? ? fill_c : su_mat.color)
 
                           base_mat.alpha = su_mat.alpha
                           base_mat.texture = nil
@@ -419,7 +418,7 @@ module Skalp
                         if base_mat
                           # Fix: Use explicit Fill Color if available
                           fill_c = Skalp.skalp_material_info(su_mat, :fill_color)
-                          base_mat.color = fill_c && !fill_c.empty? ? fill_c : su_mat.color
+                          base_mat.color = Skalp.string_to_color(fill_c && !fill_c.empty? ? fill_c : su_mat.color)
 
                           base_mat.alpha = su_mat.alpha
                           base_mat.texture = nil
