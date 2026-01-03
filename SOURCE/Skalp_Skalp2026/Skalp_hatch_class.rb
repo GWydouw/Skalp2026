@@ -156,7 +156,12 @@ module Skalp
           return
         end
 
-        unless @opts[:solid_color] == true
+        # SKIP drawing lines if it's a Solid Color or Cross/Insulation
+        # We also check the pattern_type explicitly to prevent AutoCAD lines from showing up behind the X or Solid background
+        suppress_hatch = @opts[:solid_color] == true || %w[solid cross
+                                                           insulation].include?(@opts[:pattern_type].to_s)
+        puts "[SkalpHatch Debug] create_png: Suppress? #{suppress_hatch} (solid_color=#{@opts[:solid_color]}, type=#{@opts[:pattern_type]})"
+        unless suppress_hatch
           @hatchdefinition.hatchlines.each do |hl|
             hl.rotate!(angle) unless angle == 0
             hl.line_style_entities.each do |dash|
@@ -295,6 +300,12 @@ module Skalp
           draw_gauges(png, t) if @opts[:type] == :preview && @opts[:gauge] == true # PREVIEW draw gauges
         end
 
+        if @opts[:pattern_type] == "cross"
+          draw_cross_pattern(png, pen_width)
+        elsif @opts[:pattern_type] == "insulation"
+          draw_insulation_pattern(png, pen_width, @opts[:insulation_style])
+        end
+
         draw_section_cut(png, section_cut_width) if %i[preview thumbnail].include?(@opts[:type])
         save_png(png, hatchdefinition.name) if @opts[:type] == :tile # Only save to disk for tile type
         return to_base64_blob(png) if @opts[:type] == :thumbnail
@@ -350,6 +361,41 @@ module Skalp
         png.circle_float(y_gauge.p1, rad, dot_color, 1.1) # Y origin black dot overdraw
         png.circle_float(y_gauge.p2, rad, dot_color, 1.1) # Y upper black dot overdraw
         flip_vertical_png_coordinates(y_gauge, png)
+      end
+
+      def draw_cross_pattern(png, pen_width)
+        # Draw a simple X across the canvas for preview
+        edge1 = Edge2D.new(Point2D.new(0, 0), Point2D.new(png.width, png.height))
+        edge2 = Edge2D.new(Point2D.new(0, png.height), Point2D.new(png.width, 0))
+
+        draw_an_edge_or_line(edge1, pen_width, png)
+        draw_an_edge_or_line(edge2, pen_width, png)
+      end
+
+      def draw_insulation_pattern(png, pen_width, style)
+        # Draw a representative zigzag or S-curve for preview
+        points = []
+        steps = 20
+        h = png.height * 0.4
+        cy = png.height / 2.0
+
+        if style == "scurve"
+          (0..steps).each do |i|
+            x = (i.to_f / steps) * png.width
+            y = cy + (Math.sin((i.to_f / steps) * 4 * Math::PI) * h)
+            points << Point2D.new(x, y)
+          end
+        else # zigzag
+          (0..steps).each do |i|
+            x = (i.to_f / steps) * png.width
+            y = i.even? ? cy - h : cy + h
+            points << Point2D.new(x, y)
+          end
+        end
+
+        (0...points.size - 1).each do |i|
+          draw_an_edge_or_line(Edge2D.new(points[i], points[i + 1]), pen_width, png)
+        end
       end
 
       private :draw_gauges
