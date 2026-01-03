@@ -16,7 +16,7 @@ The migration spans three primary components:
 | :--- | :--- | :--- | :--- |
 | **Skalp_Legacy** | `.../Skalp_Legacy` | The running, proven codebase (v2025). Contains all business logic, build scripts, and server interactions. | **Reference / Frozen** |
 | **Skalp2026** | `.../Skalp2026` | The new codebase. Modular, using `Rake` and `CMake`. Incorporates "SketchUp Extension Architecture" (SEA) patterns. | **Active Development** |
-| **License Server** | `.../skalp-license-server` | PHP-based backend for licensing and version checks. Host: `license.skalp4sketchup.com` (`188.226.146.205`). | **To Be Integrated** |
+| **License Server** | `.../skalp-license-server` | PHP-based backend for licensing and version checks. Host: `license.skalp4sketchup.com` (`198.211.120.37`). | **To Be Integrated** |
 
 ## 3. Documentation Structure
 

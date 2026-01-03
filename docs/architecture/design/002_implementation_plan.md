@@ -31,7 +31,7 @@
 **Goal**: Replace manual `BUILDSCRIPT.rb` logic with Rake tasks.
 
 ### 4.1. SSH Access
-We need to verify SSH access to `license.skalp4sketchup.com` (IP: `188.226.146.205`).
+We need to verify SSH access to `license.skalp4sketchup.com` (IP: `198.211.120.37`).
 *   **Action**: You need to add your public SSH key (and the CI/CD key later) to `~/.ssh/authorized_keys` on the server.
 *   **Task**: Implement `rake server:check_connection` to verify access.
 

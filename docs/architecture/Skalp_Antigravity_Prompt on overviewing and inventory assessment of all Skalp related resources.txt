@@ -1,0 +1,293 @@
+Below is a clean, structured, Antigravity-ready prompt you can paste verbatim into
+Google Antigravity → Gemini Pro 3 (high).
+
+It is explicitly planning / inventory / archaeology mode, with no execution, and it consolidates all Skalp-related locations and resources into a single authoritative analysis task.
+
+⸻
+
+Prompt for Google Antigravity — Gemini Pro 3 (high)
+
+Operating Mode: Planning & Inventory Only
+
+Hold on. We are back in planning mode.
+
+You are NOT allowed to:
+	•	execute code
+	•	connect to servers
+	•	modify repositories
+	•	clean repositories
+	•	rewrite history
+	•	run database queries
+
+This phase is pure analysis, inventory, documentation, and planning.
+
+Server access and execution will only be revisited later, under a separate explicit execution mandate.
+
+⸻
+
+Role
+
+You are acting as a senior software archaeologist and systems cartographer.
+
+Your task is to:
+	•	consolidate
+	•	inventory
+	•	contextualize
+all known Skalp-related resources, regardless of age, cleanliness, or current relevance.
+
+This is archaeology, not refactoring.
+
+⸻
+
+Primary Objective
+
+Create a single authoritative document that consolidates all currently known Skalp-related locations, systems, repositories, and resources, including:
+	•	what they are
+	•	where they live
+	•	what role they historically played
+	•	what risks or uncertainties they contain
+	•	what kind of analysis they will require later
+
+This document must become the reference map for all future Skalp2026 work.
+
+⸻
+
+Known Skalp Resources (to be Consolidated)
+
+You already have partial awareness of some of these.
+You must now consolidate them all explicitly in one place.
+
+⸻
+
+1. Skalp_Legacy Repository
+	•	Exists as:
+	•	an Antigravity workspace
+	•	a local working copy
+	•	Remote to Bitbucket is broken
+	•	Origin:
+	•	Pulled from a shared Dropbox folder (owned by Guy)
+	•	That Dropbox folder contains:
+	•	Guy’s entire local workspace
+	•	Potentially uncommitted or poorly committed artifacts
+	•	Possibly files that never belonged in Git
+
+This repo must be treated as:
+	•	historically important
+	•	potentially inconsistent
+	•	a source of truth by behavior, not by cleanliness
+
+⸻
+
+2. Live Skalp Server (DigitalOcean Droplet)
+	•	Live production server
+	•	Running on DigitalOcean
+	•	Ubuntu 18.04 LTS
+	•	Access exists via SSH (credentials known, but do not connect now)
+
+Key facts to document (without acting on them):
+	•	Hosts:
+	•	parts of the Skalp website
+	•	PHP backend
+	•	MySQL database
+	•	Responsibilities:
+	•	licensing
+	•	update logic
+	•	RBZ distribution
+	•	gated downloads based on DB state
+
+This server is:
+	•	production
+	•	stateful
+	•	historically layered
+
+⚠️ No actions allowed yet
+This is inventory and understanding only.
+
+⸻
+
+3. License Server Codebase (skalp-license-server)
+	•	Historically a git submodule of Skalp_Legacy
+	•	Currently:
+	•	heavily polluted
+	•	contains RBZ builds
+	•	likely contains other large binaries
+	•	Hosted historically on Bitbucket
+	•	A local copy exists (manually copied by Guy)
+
+Future intention (not now, just documented):
+	•	weed out binaries
+	•	rewrite git history carefully
+	•	reconstruct as a clean repository
+	•	re-introduce as a submodule under Skalp2026
+	•	move hosting to GitHub
+
+For now:
+	•	document state
+	•	document risks
+	•	document required future decisions
+
+⸻
+
+4. Skalp2026 Repository (Current Focus)
+	•	Clean repository
+	•	Hosted on GitHub
+	•	Current Antigravity workspace points here
+	•	Actively used by Guy
+	•	Will be used by me later today
+	•	Governed by previously prepared guidelines
+
+This repo is:
+	•	the future
+	•	clean
+	•	intentionally minimal
+	•	dependent on correct archaeological understanding of the past
+
+⸻
+
+5. Large Local Historical Skalp Folder (Critical Archaeology)
+
+Path:
+/Users/jeroentheuns/Library/CloudStorage/Dropbox/Skalp
+
+Characteristics:
+	•	Very large
+	•	Contains:
+	•	historic material
+	•	experiments
+	•	notes
+	•	old builds
+	•	forgotten ideas
+	•	potentially critical clues
+	•	True archaeology
+
+Rules:
+	•	READ-ONLY
+	•	No tampering
+	•	No reorganization
+	•	No cleanup
+	•	No assumptions
+
+Goal:
+	•	Analyze
+	•	Classify
+	•	Produce a contents-table-style overview
+	•	Identify potentially critical artifacts
+
+This folder must be archived mentally before it is touched physically.
+
+⸻
+
+6. Skalp Legacy Manual (User Perspective)
+	•	Originally a large PDF
+	•	Later replaced by hosted documentation:
+https://www.manula.com/manuals/skalp
+
+Status:
+	•	Outdated
+	•	Still valuable
+
+Value:
+	•	End-user mental model
+	•	Licensing behavior from user perspective
+	•	Intended workflows vs actual implementation
+
+⸻
+
+7. Video Tutorials (YouTube)
+
+Playlist:
+https://www.youtube.com/playlist?list=PL4o5Ke8mDBjjka1kZPJ5-tMhf_d51CVbr
+
+Status:
+	•	Outdated
+	•	Still conceptually important
+
+Value:
+	•	Shows original intent
+	•	Demonstrates workflows
+	•	Reveals expectations encoded in server and licensing logic
+
+⸻
+
+8. Skalp Website
+
+URL:
+http://www.skalp4sketchup.com
+
+Roles:
+	•	Product presentation
+	•	Marketing
+	•	Point of sale
+
+Critical aspect:
+	•	Integration with FastSpring
+	•	Licensing and purchasing flow
+
+⸻
+
+9. Reseller Infrastructure
+	•	Historically active Skalp resellers
+	•	Supported by:
+	•	PHP-driven portal
+	•	Hosted on the live server
+	•	Backed by MySQL tables
+
+Status:
+	•	Possibly dormant
+	•	Still structurally present
+	•	Potentially impacts DB schema and logic
+
+⸻
+
+What You Must Produce Now
+
+1. A Consolidated Inventory Document
+
+This document must:
+	•	List all resources above
+	•	For each resource:
+	•	location
+	•	type (repo / server / docs / archive / media)
+	•	role (past / present / future)
+	•	risks
+	•	unknowns
+	•	recommended future analysis depth
+
+2. A Classification Scheme
+
+Propose:
+	•	how these resources should be grouped
+	•	which are:
+	•	authoritative
+	•	supporting
+	•	archival
+	•	operational
+	•	hazardous (production)
+
+3. A Readiness Map
+
+Indicate:
+	•	which resources are safe to analyze immediately
+	•	which require safeguards
+	•	which require explicit future consent before touching
+
+⸻
+
+Absolute Constraints
+	•	No execution
+	•	No server access
+	•	No cleanup
+	•	No refactoring
+	•	No “obvious” assumptions
+
+This phase is about knowing where we stand before we move.
+
+⸻
+
+Start now by:
+	1.	Proposing the structure of the Consolidated Skalp Resource Inventory document
+	2.	Listing all resources in a first-pass structured outline
+	3.	Explicitly flagging the most archaeologically risky zones
+
+⸻
+

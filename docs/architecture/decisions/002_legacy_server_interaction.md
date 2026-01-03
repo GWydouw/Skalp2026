@@ -39,7 +39,7 @@ Because `version.php` controls the update notification for the entire install ba
     *   **Long Term**: We should integrate `skalp-license-server` so the build script can modify `version.php` locally and deploy it (via Git push or SSH SCP).
 
 ### 3. SSH Access Prerequisite
-To robustly handle #2 and to run `RubyEncoder` (ADR 001), we **must** restore and verify SSH access to the live server `license.skalp4sketchup.com` (`188.226.146.205`).
+To robustly handle #2 and to run `RubyEncoder` (ADR 001), we **must** restore and verify SSH access to the live server `license.skalp4sketchup.com` (`198.211.120.37`).
 
 ## Consequences
 

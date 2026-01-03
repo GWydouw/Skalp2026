@@ -1,0 +1,48 @@
+# Prompt: Comprehensive Inventory Assessment of Skalp Resources
+
+**Role**: Senior Archaeologist & Systems Architect
+**Context**: Re-evaluating the entire Skalp ecosystem (Legacy + 2026) to ensure no asset is lost and all dependencies are mapped.
+
+## 1. Objective
+Consolidate all known Skalp-related resources, locations, and assets into a single "Source of Truth" Inventory Document.
+
+## 2. Identified Resources (To be Audited)
+
+### A. Code Repositories
+1.  **Skalp_Legacy**:
+    *   Status: Local workspace, broken remote (Bitbucket).
+    *   Origin: Shared Dropbox folder (Owner: Guy).
+    *   Condition: Contains mixed commits, potential uncommitted artifacts.
+2.  **Skalp2026**:
+    *   Status: Clean, GitHub-hosted.
+    *   Current Workspace: The focus of this Antigravity session.
+3.  **skalp-license-server**:
+    *   Location: `server/` (Legacy) -> Needs migration.
+    *   Condition: Polluted with binaries (.rbz), heavy git history.
+    *   Action: Rewrite history (BFG/Filter-Repo) to remove blobs, then publish to GitHub as submodule.
+
+### B. Live Infrastructure (The "Server")
+*   **Hostname**: `license.skalp4sketchup.com`
+*   **Access**: SSH (`skalpadmin` @ port `65432` / `root` capability present but guarded).
+*   **Detected IP**: `198.211.120.37` (DigitalOcean Droplet).
+*   **OS**: Ubuntu 18.04.6 LTS.
+*   **Services**:
+    *   PHP Backend (License API, Update Server).
+    *   MySQL Database (Licenses, Resellers, User Data).
+    *   Artifact Hosting (Downloads).
+    *   Reseller Portal (PHP).
+
+### C. The "Big Local Folder" (Archaeology Site)
+*   **Path**: `/Users/jeroentheuns/Library/CloudStorage/Dropbox/Skalp`
+*   **Content**: Historic materials, unorganized assets, potential keys/clues.
+*   **Rule**: Read-Only. No modification without consent. Needs a "Table of Contents".
+
+### D. Documentation & Media
+1.  **Legacy Manual**: `manula.com/manuals/skalp` (Outdated but logic-accurate).
+2.  **Video Tutorials**: YouTube Playlist (Conceptually relevant).
+3.  **Sales Site**: `skalp4sketchup.com` (Fastspring integration point).
+
+## 3. Deliverables
+1.  **Inventory Document**: A structured Markdown file detailing each resource, its state, and its strategic value.
+2.  **Folder Analysis**: A listing of the critical contents of the "Big Local Folder".
+3.  **Discrepancy Report**: Note the IP change (`188` vs `198`) and Login user (`skalpadmin` vs `root`) compared to previous assumptions.

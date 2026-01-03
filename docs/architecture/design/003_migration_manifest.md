@@ -46,7 +46,7 @@ For every feature, Rake task, or logical block we attempt to migrate, we **MUST*
     *   **Commit Philosophy**: Commits should reflect *understanding*, not just *code*. A commit might be "Document findings on `Spoofing.rb`" rather than "Refactor `Spoofing.rb`".
 
 ## 5. CRITICAL: Live Production Safety Protocol
-**⚠️ WARNING: WE HAVE ROOT/ADMIN ACCESS TO A LIVE SERVER (188.226.146.205).**
+**⚠️ WARNING: WE HAVE ROOT/ADMIN ACCESS TO A LIVE SERVER (198.211.120.37).**
 
 ### 5.1. The "Red Line"
 **Absolutely NO command** that touches the database (INSERT, UPDATE, DELETE, ALTER, DROP) or modifies server state may be executed until **Section 5.2** is verified.
