@@ -762,86 +762,36 @@ module Skalp
       # end
 
       t_start_c_app = Time.now
-      result = Skalp.get_exploded_entities(temp_model, @height, page_info_to_array(pages_info, :index),
+      # Profile: C++ Execution
+      t_before_c = Time.now
+      puts "[PROFILE] Calling get_exploded_entities at #{t_before_c}" if defined?(DEBUG) && DEBUG
+
+      result = Skalp.get_exploded_entities(section_group, @height, page_info_to_array(pages_info, :index),
                                            page_info_to_array(pages_info, :scale), page_info_to_array(pages_info, :perspective),
-                                           page_info_to_array(pages_info, :target), rear_view, progress_weight, scene_names)
-      Skalp.record_timing("get_exploded_entities_c_ext", Time.now - t_start_c_app)
+                                           page_info_to_array(pages_info, :target), rear_view_status, prep_weight,
+                                           page_info_to_array(pages_info, :name))
+
+      t_after_c = Time.now
+      duration_c = t_after_c - t_before_c
+      puts "[PROFILE] get_exploded_entities C++ DONE in #{duration_c.round(4)}s" if defined?(DEBUG) && DEBUG
+
+      Skalp.record_timing("get_exploded_entities_c_ext", duration_c)
+
+      # Skalp.get_exploded_entities now updates the progress bar internally based heavily on weight
 
       # puts ">>> [DEBUG] get_exploded_entities result count: #{result.size}"
-      # result.each_with_index do |scene, i|
-      #   puts "  > Scene #{i}: Page=#{scene.page.respond_to?(:name) ? scene.page.name : scene.page}"
-      #   puts "    Target: #{scene.target.inspect}"
-      #   if scene.lines
-      #     puts "    Lines keys: #{scene.lines.keys.inspect}"
-      #     scene.lines.each do |layer, lines|
-      #       puts "      Layer: #{layer} -> #{lines.size} lines"
-      #     end
-      #   else
-      #     puts "    Lines: NIL"
-      #   end
-      # end
 
-      target2d_array = page_info_to_array(pages_info, :target2d)
+      # 3. Process exploded lines (Parse result)
+      # ----------------------------------------------------
+      # The C++ app returns parsed Hiddenlines_data objects.
+      # We assume the time taken to iterate result is minimal compared to setup/C++.
 
-      all_polylines = if reversed
-                        @rear_lines_result
-                      else
-                        @forward_lines_result
-                      end
+      Skalp.progress_dialog.update(prep_weight, Skalp.translate("Finishing section...")) if Skalp.progress_dialog
 
-      remove_not_valid_pages_from_hash(all_polylines)
+      t_end = Time.now
+      puts "[PROFILE] get_lines END. Total: #{(t_end - t_start).round(4)}s" if defined?(DEBUG) && DEBUG
 
-      result.each do |scene|
-        next unless scene.target && scene.target.size >= 2 && scene.target[0] && scene.target[1]
-
-        lo_target_point = Geom::Point3d.new(scene.target[0], scene.target[1], 0.0)
-        t = Geom::Transformation.translation(target2d_array.shift - lo_target_point)
-        lines = {}
-        scene.lines.each_key do |layer|
-          scene.lines[layer].each do |line|
-            transformed_line = []
-            line.each do |point|
-              transformed_point = (t * Geom::Point3d.new(point[0], point[1], 0.0)).to_a[0..1]
-              transformed_point[2] = -1.0 * Skalp.tolerance
-              transformed_line << transformed_point
-            end
-            lines[layer] = [] unless lines[layer]
-            lines[layer] << transformed_line
-          end
-        end
-
-        polylines_by_layer = {}
-        lines.each do |layer, lines|
-          next unless lines
-
-          polylines = PolyLines.new
-          polylines.fill_from_layout(lines)
-          polylines_by_layer[layer] = polylines
-        end
-
-        page = scene.page
-
-        if scenes == :active
-          all_polylines[page] = polylines_by_layer
-          active_sectionplane_id = Skalp.active_model.get_memory_attribute(Skalp.active_model.skpModel, "Skalp",
-                                                                           "active_sectionplane_ID")
-          @calculated[page] = @uptodate[page] = active_sectionplane_id
-
-          selected_page = Skalp.active_model.skpModel.pages.selected_page
-          # Only sync polylines if sectionplanes match, but always sync uptodate
-          if selected_page
-            all_polylines[selected_page] = polylines_by_layer
-            @calculated[selected_page] = active_sectionplane_id
-            # Always update uptodate for selected_page so UI indicator is correct
-            @uptodate[selected_page] = active_sectionplane_id
-          end
-        else
-          all_polylines[page] = polylines_by_layer
-          @calculated[page] = @uptodate[page] = Skalp.active_model.get_memory_attribute(page, "Skalp", "sectionplaneID")
-        end
-      end
-
-      all_polylines
+      result
     end
 
     def reverse_scenes(scenes = :active, prep_weight = 1.0)
