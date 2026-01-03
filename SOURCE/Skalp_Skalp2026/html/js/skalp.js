@@ -534,6 +534,9 @@ function create_hatch() {
         var unify = $("#unify_material").prop('checked');
         var drawing_priority = document.getElementById('zindex').value;
 
+        var pattern_type = document.getElementById('pattern_type').value;
+        var insulation_style = document.getElementById('insulation_style').value;
+
         var params = [
             utf8(acad_pat),
             size_x,
@@ -549,7 +552,9 @@ function create_hatch() {
             utf8(name),
             section_line_color,
             unify,
-            drawing_priority
+            drawing_priority,
+            pattern_type,
+            insulation_style
         ].join(';');
 
         window.location = 'skp:create_hatch@' + params;
@@ -618,6 +623,9 @@ function create_preview(status) {
     var unify = $("#unify_material").prop('checked');
     var drawing_priority = document.getElementById('zindex').value;
 
+    var pattern_type = document.getElementById('pattern_type').value;
+    var insulation_style = document.getElementById('insulation_style').value;
+
     var params = [
         utf8(acad_pat),
         size_x,
@@ -633,7 +641,9 @@ function create_preview(status) {
         utf8(materialname),
         section_line_color,
         unify,
-        drawing_priority
+        drawing_priority,
+        pattern_type,
+        insulation_style
     ].join(';');
 
     if (acad_pat != '') {

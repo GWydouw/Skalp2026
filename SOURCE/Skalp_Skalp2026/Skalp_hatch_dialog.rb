@@ -163,6 +163,11 @@ module Skalp
         # If injection data was missing (fallback), load via Ruby
         load_patterns_and_materials unless @initial_preview_base64 && @initial_pattern_string
 
+        # Ensure UI state matches loaded pattern (e.g. Solid Color rows hidden)
+        if @initial_pattern_string && (@initial_pattern_string[:pattern_type] == "solid" || @initial_pattern_string[:name] == "SOLID_COLOR")
+          script("change_pattern_type('solid', true);")
+        end
+
         show
       end
 
@@ -334,17 +339,29 @@ module Skalp
 
       @hatch = Skalp::SkalpHatch::Hatch.new
 
-      solidcolor = pattern_name == "SOLID_COLOR, solid color without hatching"
-      if solidcolor
+      # Fixed logic to detect Solid/Cross/Hatch BEFORE calling create_png
+      solidcolor = false # Initialize solidcolor
+      if pattern_name == "SOLID_COLOR, solid color without hatching" || pattern_string[:pattern_type] == "solid"
         @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["SOLID_COLOR, solid color without hatching",
                                                                     "45, 0,0, 0,.125"]))
         pattern_string[:line_color] = pattern_string[:fill_color]
+        solidcolor = true
+      elsif %w[cross X-Hatch].include?(pattern_string[:pattern_type]) || pattern_name == "CROSS_HATCH"
+        @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["CROSS_HATCH", "45, 0,0, 0,.125"]))
+        solidcolor = false
+      elsif pattern_string[:pattern_type] == "insulation" || pattern_name == "INSULATION" # Legacy support
+        @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["INSULATION", "45, 0,0, 0,.125"]))
+        solidcolor = false
       else
         @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(pattern_string[:pattern]))
+        solidcolor = false
       end
 
       @tile.calculate(pattern_string[:user_x], :x)
-      drawing_scale = Skalp.dialog ? Skalp.dialog.drawing_scale.to_f : 50.0
+      # drawing_scale = Skalp.dialog ? Skalp.dialog.drawing_scale.to_f : 50.0 # This is now inside create_png params
+
+      zoom_divisor = (105 - 60) * 5.0 / 100.0
+      zoom_factor = zoom_divisor == 0 ? 1.0 : 1.0 / zoom_divisor
 
       pattern_info = @hatch.create_png({
                                          solid_color: solidcolor,
@@ -357,11 +374,13 @@ module Skalp
                                          pen: penwidth.to_inch,
                                          section_cut_width: pattern_string[:section_cut_width].to_f,
                                          resolution: SCREEN_DPI,
-                                         print_scale: drawing_scale,
-                                         zoom_factor: 1.0 / ((105 - 60) * 5.0 / 100.0), # Default slider value = 60
+                                         print_scale: Skalp.dialog ? Skalp.dialog.drawing_scale.to_f : 50.0,
+                                         zoom_factor: zoom_factor,
                                          user_x: @tile.x_value,
                                          space: pattern_string[:space],
-                                         section_line_color: pattern_string[:section_line_color] || "rgb(0,0,0)"
+                                         section_line_color: pattern_string[:section_line_color] || "rgb(0,0,0)",
+                                         pattern_type: pattern_string[:pattern_type],
+                                         insulation_style: pattern_string[:insulation_style]
                                        })
 
       @initial_preview_base64 = pattern_info[:png_base64] if pattern_info
@@ -584,24 +603,16 @@ module Skalp
                               space: space,
 
                               # Lineweights
-                              lineweight_model: (if space == "modelspace"
-                                                   s[:pen].is_a?(String) ? s[:pen] : pen_formatted
-                                                 else
-                                                   "0.35 mm"
-                                                 end),
-                              lineweight_paper: (if space == "paperspace"
-                                                   s[:pen].is_a?(String) ? s[:pen] : pen_formatted
-                                                 else
-                                                   "0.18 mm"
-                                                 end),
+                              lineweight_model: pen_formatted,
+                              lineweight_paper: pen_formatted,
+                              sectioncut_linewidth: sc_formatted,
 
-                              sectioncut_linewidth: sc_formatted.to_s.empty? || sc_formatted.to_s == "0.00 mm" ? "0.00 mm" : sc_formatted,
+                              aligned: s[:alignment].to_s,
+                              unify: s[:unify].to_s,
+                              priority: s[:drawing_priority].to_s,
 
-                              slider: "60",
-                              priority: s[:drawing_priority],
-                              unify: s[:unify],
-                              pattern_type: s[:pattern_type] || "hatch",
-                              insulation_style: s[:insulation_style] || "zigzag"
+                              pattern_type: s[:pattern_type],
+                              insulation_style: s[:insulation_style]
                             })
 
       raw_data = {
@@ -635,6 +646,9 @@ module Skalp
 
       SkalpHatch.hatchdefs.each do |hatchdef|
         name = hatchdef.name.to_s.strip
+        # Skip SOLID_COLOR as it is now a dedicated pattern type
+        next if name.upcase.include?("SOLID_COLOR")
+
         if hatchdef.description && hatchdef.description.to_s.strip != ""
           description = hatchdef.description.to_s.strip
           key = "#{name}, #{description}"
@@ -647,8 +661,6 @@ module Skalp
       pat_names.compact!
       pat_names.uniq!
       pat_names.sort!
-
-      pat_names.unshift("SOLID_COLOR, solid color without hatching")
 
       # Ensure current material pattern is in list
       if @selected_material && @selected_material[:pattern]
@@ -797,15 +809,15 @@ module Skalp
 
         @hatch = Skalp::SkalpHatch::Hatch.new
 
-        if pattern_name == "SOLID_COLOR, solid color without hatching"
+        if pattern_name == "SOLID_COLOR, solid color without hatching" || vars[15] == "solid"
           @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["SOLID_COLOR, solid color without hatching",
                                                                       "45, 0,0, 0,.125"]))
           pattern_string[:line_color] = pattern_string[:fill_color]
           solidcolor = true
-        elsif pattern_name == "CROSS_HATCH"
+        elsif vars[15] == "cross" || pattern_name == "CROSS_HATCH"
           @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["CROSS_HATCH", "45, 0,0, 0,.125"]))
           solidcolor = false
-        elsif pattern_name == "INSULATION"
+        elsif vars[15] == "insulation" || pattern_name == "INSULATION"
           @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["INSULATION", "45, 0,0, 0,.125"]))
           solidcolor = false
         else
@@ -1108,13 +1120,15 @@ module Skalp
                     Skalp::PenWidth.new(vars[3],
                                         vars[2], true)
                   end
-      if vars[0] == "SOLID_COLOR, solid color without hatching"
+      puts "[Skalp Debug] create_hatch CALLED - Pattern: #{vars[0]}, Type: #{vars[15].inspect}"
+      if vars[0] == "SOLID_COLOR, solid color without hatching" || vars[15].to_s.strip == "solid"
         vars[5] = vars[6]
         solidcolor = true
       else
         solidcolor = false
       end
 
+      puts "[Skalp Debug] create_hatch CALLED - Solid? #{solidcolor}"
       script("solid_color(#{solidcolor});")
 
       pattern_info = @hatch.create_png({
@@ -1194,7 +1208,8 @@ module Skalp
         section_line_color: vars[12] || "rgb(0,0,0)",
         unify: vars[13] == "true",
         drawing_priority: (vars[14] || 0).to_i,
-        pattern_type: vars[15],
+        solid_color: solidcolor,
+        pattern_type: vars[15].to_s.strip,
         insulation_style: vars[16]
       }
 

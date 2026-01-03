@@ -152,6 +152,22 @@
                     position: relative !important;
                     display: block !important;
                 }
+
+                /* Class-based visibility overrides */
+                body.pattern-solid #pattern_line_color_row,
+                body.pattern-solid #pattern_line_width_row {
+                    display: none !important;
+                }
+
+
+                body.pattern-cross #pattern_line_color_row,
+                body.pattern-cross #pattern_line_width_row,
+                body.pattern-insulation #pattern_line_color_row,
+                body.pattern-insulation #pattern_line_width_row,
+                body.pattern-hatch #pattern_line_color_row,
+                body.pattern-hatch #pattern_line_width_row {
+                    display: flex !important;
+                }
             </style>
         </div>
     </div>
@@ -171,8 +187,8 @@
                     <select id="pattern_type" onchange="change_pattern_type(this.value)">
                         <option value="hatch">Standard Hatch</option>
                         <option value="solid">Solid Color</option>
-                        <option value="cross">Cross Hatch</option>
-                        <option value="insulation">Insulation</option>
+                        <option value="cross">X-Hatch</option>
+                        <!-- <option value="insulation">Insulation</option> -->
                     </select>
                 </div>
 
@@ -363,43 +379,43 @@
 
     <script>
         function change_pattern_type(type, no_preview) {
+            console.log('[Skalp Debug] change_pattern_type called! TYPE =', type);
+
+            // Remove existing type classes from body
+            document.body.classList.remove('pattern-solid', 'pattern-cross', 'pattern-insulation', 'pattern-hatch');
+            document.body.classList.add('pattern-' + type);
+            console.log('[Skalp Debug] Added body class: pattern-' + type);
+
             // Hide/Show relevant sections
             if (type === 'solid') {
+                console.log('[Skalp Debug] UI state for solid type (CSS handles row hiding)');
                 $('#acad_pattern_list').parent().hide();
                 $('#tile_y').parent().parent().hide();
                 $('#units_row').hide();
-                $('#pattern_line_color_row').hide();
-                $('#pattern_line_width_row').hide();
                 $('#insulation_style_row').hide();
                 $('#align_pattern').parent().hide();
             } else if (type === 'cross') {
                 $('#acad_pattern_list').parent().hide();
                 $('#tile_y').parent().parent().hide();
                 $('#units_row').hide();
-                $('#pattern_line_color_row').show();
-                $('#pattern_line_width_row').show();
                 $('#insulation_style_row').hide();
                 $('#align_pattern').parent().hide();
             } else if (type === 'insulation') {
                 $('#acad_pattern_list').parent().hide();
                 $('#tile_y').parent().parent().hide();
                 $('#units_row').hide();
-                $('#pattern_line_color_row').show();
-                $('#pattern_line_width_row').show();
                 $('#insulation_style_row').show();
                 $('#align_pattern').parent().hide();
             } else { // hatch
                 $('#acad_pattern_list').parent().show();
                 $('#tile_y').parent().parent().show();
                 $('#units_row').show();
-                $('#pattern_line_color_row').show();
-                $('#pattern_line_width_row').show();
                 $('#insulation_style_row').hide();
                 $('#align_pattern').parent().show();
             }
 
             if (!no_preview) create_preview(0);
-            updateWindowHeight();
+            setTimeout(updateWindowHeight, 50); // Small delay to ensure DOM updates
         }
 
         // Toggle section expand/collapse
@@ -417,13 +433,16 @@
             }
 
             // Adjust window height after transition
-            setTimeout(updateWindowHeight, 350);
+            setTimeout(updateWindowHeight, 300);
         }
 
         function updateWindowHeight() {
             var body = document.body;
-            var height = body.scrollHeight + 40; // larger buffer to ensure footer visibility
-            var width = 235; // Target fixed width inclusive of 10px margins
+            // Use getBoundingClientRect for more accurate height calculation including margins
+            var rect = body.getBoundingClientRect();
+            var height = Math.ceil(body.scrollHeight) + 20;
+            var width = 235;
+
             if (typeof sketchup !== 'undefined' && sketchup.resize_window) {
                 sketchup.resize_window(width, height);
             }
@@ -432,7 +451,7 @@
         // Initialize height on load
         window.onload = function () {
             ready_hatch();
-            updateWindowHeight();
+            setTimeout(updateWindowHeight, 100);
         };
 
         // Initialize Spectrum color pickers with alpha support
@@ -551,6 +570,7 @@
         // Color picker functions are now handled by Spectrum's change event
         function save_material() {
             var materialName = document.getElementById('hatch_name').value;
+            console.log('[Skalp Debug] save_material button clicked for:', materialName);
             if (!materialName || materialName.trim() === '') {
                 alert('Please enter a material name');
                 return;
@@ -558,6 +578,7 @@
 
             // 1. Force a CREATE HATCH (with force=1 to be safe) to save the parameters to Ruby
             var params = get_current_params(1);
+            console.log('[Skalp Debug] Final Params being sent to Ruby:', params);
             sketchup.create_hatch(params);
 
             // 2. Then call save logic (which closes dialog)

@@ -28,6 +28,26 @@ module Skalp
   # Sketchup.active_model.set_attribute('Skalp_sectionmaterials', 'test', {line_color: 'rgb(255,0,0)', pattern:["45, 0,0, 0,.125", "135, 0,0, 0,.125"], pattern_size: '3mm'}.inspect)
   #
 
+  def self.string_to_color(str)
+    return str if str.is_a?(Sketchup::Color)
+    return Sketchup::Color.new(0, 0, 0) if str.nil? || str.to_s.empty?
+
+    str = str.to_s.strip
+    if str =~ /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/i
+      r = Regexp.last_match(1).to_i
+      g = Regexp.last_match(2).to_i
+      b = Regexp.last_match(3).to_i
+      a = Regexp.last_match(4)
+      color = Sketchup::Color.new(r, g, b)
+      color.alpha = (a.to_f * 255).to_i if a
+      return color
+    end
+
+    Sketchup::Color.new(str)
+  rescue StandardError
+    Sketchup::Color.new(0, 0, 0)
+  end
+
   def find_used_skalp_materials
     model = Sketchup.active_model
     layers = model.layers

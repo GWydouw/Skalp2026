@@ -373,6 +373,9 @@ module Skalp
           (Skalp.translate("Skalp will not be able to show section results whenever a") + " #{extension.name} ") <<
           (Skalp.translate("is already shown in the same location.") + "\n\n") <<
           Skalp.translate("Proceed loading Skalp at your own risk?")
+        if @initial_pattern_string && (@initial_pattern_string[:pattern_type] == "solid" || @initial_pattern_string[:name] == "SOLID_COLOR")
+          script("change_pattern_type('solid', true);")
+        end
         if extension.name == "SolidSection" # || extension.name == 'Dibac'
           if extension.loaded?
             # iscarnet = true
@@ -1201,4 +1204,4 @@ end
 #   #Skalp.send :include, Skalp::Method_spoofer
 # end
 # Startup Debug Info
-puts ">>> Skalp Loaded: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')} - Build: #10"
+puts ">>> Skalp Loaded: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')} - Build: #19"
