@@ -45,6 +45,27 @@
         if (data.settings) {
             var s = data.settings;
 
+            // Pattern Type
+            if (s.pattern_type) {
+                $('#pattern_type').val(s.pattern_type);
+                change_pattern_type(s.pattern_type, true);
+            } else {
+                // Determine pattern type from pattern name if not explicitly set
+                if (data.pattern_name === "SOLID_COLOR, solid color without hatching") {
+                    $('#pattern_type').val('solid');
+                    change_pattern_type('solid', true);
+                } else if (data.pattern_name === "CROSS_HATCH") {
+                    $('#pattern_type').val('cross');
+                    change_pattern_type('cross', true);
+                } else if (data.pattern_name === "INSULATION") {
+                    $('#pattern_type').val('insulation');
+                    change_pattern_type('insulation', true);
+                } else {
+                    $('#pattern_type').val('hatch');
+                    change_pattern_type('hatch', true);
+                }
+            }
+
             // Colors (update input value AND color block for initialization)
             if (s.line_color) {
                 $('#line_color_input').val(s.line_color);
@@ -144,6 +165,17 @@
                 <h3>Pattern definition</h3>
             </div>
             <div id="autocad_section" class="section-content">
+                <!-- Pattern Type -->
+                <div class="field-row">
+                    <label for="pattern_type">Pattern Type:</label>
+                    <select id="pattern_type" onchange="change_pattern_type(this.value)">
+                        <option value="hatch">Standard Hatch</option>
+                        <option value="solid">Solid Color</option>
+                        <option value="cross">Cross Hatch</option>
+                        <option value="insulation">Insulation</option>
+                    </select>
+                </div>
+
                 <!-- Tile Size -->
                 <div class="field-row">
                     <label>Tile Size:</label>
@@ -163,11 +195,20 @@
                 </div>
 
                 <!-- Type -->
-                <div class="field-row">
+                <div class="field-row" id="units_row">
                     <label for="units">Type:</label>
                     <select id="units" onchange="units(this.value)">
                         <option value='paperspace'>Scale Dependent</option>
                         <option value='modelspace'>Absolute Size</option>
+                    </select>
+                </div>
+
+                <!-- Insulation Style -->
+                <div class="field-row" id="insulation_style_row" style="display:none;">
+                    <label for="insulation_style">Insulation Style:</label>
+                    <select id="insulation_style" onchange="create_preview(0)">
+                        <option value="zigzag">ZigZag</option>
+                        <option value="scurve">S-Curve</option>
                     </select>
                 </div>
             </div>
@@ -321,6 +362,46 @@
     </div>
 
     <script>
+        function change_pattern_type(type, no_preview) {
+            // Hide/Show relevant sections
+            if (type === 'solid') {
+                $('#acad_pattern_list').parent().hide();
+                $('#tile_y').parent().parent().hide();
+                $('#units_row').hide();
+                $('#pattern_line_color_row').hide();
+                $('#pattern_line_width_row').hide();
+                $('#insulation_style_row').hide();
+                $('#align_pattern').parent().hide();
+            } else if (type === 'cross') {
+                $('#acad_pattern_list').parent().hide();
+                $('#tile_y').parent().parent().hide();
+                $('#units_row').hide();
+                $('#pattern_line_color_row').show();
+                $('#pattern_line_width_row').show();
+                $('#insulation_style_row').hide();
+                $('#align_pattern').parent().hide();
+            } else if (type === 'insulation') {
+                $('#acad_pattern_list').parent().hide();
+                $('#tile_y').parent().parent().hide();
+                $('#units_row').hide();
+                $('#pattern_line_color_row').show();
+                $('#pattern_line_width_row').show();
+                $('#insulation_style_row').show();
+                $('#align_pattern').parent().hide();
+            } else { // hatch
+                $('#acad_pattern_list').parent().show();
+                $('#tile_y').parent().parent().show();
+                $('#units_row').show();
+                $('#pattern_line_color_row').show();
+                $('#pattern_line_width_row').show();
+                $('#insulation_style_row').hide();
+                $('#align_pattern').parent().show();
+            }
+
+            if (!no_preview) create_preview(0);
+            updateWindowHeight();
+        }
+
         // Toggle section expand/collapse
         function toggleSection(sectionId) {
             const section = document.getElementById(sectionId);
@@ -418,6 +499,9 @@
         // Helper to gather all params (Shared by create_preview and save_material)
         function get_current_params(force) {
             var pattern = document.getElementById('acad_pattern_list') ? document.getElementById('acad_pattern_list').value : '';
+            var pattern_type = document.getElementById('pattern_type') ? document.getElementById('pattern_type').value : 'hatch';
+            var insulation_style = document.getElementById('insulation_style') ? document.getElementById('insulation_style').value : 'zigzag';
+
             var tile_x = document.getElementById('tile_x') ? document.getElementById('tile_x').value : '';
             var tile_y = document.getElementById('tile_y') ? document.getElementById('tile_y').value : '';
 
@@ -458,7 +542,9 @@
                 materialName,       // 11
                 sectionLineColor,   // 12
                 unify,              // 13
-                drawingPriority     // 14
+                drawingPriority,    // 14
+                pattern_type,       // 15
+                insulation_style    // 16
             ].join(';');
         }
 

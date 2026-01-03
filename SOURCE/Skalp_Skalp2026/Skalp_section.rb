@@ -253,12 +253,20 @@ module Skalp
                         # Single object: use top parent
                         face.set_attribute("Skalp", "from_object", current_section.node.value.top_parent.value.to_s)
                       end
-                      face.material = Skalp.create_su_material(mat_name)
+                      face.material = su_mat = Skalp.create_su_material(mat_name)
                       correct_UV_material(face)
                       l_name = sections.first.layer_by_style(type, mat_name)
                       layer = @skpModel.layers[l_name]
                       face.layer = layer if layer && layer.valid?
                       face.normal.dot(normal) < 0 ? face.reverse! : nil
+
+                      pattern_type = Skalp.skalp_material_info(su_mat, :pattern_type)
+                      if pattern_type == "cross"
+                        draw_procedural_cross_hatch(face, sectiongroup, mat_name)
+                      elsif pattern_type == "insulation"
+                        insulation_style = Skalp.skalp_material_info(su_mat, :insulation_style)
+                        draw_procedural_insulation(face, sectiongroup, mat_name, insulation_style)
+                      end
                     rescue ArgumentError
                     end
                   end
@@ -371,12 +379,20 @@ module Skalp
                         # Single object: use top parent
                         face.set_attribute("Skalp", "from_object", current_section.node.value.top_parent.value.to_s)
                       end
-                      face.material = Skalp.create_su_material(mat_name)
+                      face.material = su_mat = Skalp.create_su_material(mat_name)
                       correct_UV_material(face)
                       l_name = sections.first.layer_by_style(type, mat_name)
                       layer = @skpModel.layers[l_name]
                       face.layer = layer if layer && layer.valid?
                       face.normal.dot(normal) < 0 ? face.reverse! : nil
+
+                      pattern_type = Skalp.skalp_material_info(su_mat, :pattern_type)
+                      if pattern_type == "cross"
+                        draw_procedural_cross_hatch(face, sectiongroup, mat_name)
+                      elsif pattern_type == "insulation"
+                        insulation_style = Skalp.skalp_material_info(su_mat, :insulation_style)
+                        draw_procedural_insulation(face, sectiongroup, mat_name, insulation_style)
+                      end
                     rescue ArgumentError
                     end
                   end
@@ -537,11 +553,21 @@ module Skalp
                   face.set_attribute("Skalp", "from_object", section2d.node.value.top_parent.value.to_s)
                   face.set_attribute("Skalp", "from_sub_object", section2d.node.value.to_s)
                   materialname = section2d.hatch_by_style(type).to_s
-                  face.material = Skalp.create_su_material(materialname)
+                  face.material = su_mat = Skalp.create_su_material(materialname)
                   correct_UV_material(face)
                   layer = @skpModel.layers[section2d.layer_by_style(type, materialname)]
                   face.layer = layer if layer && layer.valid?
                   normal.dot(face.normal) < 0 ? face.reverse! : nil
+
+                  if su_mat
+                    pattern_type = Skalp.skalp_material_info(su_mat, :pattern_type)
+                    if pattern_type == "cross"
+                      draw_procedural_cross_hatch(face, sectiongroup, materialname)
+                    elsif pattern_type == "insulation"
+                      insulation_style = Skalp.skalp_material_info(su_mat, :insulation_style)
+                      draw_procedural_insulation(face, sectiongroup, materialname, insulation_style)
+                    end
+                  end
                 rescue ArgumentError
                 end
               end
@@ -1312,6 +1338,155 @@ module Skalp
       sectiongroup.entities.each do |face|
         # node_value = Skalp.active_model.entity_strings[face.get_attribute('Skalp','from_sub_object')]
         node_value.section2d[@sectionplane]
+      end
+    end
+
+    def draw_procedural_cross_hatch(face, parent, mat_name)
+      return unless face.valid? && face.outer_loop.edges.size == 4
+
+      su_mat = Sketchup.active_model.materials[mat_name]
+      return unless su_mat
+
+      pattern_info = Skalp.get_pattern_info(su_mat)
+      return unless pattern_info
+
+      # Use dedicated hatch line width from pattern_info, not global section_cut_width
+      pen_str = pattern_info[:pen] || "0.18 mm"
+      width = Skalp.mm_or_pts_to_inch(pen_str)
+      type = @page || @skpModel
+      scale = Skalp.dialog.drawing_scale(type)
+      model_width = (width * scale)
+
+      line_mat = get_procedural_line_material(su_mat, pattern_info)
+      layer = face.layer
+
+      v = face.outer_loop.vertices
+      normal = face.normal
+
+      add_procedural_segment(parent, v[0].position, v[2].position, model_width, normal, line_mat, layer)
+      add_procedural_segment(parent, v[1].position, v[3].position, model_width, normal, line_mat, layer)
+    end
+
+    def draw_procedural_insulation(face, parent, mat_name, style)
+      return unless face.valid?
+
+      su_mat = Sketchup.active_model.materials[mat_name]
+      return unless su_mat
+
+      pattern_info = Skalp.get_pattern_info(su_mat)
+      return unless pattern_info
+
+      # Use dedicated hatch line width from pattern_info, not global section_cut_width
+      pen_str = pattern_info[:pen] || "0.18 mm"
+      width = Skalp.mm_or_pts_to_inch(pen_str)
+      type = @page || @skpModel
+      scale = Skalp.dialog.drawing_scale(type)
+      model_width = (width * scale)
+
+      line_mat = get_procedural_line_material(su_mat, pattern_info)
+      layer = face.layer
+
+      # Find two longest parallel edges
+      edges = face.outer_loop.edges.sort_by(&:length).reverse
+      return if edges.size < 2
+
+      e1 = edges[0]
+      e2 = edges.find { |e| e != e1 && e.line[1].parallel?(e1.line[1]) }
+      return unless e2
+
+      # Centerline calculation
+      p1a = e1.start.position
+      p1b = e1.end.position
+      p2a = e2.project_point(p1a)
+      p2b = e2.project_point(p1b)
+
+      m1 = Geom.linear_combination(0.5, p1a, 0.5, p2a)
+      m2 = Geom.linear_combination(0.5, p1b, 0.5, p2b)
+      center_vec = m2 - m1
+      return if center_vec.length < 0.01
+
+      thickness = p1a.distance(p2a)
+      steps = (center_vec.length / (thickness * 0.8)).to_i
+      steps = 1 if steps < 1
+
+      perp_vec = (p2a - p1a).normalize
+      normal = face.normal
+
+      cy = m1.dup
+      step_vec = center_vec.clone
+      step_vec.length = center_vec.length / steps
+
+      if style == "scurve"
+        divs = 10
+        (0...steps).each do |s|
+          (0...divs).each do |d|
+            t = d.to_f / divs
+            p_start = Geom.linear_combination(1.0 - t, cy, t, cy + step_vec)
+            p_start.offset!(perp_vec, Math.sin(t * Math::PI) * thickness * 0.4)
+
+            t_next = (d + 1).to_f / divs
+            p_end = Geom.linear_combination(1.0 - t_next, cy, t_next, cy + step_vec)
+            p_end.offset!(perp_vec, Math.sin(t_next * Math::PI) * thickness * 0.4)
+
+            add_procedural_segment(parent, p_start, p_end, model_width, normal, line_mat, layer)
+          end
+          cy.offset!(step_vec)
+        end
+      else # zigzag
+        (0...steps).each do |i|
+          p_start = cy.dup
+          p_start.offset!(perp_vec, i.even? ? -thickness * 0.4 : thickness * 0.4)
+          p_end = cy + step_vec
+          p_end.offset!(perp_vec, i.even? ? thickness * 0.4 : -thickness * 0.4)
+          add_procedural_segment(parent, p_start, p_end, model_width, normal, line_mat, layer)
+          cy.offset!(step_vec)
+        end
+      end
+    end
+
+    def get_procedural_line_material(su_mat, pattern_info)
+      # Use dedicated hatch line color from pattern_info, not global section_line_color
+      color_str = pattern_info[:line_color] || "rgb(0,0,0)"
+      color_str = "rgb(0,0,0)" if color_str.nil? || color_str.empty?
+
+      line_mat_name = if ["rgb(0,0,0)", "rgb(0, 0, 0)"].include?(color_str)
+                        "Skalp linecolor"
+                      else
+                        "Skalp linecolor - #{color_str}"
+                      end
+      Skalp.create_su_material(line_mat_name)
+    end
+
+    def add_procedural_segment(parent, p1, p2, width, normal, material, layer)
+      if width > 0.001
+        vec = (p2 - p1).normalize
+        begin
+          perp = vec.cross(normal).normalize
+        rescue StandardError
+          # Fallback if points are too close
+          perp = Geom::Vector3d.new(1, 0, 0)
+        end
+        half_width = width / 2.0
+
+        pts = [
+          p1.offset(perp, half_width),
+          p1.offset(perp, -half_width),
+          p2.offset(perp, -half_width),
+          p2.offset(perp, half_width)
+        ]
+        f = parent.entities.add_face(pts)
+        if f
+          f.material = material if material
+          f.back_material = material if material
+          f.layer = layer if layer
+          f.edges.each { |e| e.hidden = true }
+        end
+      else
+        e = parent.entities.add_line(p1, p2)
+        if e
+          e.material = material if material
+          e.layer = layer if layer
+        end
       end
     end
   end

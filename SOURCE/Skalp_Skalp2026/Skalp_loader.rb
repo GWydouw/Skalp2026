@@ -72,7 +72,9 @@ module Skalp
                                   zoom_factor: 0.444,
                                   user_x: converted_x,
                                   space: pattern_info[:space],
-                                  section_line_color: pattern_info[:section_line_color] || "rgb(0,0,0)"
+                                  section_line_color: pattern_info[:section_line_color] || "rgb(0,0,0)",
+                                  pattern_type: pattern_info[:pattern_type],
+                                  insulation_style: pattern_info[:insulation_style]
                                 })
       if result
         # puts "Skalp Debug: Thumb created successfully, size: #{result.size}"

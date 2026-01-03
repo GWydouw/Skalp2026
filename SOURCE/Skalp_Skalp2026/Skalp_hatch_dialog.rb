@@ -599,7 +599,9 @@ module Skalp
 
                               slider: "60",
                               priority: s[:drawing_priority],
-                              unify: s[:unify]
+                              unify: s[:unify],
+                              pattern_type: s[:pattern_type] || "hatch",
+                              insulation_style: s[:insulation_style] || "zigzag"
                             })
 
       raw_data = {
@@ -800,6 +802,12 @@ module Skalp
                                                                       "45, 0,0, 0,.125"]))
           pattern_string[:line_color] = pattern_string[:fill_color]
           solidcolor = true
+        elsif pattern_name == "CROSS_HATCH"
+          @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["CROSS_HATCH", "45, 0,0, 0,.125"]))
+          solidcolor = false
+        elsif pattern_name == "INSULATION"
+          @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["INSULATION", "45, 0,0, 0,.125"]))
+          solidcolor = false
         else
           @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(pattern_string[:pattern]))
           solidcolor = false
@@ -839,7 +847,9 @@ module Skalp
                                            zoom_factor: zoom_factor,
                                            user_x: @tile.x_value,
                                            space: pattern_string[:space],
-                                           section_line_color: pattern_string[:section_line_color] || "rgb(0,0,0)"
+                                           section_line_color: pattern_string[:section_line_color] || "rgb(0,0,0)",
+                                           pattern_type: pattern_string[:pattern_type],
+                                           insulation_style: pattern_string[:insulation_style]
                                          })
 
         @tile.gauge = pattern_info[:gauge_ratio]
@@ -879,6 +889,10 @@ module Skalp
             @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["SOLID_COLOR, solid color without hatching",
                                                                         "45, 0,0, 0,.125"]))
             vars[5] = vars[6]
+          elsif vars[15] == "cross"
+            @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["CROSS_HATCH", "45, 0,0, 0,.125"]))
+          elsif vars[15] == "insulation"
+            @hatch.add_hatchdefinition(SkalpHatch::HatchDefinition.new(["INSULATION", "45, 0,0, 0,.125"]))
           else
             @hatch.add_hatchdefinition(@hatchdefs[pattern_key])
           end
@@ -925,7 +939,9 @@ module Skalp
                                              space: vars[2].to_s.to_sym,
                                              section_line_color: vars[12] || "rgb(0,0,0)",
                                              unify: vars[13] == "true",
-                                             drawing_priority: (vars[14] || 0).to_i
+                                             drawing_priority: (vars[14] || 0).to_i,
+                                             pattern_type: vars[15],
+                                             insulation_style: vars[16]
                                            })
           @tile.gauge = pattern_info[:gauge_ratio]
           @last_preview_base64 = pattern_info[:png_base64] # Store for final set_preview call
@@ -1112,7 +1128,9 @@ module Skalp
                                          print_scale: 1,
                                          user_x: @tile.x_value,
                                          space: vars[2].to_s.to_sym,
-                                         section_line_color: vars[12] || "rgb(0,0,0)"
+                                         section_line_color: vars[12] || "rgb(0,0,0)",
+                                         pattern_type: vars[15],
+                                         insulation_style: vars[16]
                                        })
 
       unless pattern_info
@@ -1175,7 +1193,9 @@ module Skalp
         alignment: vars[9],
         section_line_color: vars[12] || "rgb(0,0,0)",
         unify: vars[13] == "true",
-        drawing_priority: (vars[14] || 0).to_i
+        drawing_priority: (vars[14] || 0).to_i,
+        pattern_type: vars[15],
+        insulation_style: vars[16]
       }
 
       # Generate thumbnail for this pattern
@@ -1204,7 +1224,9 @@ module Skalp
           (old_pattern_info[:section_cut_width].to_f - new_pattern_info[:section_cut_width].to_f).abs > 0.000001 ||
           old_pattern_info[:drawing_priority] != new_pattern_info[:drawing_priority] ||
           old_pattern_info[:unify] != new_pattern_info[:unify] ||
-          old_pattern_info[:section_line_color] != new_pattern_info[:section_line_color])
+          old_pattern_info[:section_line_color] != new_pattern_info[:section_line_color] ||
+          old_pattern_info[:pattern_type] != new_pattern_info[:pattern_type] ||
+          old_pattern_info[:insulation_style] != new_pattern_info[:insulation_style])
 
         @recalc_section_needed = true
       end
