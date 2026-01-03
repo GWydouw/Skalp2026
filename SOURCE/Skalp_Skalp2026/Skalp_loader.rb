@@ -281,7 +281,7 @@ module Skalp
   @log.info("Skalp version: " + SKALP_VERSION)
   @log.info("Sketchup version: " + Sketchup.version)
 
-  EXPIRE_DATE = Time.new(2030, 12, 31) # TODO: set beta expire date
+  EXPIRE_DATE = Time.new(2099, 12, 31) # TODO: set beta expire date
 
   @log.info("OS: " + RUBY_PLATFORM + " " + Sketchup.os_language)
 
