@@ -145,6 +145,53 @@ module Skalp
         sections_group.visible = true
       end
 
+      # Optimized update for a single plane (used during dragging)
+      def self.update_single_plane(face_name)
+        return unless Engine.active_box_id
+        return unless Skalp.respond_to?(:active_model) && Skalp.active_model
+        return unless Skalp.live_section_ON
+
+        # 1. Find the SectionBox Root
+        root = Sketchup.active_model.entities.find { |e| e.get_attribute(Skalp::BoxSection::DICTIONARY_NAME, "box_id") == Engine.active_box_id }
+        return unless root
+
+        # 2. Find target Model Group and its context
+        context = get_model_context(root, root.transformation)
+        return unless context
+
+        model_group = context[:group]
+        parent_world_trans = context[:parent_world_trans]
+        world_to_parent = parent_world_trans.inverse
+
+        # 3. Find/Create sections group
+        parent_entities = model_group.parent.entities
+        sections_group = parent_entities.grep(Sketchup::Group).find { |g| g.name == SECTIONS_GROUP_NAME }
+        unless sections_group
+          sections_group = parent_entities.add_group
+          sections_group.name = SECTIONS_GROUP_NAME
+        end
+
+        # 4. Initialize Visibility
+        visibility = Skalp::Visibility.new
+        visibility.update(Sketchup.active_model.pages.selected_page)
+
+        # 5. Get Plane Data and find the specific plane
+        planes_data = Skalp::BoxSection.get_section_planes_data(root)
+        pd = planes_data.find { |d| d[:name] == face_name }
+        return unless pd
+
+        skp_plane = pd[:plane]
+        return unless skp_plane && skp_plane.valid? && skp_plane.active?
+
+        # 6. Clear only the specific subgroup if it exists
+        old_face_group = sections_group.entities.grep(Sketchup::Group).find { |g| g.name == "#{face_name}-sections" }
+        old_face_group.erase! if old_face_group
+
+        # 7. Process
+        process_single_plane(skp_plane, face_name, pd[:original_point], pd[:normal], sections_group, world_to_parent,
+                             visibility)
+      end
+
       def self.process_single_plane(skp_plane, face_name, world_point, world_normal, sections_group, world_to_parent,
                                     visibility)
         # Create Virtual Plane (World Coords)
