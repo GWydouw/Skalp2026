@@ -72,7 +72,9 @@ module Skalp
                                   zoom_factor: 0.444,
                                   user_x: converted_x,
                                   space: pattern_info[:space],
-                                  section_line_color: pattern_info[:section_line_color] || "rgb(0,0,0)"
+                                  section_line_color: pattern_info[:section_line_color] || "rgb(0,0,0)",
+                                  pattern_type: pattern_info[:pattern_type],
+                                  insulation_style: pattern_info[:insulation_style]
                                 })
       if result
         # puts "Skalp Debug: Thumb created successfully, size: #{result.size}"
@@ -371,6 +373,9 @@ module Skalp
           (Skalp.translate("Skalp will not be able to show section results whenever a") + " #{extension.name} ") <<
           (Skalp.translate("is already shown in the same location.") + "\n\n") <<
           Skalp.translate("Proceed loading Skalp at your own risk?")
+        if @initial_pattern_string && (@initial_pattern_string[:pattern_type] == "solid" || @initial_pattern_string[:name] == "SOLID_COLOR")
+          script("change_pattern_type('solid', true);")
+        end
         if extension.name == "SolidSection" # || extension.name == 'Dibac'
           if extension.loaded?
             # iscarnet = true
@@ -1199,4 +1204,4 @@ end
 #   #Skalp.send :include, Skalp::Method_spoofer
 # end
 # Startup Debug Info
-puts ">>> Skalp Loaded: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')} - Build: #10"
+puts ">>> Skalp Loaded: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')} - Build: #24"

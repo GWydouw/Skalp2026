@@ -45,6 +45,27 @@
         if (data.settings) {
             var s = data.settings;
 
+            // Pattern Type
+            if (s.pattern_type) {
+                $('#pattern_type').val(s.pattern_type);
+                change_pattern_type(s.pattern_type, true);
+            } else {
+                // Determine pattern type from pattern name if not explicitly set
+                if (data.pattern_name === "SOLID_COLOR, solid color without hatching") {
+                    $('#pattern_type').val('solid');
+                    change_pattern_type('solid', true);
+                } else if (data.pattern_name === "CROSS_HATCH") {
+                    $('#pattern_type').val('cross');
+                    change_pattern_type('cross', true);
+                } else if (data.pattern_name === "INSULATION") {
+                    $('#pattern_type').val('insulation');
+                    change_pattern_type('insulation', true);
+                } else {
+                    $('#pattern_type').val('hatch');
+                    change_pattern_type('hatch', true);
+                }
+            }
+
             // Colors (update input value AND color block for initialization)
             if (s.line_color) {
                 $('#line_color_input').val(s.line_color);
@@ -131,6 +152,22 @@
                     position: relative !important;
                     display: block !important;
                 }
+
+                /* Class-based visibility overrides */
+                body.pattern-solid #pattern_line_color_row,
+                body.pattern-solid #pattern_line_width_row {
+                    display: none !important;
+                }
+
+
+                body.pattern-cross #pattern_line_color_row,
+                body.pattern-cross #pattern_line_width_row,
+                body.pattern-insulation #pattern_line_color_row,
+                body.pattern-insulation #pattern_line_width_row,
+                body.pattern-hatch #pattern_line_color_row,
+                body.pattern-hatch #pattern_line_width_row {
+                    display: flex !important;
+                }
             </style>
         </div>
     </div>
@@ -144,6 +181,17 @@
                 <h3>Pattern definition</h3>
             </div>
             <div id="autocad_section" class="section-content">
+                <!-- Pattern Type -->
+                <div class="field-row">
+                    <label for="pattern_type">Pattern Type:</label>
+                    <select id="pattern_type" onchange="change_pattern_type(this.value)">
+                        <option value="hatch">Standard Hatch</option>
+                        <option value="solid">Solid Color</option>
+                        <option value="cross">X-Hatch</option>
+                        <!-- <option value="insulation">Insulation</option> -->
+                    </select>
+                </div>
+
                 <!-- Tile Size -->
                 <div class="field-row">
                     <label>Tile Size:</label>
@@ -163,11 +211,20 @@
                 </div>
 
                 <!-- Type -->
-                <div class="field-row">
+                <div class="field-row" id="units_row">
                     <label for="units">Type:</label>
                     <select id="units" onchange="units(this.value)">
                         <option value='paperspace'>Scale Dependent</option>
                         <option value='modelspace'>Absolute Size</option>
+                    </select>
+                </div>
+
+                <!-- Insulation Style -->
+                <div class="field-row" id="insulation_style_row" style="display:none;">
+                    <label for="insulation_style">Insulation Style:</label>
+                    <select id="insulation_style" onchange="create_preview(0)">
+                        <option value="zigzag">ZigZag</option>
+                        <option value="scurve">S-Curve</option>
                     </select>
                 </div>
             </div>
@@ -321,6 +378,46 @@
     </div>
 
     <script>
+        function change_pattern_type(type, no_preview) {
+            console.log('[Skalp Debug] change_pattern_type called! TYPE =', type);
+
+            // Remove existing type classes from body
+            document.body.classList.remove('pattern-solid', 'pattern-cross', 'pattern-insulation', 'pattern-hatch');
+            document.body.classList.add('pattern-' + type);
+            console.log('[Skalp Debug] Added body class: pattern-' + type);
+
+            // Hide/Show relevant sections
+            if (type === 'solid') {
+                console.log('[Skalp Debug] UI state for solid type (CSS handles row hiding)');
+                $('#acad_pattern_list').parent().hide();
+                $('#tile_y').parent().parent().hide();
+                $('#units_row').hide();
+                $('#insulation_style_row').hide();
+                $('#align_pattern').parent().hide();
+            } else if (type === 'cross') {
+                $('#acad_pattern_list').parent().hide();
+                $('#tile_y').parent().parent().hide();
+                $('#units_row').hide();
+                $('#insulation_style_row').hide();
+                $('#align_pattern').parent().hide();
+            } else if (type === 'insulation') {
+                $('#acad_pattern_list').parent().hide();
+                $('#tile_y').parent().parent().hide();
+                $('#units_row').hide();
+                $('#insulation_style_row').show();
+                $('#align_pattern').parent().hide();
+            } else { // hatch
+                $('#acad_pattern_list').parent().show();
+                $('#tile_y').parent().parent().show();
+                $('#units_row').show();
+                $('#insulation_style_row').hide();
+                $('#align_pattern').parent().show();
+            }
+
+            if (!no_preview) create_preview(0);
+            setTimeout(updateWindowHeight, 50); // Small delay to ensure DOM updates
+        }
+
         // Toggle section expand/collapse
         function toggleSection(sectionId) {
             const section = document.getElementById(sectionId);
@@ -336,13 +433,16 @@
             }
 
             // Adjust window height after transition
-            setTimeout(updateWindowHeight, 350);
+            setTimeout(updateWindowHeight, 300);
         }
 
         function updateWindowHeight() {
             var body = document.body;
-            var height = body.scrollHeight + 40; // larger buffer to ensure footer visibility
-            var width = 235; // Target fixed width inclusive of 10px margins
+            // Use getBoundingClientRect for more accurate height calculation including margins
+            var rect = body.getBoundingClientRect();
+            var height = Math.ceil(body.scrollHeight) + 20;
+            var width = 235;
+
             if (typeof sketchup !== 'undefined' && sketchup.resize_window) {
                 sketchup.resize_window(width, height);
             }
@@ -351,7 +451,7 @@
         // Initialize height on load
         window.onload = function () {
             ready_hatch();
-            updateWindowHeight();
+            setTimeout(updateWindowHeight, 100);
         };
 
         // Initialize Spectrum color pickers with alpha support
@@ -418,6 +518,9 @@
         // Helper to gather all params (Shared by create_preview and save_material)
         function get_current_params(force) {
             var pattern = document.getElementById('acad_pattern_list') ? document.getElementById('acad_pattern_list').value : '';
+            var pattern_type = document.getElementById('pattern_type') ? document.getElementById('pattern_type').value : 'hatch';
+            var insulation_style = document.getElementById('insulation_style') ? document.getElementById('insulation_style').value : 'zigzag';
+
             var tile_x = document.getElementById('tile_x') ? document.getElementById('tile_x').value : '';
             var tile_y = document.getElementById('tile_y') ? document.getElementById('tile_y').value : '';
 
@@ -458,13 +561,16 @@
                 materialName,       // 11
                 sectionLineColor,   // 12
                 unify,              // 13
-                drawingPriority     // 14
+                drawingPriority,    // 14
+                pattern_type,       // 15
+                insulation_style    // 16
             ].join(';');
         }
 
         // Color picker functions are now handled by Spectrum's change event
         function save_material() {
             var materialName = document.getElementById('hatch_name').value;
+            console.log('[Skalp Debug] save_material button clicked for:', materialName);
             if (!materialName || materialName.trim() === '') {
                 alert('Please enter a material name');
                 return;
@@ -472,6 +578,7 @@
 
             // 1. Force a CREATE HATCH (with force=1 to be safe) to save the parameters to Ruby
             var params = get_current_params(1);
+            console.log('[Skalp Debug] Final Params being sent to Ruby:', params);
             sketchup.create_hatch(params);
 
             // 2. Then call save logic (which closes dialog)
