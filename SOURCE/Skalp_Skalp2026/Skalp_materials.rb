@@ -761,6 +761,8 @@ module Skalp
   end
 
   def skalp_material_info(su_material, info_type = :name)
+    return nil unless su_material
+
     # :name, :pattern, :print_scale, :resolution=, :user_x, :space, :pen, :line_color, :fill_color, :gauge_ratio, :pat_scale, :angle, :alignment ,:section_cut_width
     material_ID = su_material.get_attribute("Skalp", "ID")
 

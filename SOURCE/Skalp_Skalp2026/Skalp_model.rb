@@ -1389,112 +1389,123 @@ module Skalp
     end
 
     def update_all_pages(save = true, rear_view = true, dialog_title = nil)
-      Skalp.block_observers = true
-      skalp_pages = []
-      no_skalp_pages = []
-      check_pages
+      if @controlCenter.process_queue_busy
+        UI.start_timer(2.0, false) { update_all_pages(save, rear_view, dialog_title) }
+        return
+      end
 
-      start("Skalp - set style to show Skalp section", true)
+      @controlCenter.process_queue_busy = true
 
-      for skpPage in @skpModel.pages
-        if get_memory_attribute(skpPage, "Skalp", "ID")
-          Skalp.force_style_to_show_skalp_section(skpPage, false, false)
-          skalp_pages << skpPage
-        else
-          no_skalp_pages << skpPage
+      begin
+        Skalp.block_observers = true
+        skalp_pages = []
+        no_skalp_pages = []
+        check_pages
+
+        start("Skalp - set style to show Skalp section", true)
+
+        for skpPage in @skpModel.pages
+          if get_memory_attribute(skpPage, "Skalp", "ID")
+            Skalp.force_style_to_show_skalp_section(skpPage, false, false)
+            skalp_pages << skpPage
+          else
+            no_skalp_pages << skpPage
+          end
         end
-      end
 
-      return if pages == []
+        return if pages == []
 
-      commit
-
-      # Adaptive weighting based on historical timings
-      # Adaptive weighting based on historical timings
-      w_sections = Skalp.get_avg_timing("update_all_pages_sections", 0.5)
-      w_addlines = Skalp.get_avg_timing("update_all_pages_addlines", 0.1)
-
-      # Hardcoded weights to match reality and avoid auto-learning corruption from previous bad data
-      w_rearlines = 0.25 # ~12s total / 63 pages = ~0.2s per page
-      w_prep = 10.0      # Save ~4s + Reverse ~5s = ~9s total constant overhead
-
-      # Normalize weights to be "per scene"
-      # (If it's the first run, it defaults to 1:5:1 ratio)
-
-      total_weighted_steps = skalp_pages.size * w_sections
-      if rear_view
-        total_weighted_steps += w_prep
-        total_weighted_steps += skalp_pages.size * w_rearlines
-        total_weighted_steps += skalp_pages.size * w_addlines
-      end
-      total_weighted_steps += 0.5 if save # small weight for save
-
-      # Initialize progress dialog
-      current_title = dialog_title || Skalp.translate("Update for Layout")
-      progress = Skalp::ProgressDialog.new(current_title, total_weighted_steps)
-      progress.show
-      Skalp.progress_dialog = progress
-
-      # Timing trackers
-      t_start_sections = Time.now
-
-      # Phase 1: Process sections
-      progress.offset = 0
-      progress.phase(Skalp.translate("Updating sections"))
-      start("Skalp - Updating sections", true)
-      skalp_pages.each_with_index do |skpPage, i|
-        progress.update(i * w_sections, Skalp.translate("Updating section"), skpPage.name)
-        sectionplane_by_id(get_memory_attribute(skpPage, "Skalp", "sectionplaneID")).calculate_section(false, skpPage)
-      end
-      Skalp.record_timing("update_all_pages_sections", (Time.now - t_start_sections) / [skalp_pages.size, 1].max)
-
-      manage_sections(skalp_pages, no_skalp_pages)
-      skalp_pages.each do |skpPage|
-        Skalp.update_page(skpPage, false, false)
-        sectionplaneID = get_memory_attribute(skpPage, "Skalp", "sectionplaneID")
-        set_memory_attribute(skpPage, "Skalp", "sectionplaneID", sectionplaneID)
-      end
-      commit
-
-      # Phase 2: Process rear lines (C Application)
-      if rear_view
-        # Phase 2: Preparing rear lines calculation
-        progress.offset = skalp_pages.size * w_sections
-        progress.phase(Skalp.translate("Preparing rear lines calculation"))
-
-        t_start_prep = Time.now
-        # Phase 3: Process rear lines (C Application)
-        # update_rear_lines calls get_lines which calls save_temp_model and reverse_scenes
-        @hiddenlines.update_rear_lines(:all, true, w_rearlines, w_prep)
-        Skalp.record_timing("update_all_pages_prep", Time.now - t_start_prep)
-
-        # Phase 3: Add rear lines to model
-        progress.offset = (skalp_pages.size * w_sections) + w_prep + (skalp_pages.size * w_rearlines)
-        start("Skalp - adding rear lines", true)
-        progress.phase(Skalp.translate("Adding rear lines to model"))
-        t_start_addlines = Time.now
-        @hiddenlines.add_rear_lines_to_model(:all)
-        Skalp.record_timing("update_all_pages_addlines", (Time.now - t_start_addlines) / [skalp_pages.size, 1].max)
-        manage_sections(skalp_pages, no_skalp_pages)
         commit
+
+        # Adaptive weighting based on historical timings
+        # Adaptive weighting based on historical timings
+        w_sections = Skalp.get_avg_timing("update_all_pages_sections", 0.5)
+        w_addlines = Skalp.get_avg_timing("update_all_pages_addlines", 0.1)
+
+        # Hardcoded weights to match reality and avoid auto-learning corruption from previous bad data
+        w_rearlines = 0.25 # ~12s total / 63 pages = ~0.2s per page
+        w_prep = 10.0      # Save ~4s + Reverse ~5s = ~9s total constant overhead
+
+        # Normalize weights to be "per scene"
+        # (If it's the first run, it defaults to 1:5:1 ratio)
+
+        total_weighted_steps = skalp_pages.size * w_sections
+        if rear_view
+          total_weighted_steps += w_prep
+          total_weighted_steps += skalp_pages.size * w_rearlines
+          total_weighted_steps += skalp_pages.size * w_addlines
+        end
+        total_weighted_steps += 0.5 if save # small weight for save
+
+        # Initialize progress dialog
+        current_title = dialog_title || Skalp.translate("Update for Layout")
+        progress = Skalp::ProgressDialog.new(current_title, total_weighted_steps)
+        progress.show
+        Skalp.progress_dialog = progress
+
+        # Timing trackers
+        t_start_sections = Time.now
+
+        # Phase 1: Process sections
+        progress.offset = 0
+        progress.phase(Skalp.translate("Updating sections"))
+        start("Skalp - Updating sections", true)
+        skalp_pages.each_with_index do |skpPage, i|
+          progress.update(i * w_sections, Skalp.translate("Updating section"), skpPage.name)
+          sectionplane_by_id(get_memory_attribute(skpPage, "Skalp", "sectionplaneID")).calculate_section(false, skpPage)
+        end
+        Skalp.record_timing("update_all_pages_sections", (Time.now - t_start_sections) / [skalp_pages.size, 1].max)
+
+        manage_sections(skalp_pages, no_skalp_pages)
+        skalp_pages.each do |skpPage|
+          Skalp.update_page(skpPage, false, false)
+          sectionplaneID = get_memory_attribute(skpPage, "Skalp", "sectionplaneID")
+          set_memory_attribute(skpPage, "Skalp", "sectionplaneID", sectionplaneID)
+        end
+        commit
+
+        # Phase 2: Process rear lines (C Application)
+        if rear_view
+          # Phase 2: Preparing rear lines calculation
+          progress.offset = skalp_pages.size * w_sections
+          progress.phase(Skalp.translate("Preparing rear lines calculation"))
+
+          t_start_prep = Time.now
+          # Phase 3: Process rear lines (C Application)
+          # update_rear_lines calls get_lines which calls save_temp_model and reverse_scenes
+          @hiddenlines.update_rear_lines(:all, true, w_rearlines, w_prep)
+          Skalp.record_timing("update_all_pages_prep", Time.now - t_start_prep)
+
+          # Phase 3: Add rear lines to model
+          progress.offset = (skalp_pages.size * w_sections) + w_prep + (skalp_pages.size * w_rearlines)
+          start("Skalp - adding rear lines", true)
+          progress.phase(Skalp.translate("Adding rear lines to model"))
+          t_start_addlines = Time.now
+          @hiddenlines.add_rear_lines_to_model(:all)
+          Skalp.record_timing("update_all_pages_addlines", (Time.now - t_start_addlines) / [skalp_pages.size, 1].max)
+          manage_sections(skalp_pages, no_skalp_pages)
+          commit
+        end
+
+        # Ensure the model version is updated so the warning doesn't reappear
+        set_version
+
+        # Phase 4: Save
+        if save
+          progress.offset = skalp_pages.size * (w_sections + (rear_view ? (w_rearlines + w_addlines) : 0))
+          progress.update(0.1, Skalp.translate("Saving model"), "")
+          Sketchup.send_action "saveDocument:"
+        end
+
+        Skalp.log_timing_report
+        Skalp.block_observers = false
+        progress.close
+        Skalp.progress_dialog = nil
+        Skalp.active_model.observer_active = true
+        Skalp.exportLObutton_off
+      ensure
+        @controlCenter.process_queue_busy = false
       end
-
-      # Ensure the model version is updated so the warning doesn't reappear
-      set_version
-
-      # Phase 4: Save
-      if save
-        progress.offset = skalp_pages.size * (w_sections + (rear_view ? (w_rearlines + w_addlines) : 0))
-        progress.update(0.1, Skalp.translate("Saving model"), "")
-        Sketchup.send_action "saveDocument:"
-      end
-
-      Skalp.log_timing_report
-      Skalp.block_observers = false
-      progress.close
-      Skalp.progress_dialog = nil
-      Skalp.active_model.observer_active = true
-      Skalp.exportLObutton_off
     end
 
     def turn_off_animation

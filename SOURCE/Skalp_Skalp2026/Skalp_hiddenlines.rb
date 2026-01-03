@@ -140,20 +140,49 @@ module Skalp
     end
 
     def update_forward_lines(scenes = :active)
-      @forward_lines_result = get_lines(scenes, false)
+      results = get_lines(scenes, false)
+      return unless results.is_a?(Array)
+
+      results.each do |data|
+        polylines_by_layer = {}
+        data.lines.each do |layer, line_data|
+          next unless line_data
+
+          polylines = PolyLines.new
+          polylines.fill_from_layout(line_data)
+          polylines_by_layer[layer] = polylines
+        end
+        @forward_lines_result[data.page] = polylines_by_layer
+      end
     end
 
     def update_rear_lines(scenes = :active, save_temp = true, progress_weight = 1.0, prep_weight = 0.0)
       # Show progress dialog if updating all scenes and not already showing one
       # Show progress dialog if not already showing one
+      results = []
       if Skalp.progress_dialog.nil?
         count = scenes == :all ? @skpModel.pages.size : 1
         Skalp::ProgressDialog.show(Skalp.translate("Update Rearlines"), count) do |progress|
-          @rear_lines_result = get_lines(scenes, true, save_temp, progress_weight, prep_weight)
+          results = get_lines(scenes, true, save_temp, progress_weight, prep_weight)
         end
       else
-        @rear_lines_result = get_lines(scenes, true, save_temp, progress_weight, prep_weight)
+        results = get_lines(scenes, true, save_temp, progress_weight, prep_weight)
       end
+
+      if results.is_a?(Array)
+        results.each do |data|
+          polylines_by_layer = {}
+          data.lines.each do |layer, line_data|
+            next unless line_data
+
+            polylines = PolyLines.new
+            polylines.fill_from_layout(line_data)
+            polylines_by_layer[layer] = polylines
+          end
+          @rear_lines_result[data.page] = polylines_by_layer
+        end
+      end
+
       @model.model_changes = false if @rear_lines_result != {}
     end
 
@@ -368,7 +397,8 @@ module Skalp
           ro["RenderMode"] = 1 # Hidden Line
           ro["Texture"] = true
           ro["DisplayColorByLayer"] = true
-          ro["EdgeColorMode"] = 0
+          # Don't force EdgeColorMode - preserve user's setting
+          # ro["EdgeColorMode"] = 0
           ro["DrawBackEdges"] = false
           ro["SectionCutDrawEdges"] = false
           ro["SectionDefaultCutColor"] = Sketchup::Color.new(0, 0, 0, 0)
@@ -377,12 +407,15 @@ module Skalp
         # Prepare pages (styles, section planes, layers)
         t_start_loop = Time.now
 
-        # 0. Capture original state for manual restoration
+        # Capture original style to ensure it's restored correctly
         original_root_style = @skpModel.styles.selected_style
-        original_model_rendering_options = Skalp.rendering_options_to_hash
 
-        unique_styles = ([original_root_style] + @skpModel.pages.map(&:style)).uniq.compact
-        style_original_settings = {}
+        # Start a transparent operation to prevent style change warnings
+        # We'll abort this at the end to discard all rendering option changes
+        @skpModel.start_operation("Skalp - temp rendering options", true, false, true)
+
+        # Capture original model rendering options
+        original_model_rendering_options = Skalp.rendering_options_to_hash
 
         # Snapshot Active View context (Camera & Section Plane)
         original_camera = {
@@ -394,47 +427,18 @@ module Skalp
         }
         original_active_section_plane = @skpModel.entities.active_section_plane
 
-        # 1. Modify existing styles directly
-        unique_styles.each do |style|
-          # Capture
-          @skpModel.styles.selected_style = style
-          style_original_settings[style] = Skalp.rendering_options_to_hash
-
-          # Apply Overrides to ACTIVE rendering options (which are now linked to this style)
-          apply_hiddenline_overrides(@skpModel.rendering_options)
-
-          # Bake the changes into the style
-          @skpModel.styles.update_selected_style
-        end
-
-        # 2. Configure Model state (for Active View)
-        # First ensure we are back on the root style
-        @skpModel.styles.selected_style = original_root_style
-
-        # Restore Camera orientation and context
-        cam = @skpModel.active_view.camera
-        cam.set(original_camera[:eye], original_camera[:target], original_camera[:up])
-        cam.perspective = original_camera[:perspective]
-        cam.height = original_camera[:height] if original_camera[:height]
-
-        # Restore Active Section Plane
-        @skpModel.entities.active_section_plane = if original_active_section_plane && original_active_section_plane.valid?
-                                                    original_active_section_plane
-                                                  else
-                                                    nil
-                                                  end
-
-        # Apply ALL overrides directly to the model's active state
+        # Apply hiddenline overrides directly to the model's active state
+        # This is temporary and will be restored in the ensure block
         apply_hiddenline_overrides(@skpModel.rendering_options)
 
-        # 3. Ensure all pages have section planes active
+        # Ensure all pages have section planes active
         @skpModel.pages.each { |page| page.use_section_planes = true }
 
         Skalp.record_timing("save_temp_model_setup", Time.now - t_start_loop)
 
         # puts "[DEBUG] Deleting old temp files..."
         # File.delete(@temp_model) if File.exist?(@temp_model)
-        # File.delete(@temp_model_reversed) if File.exist?(@temp_model_reversed)
+        # File.delete(@temp_ model_reversed) if File.exist?(@temp_model_reversed)
 
         # puts "[DEBUG] Saving model copy to: #{@temp_model}"
         t_start_save = Time.now
@@ -447,38 +451,14 @@ module Skalp
         puts "[ERROR] Skalp hiddenlines save_temp_model failed: #{e.message}"
         puts e.backtrace.join("\n")
       ensure
-        # Manual Restoration
-        # puts "[DEBUG] Restoring original model state..."
-
-        # 1. Restore each style's settings
-        if style_original_settings
-          style_original_settings.each do |style, settings|
-            next unless style.valid?
-
-            @skpModel.styles.selected_style = style
-            Skalp.hash_to_rendering_options(settings)
-            @skpModel.styles.update_selected_style
-          end
-        end
-        # 2. Restore model root state
-        @skpModel.styles.selected_style = original_root_style
-        Skalp.hash_to_rendering_options(original_model_rendering_options)
-
-        # 3. Restore Active View Camera & Section Plane
-        if original_camera
-          cam = @skpModel.active_view.camera
-          cam.set(original_camera[:eye], original_camera[:target], original_camera[:up])
-          cam.perspective = original_camera[:perspective]
-          cam.height = original_camera[:height] if original_camera[:height]
-        end
-        @skpModel.entities.active_section_plane = if original_active_section_plane && original_active_section_plane.valid?
-                                                    original_active_section_plane
-                                                  else
-                                                    nil
-                                                  end
-
+        # Abort the operation to automatically revert all rendering option changes
+        # This prevents the "Style changed" warning dialog
         # puts "[DEBUG] Aborting operation to restore original state..."
         @skpModel.abort_operation
+
+        # Explicitly restore the original style to correct any visual glitches
+        @skpModel.styles.selected_style = original_root_style if original_root_style && original_root_style.valid?
+
         @model.observer_active = observers
       end
     end
@@ -683,6 +663,7 @@ module Skalp
     end
 
     def get_lines(scenes = :active, reversed = false, save_temp = true, progress_weight = 1.0, prep_weight = 0.0)
+      t_start = Time.now
       pages_info = get_pages_info(scenes, reversed)
 
       block_observer_status = Skalp.block_observers
@@ -741,10 +722,6 @@ module Skalp
 
       scene_names = pages_info.map { |h| h[:page_name] }
 
-      scene_names = pages_info.map { |h| h[:page_name] }
-
-      scene_names = pages_info.map { |h| h[:page_name] }
-
       # puts ">>> [DEBUG] calling get_exploded_entities"
       # puts "    temp_model: #{temp_model}"
       if File.exist?(temp_model)
@@ -766,9 +743,9 @@ module Skalp
       t_before_c = Time.now
       puts "[PROFILE] Calling get_exploded_entities at #{t_before_c}" if defined?(DEBUG) && DEBUG
 
-      result = Skalp.get_exploded_entities(section_group, @height, page_info_to_array(pages_info, :index),
+      result = Skalp.get_exploded_entities(temp_model, @height, page_info_to_array(pages_info, :index),
                                            page_info_to_array(pages_info, :scale), page_info_to_array(pages_info, :perspective),
-                                           page_info_to_array(pages_info, :target), rear_view_status, prep_weight,
+                                           page_info_to_array(pages_info, :target), rear_view, prep_weight,
                                            page_info_to_array(pages_info, :name))
 
       t_after_c = Time.now
