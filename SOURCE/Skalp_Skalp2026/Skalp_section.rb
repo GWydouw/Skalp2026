@@ -46,7 +46,6 @@ module Skalp
 
       return if @model.undoredo_action
 
-      puts ">>> Skalp Loaded: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')} - Build: #17"
       @model.start("Skalp - #{Skalp.translate('update section')}")
 
       type = @page || @skpModel
@@ -229,7 +228,6 @@ module Skalp
                   end
 
                   poly_to_process.each_with_index do |p, pp_idx|
-                    # puts "[PROFILE] Adding face #{pp_idx}..." if defined?(DEBUG) && DEBUG
                     outerloop = if has_offset
                                   p.outerloop.vertices.map do |v|
                                     v.offset(transform_vec)
@@ -242,29 +240,30 @@ module Skalp
                       innerloops << (has_offset ? loop.vertices.map { |v| v.offset(transform_vec) } : loop.vertices)
                     end
 
-                    begin
-                      face = if innerloops.empty?
-                               builder.add_face(outerloop)
-                             else
-                               builder.add_face(outerloop,
-                                                holes: innerloops)
-                             end
+                    face = if innerloops.empty?
+                             builder.add_face(outerloop)
+                           else
+                             builder.add_face(outerloop,
+                                              holes: innerloops)
+                           end
+                    next unless face && face.valid?
 
-                      face.set_attribute("Skalp", "from_sub_object", current_ids)
-                      if current_ids.include?(",")
-                        # Unified: mixed
-                        face.set_attribute("Skalp", "from_object", "Unified")
-                      else
-                        # Single object: use top parent
-                        face.set_attribute("Skalp", "from_object", current_section.node.value.top_parent.value.to_s)
-                      end
-                      face.material = su_mat = Skalp.create_su_material(mat_name)
-                      correct_UV_material(face)
-                      l_name = sections.first.layer_by_style(type, mat_name)
-                      layer = @skpModel.layers[l_name]
-                      face.layer = layer if layer && layer.valid?
-                      face.normal.dot(normal) < 0 ? face.reverse! : nil
+                    face.set_attribute("Skalp", "from_sub_object", current_ids)
+                    if current_ids.include?(",")
+                      # Unified: mixed
+                      face.set_attribute("Skalp", "from_object", "Unified")
+                    else
+                      # Single object: use top parent
+                      face.set_attribute("Skalp", "from_object", current_section.node.value.top_parent.value.to_s)
+                    end
+                    face.material = su_mat = Skalp.create_su_material(mat_name)
+                    correct_UV_material(face)
+                    l_name = sections.first.layer_by_style(type, mat_name)
+                    layer = @skpModel.layers[l_name]
+                    face.layer = layer if layer && layer.valid?
+                    face.normal.dot(normal) < 0 ? face.reverse! : nil
 
+                    if su_mat
                       pattern_type = Skalp.skalp_material_info(su_mat, :pattern_type)
                       if %w[cross insulation].include?(pattern_type)
                         # Clean Base Material Logic to prevent underlying texture
@@ -286,158 +285,15 @@ module Skalp
                       end
 
                       if pattern_type == "cross"
-                        draw_procedural_cross_hatch(face, procedural_group, su_mat)
+                        draw_procedural_cross_hatch(face, procedural_group, su_mat, use_lineweight)
                       elsif pattern_type == "insulation"
                         insulation_style = Skalp.skalp_material_info(su_mat, :insulation_style)
-                        draw_procedural_insulation(face, procedural_group, mat_name, insulation_style)
+                        draw_procedural_insulation(face, procedural_group, mat_name, insulation_style, use_lineweight)
                       end
-                    rescue ArgumentError
                     end
-                  end
-                end
-              end
-
-              has_offset = z_offset.abs > 0.000001
-
-              # A. UNIFY LOGIC
-              by_material = Hash.new { |h, k| h[k] = [] }
-              current_sections.each do |sec|
-                mat = skalp_style_material(sec, type)
-                by_material[mat] << sec
-              end
-
-              # B. CALCULATE LINEWEIGHT MASK ONCE PER PRIORITY (not per material!)
-              # This is the KEY optimization: mask is priority-specific, not material-specific
-              slice_mask = Skalp::MultiPolygon.new
-              lineweight_groups_by_priority[priority].each do |_, group_secs|
-                by_mat_mask = Hash.new { |h, k| h[k] = [] }
-                group_secs.each { |sec| by_mat_mask[skalp_style_material(sec, type)] << sec }
-
-                by_mat_mask.each do |m_name, m_sections|
-                  s_mat = materials[m_name]
-                  u = s_mat ? Skalp.skalp_material_info(s_mat, :unify) == true : false
-                  width = get_lineweight_width(m_sections.first, type)
-                  next unless width > 0.0
-
-                  if u && m_sections.size > 1
-                    u_poly = Skalp::MultiPolygon.new
-                    m_sections.each { |sec| u_poly.union!(sec.to_mpoly) }
-                    slice_mask.union!(u_poly.outline(width * scale))
-                  else
-                    m_sections.each { |sec| slice_mask.union!(sec.to_mpoly.outline(width * scale)) }
-                  end
-                end
-              end
-
-              centerline_loops = []
-
-              # C. PROCESS EACH MATERIAL WITH THE SHARED MASK
-              by_material.each do |mat_name, sections|
-                su_mat = materials[mat_name]
-                unify = su_mat ? Skalp.skalp_material_info(su_mat, :unify) == true : false
-                final_polygons = []
-
-                if unify && sections.size > 1
-                  union_poly = Skalp::MultiPolygon.new
-                  sections.each { |sec| union_poly.union!(sec.to_mpoly) }
-                  contributing_ids = sections.map { |sec| sec.node.value.to_s }.join(",")
-                  union_poly.polygons.polygons.each do |p|
-                    final_polygons << { poly: p, ids: contributing_ids, sec: sections.first }
-                  end
-                else
-                  sections.each do |sec|
-                    sec_id = sec.node.value.to_s
-                    sec.polygons.each do |p|
-                      final_polygons << { poly: p, ids: sec_id, sec: sec }
-                    end
-                  end
-                end
-
-                # D. GENERATE FACES (apply pre-calculated mask)
-                final_polygons.each do |data|
-                  polygon = data[:poly]
-                  current_ids = data[:ids]
-                  current_section = data[:sec]
-
-                  # Apply the pre-calculated mask
-                  poly_to_process = [polygon]
-                  unless slice_mask.to_a.empty?
-                    mp = Skalp::MultiPolygon.new(polygon.to_a)
-                    mp.difference!(slice_mask)
-                    poly_to_process = mp.polygons.polygons
-                  end
-
-                  centerline_data = { loop: polygon.outerloop, section: current_section }
-                  centerline_loops << centerline_data
-                  polygon.innerloops.each do |il|
-                    centerline_loops << { loop: il, section: current_section }
-                  end
-
-                  poly_to_process.each_with_index do |p, pp_idx|
-                    # puts "[PROFILE] Adding face #{pp_idx}..." if defined?(DEBUG) && DEBUG
-                    outerloop = if has_offset
-                                  p.outerloop.vertices.map do |v|
-                                    v.offset(transform_vec)
-                                  end
-                                else
-                                  p.outerloop.vertices
-                                end
-                    innerloops = []
-                    p.innerloops.each do |loop|
-                      innerloops << (has_offset ? loop.vertices.map { |v| v.offset(transform_vec) } : loop.vertices)
-                    end
-
-                    begin
-                      face = if innerloops.empty?
-                               builder.add_face(outerloop)
-                             else
-                               builder.add_face(outerloop,
-                                                holes: innerloops)
-                             end
-
-                      face.set_attribute("Skalp", "from_sub_object", current_ids)
-                      if current_ids.include?(",")
-                        # Unified: mixed
-                        face.set_attribute("Skalp", "from_object", "Unified")
-                      else
-                        # Single object: use top parent
-                        face.set_attribute("Skalp", "from_object", current_section.node.value.top_parent.value.to_s)
-                      end
-                      face.material = su_mat = Skalp.create_su_material(mat_name)
-                      correct_UV_material(face)
-                      l_name = sections.first.layer_by_style(type, mat_name)
-                      layer = @skpModel.layers[l_name]
-                      face.layer = layer if layer && layer.valid?
-                      face.normal.dot(normal) < 0 ? face.reverse! : nil
-
-                      pattern_type = Skalp.skalp_material_info(su_mat, :pattern_type)
-                      if %w[cross insulation].include?(pattern_type)
-                        # Clean Base Material Logic to prevent underlying texture
-                        base_mat_name = mat_name + "_Base"
-                        base_mat = Skalp.create_su_material(base_mat_name)
-                        if base_mat
-                          # Fix: Use explicit Fill Color if available
-                          fill_c = Skalp.skalp_material_info(su_mat, :fill_color)
-                          base_mat.color = Skalp.string_to_color(fill_c && !fill_c.empty? ? fill_c : su_mat.color)
-
-                          base_mat.alpha = su_mat.alpha
-                          base_mat.texture = nil
-                          face.material = base_mat
-                        else
-                          face.material = su_mat
-                        end
-                      else
-                        face.material = su_mat
-                      end
-
-                      if pattern_type == "cross"
-                        draw_procedural_cross_hatch(face, procedural_group, su_mat)
-                      elsif pattern_type == "insulation"
-                        insulation_style = Skalp.skalp_material_info(su_mat, :insulation_style)
-                        draw_procedural_insulation(face, procedural_group, mat_name, insulation_style)
-                      end
-                    rescue ArgumentError
-                    end
+                  rescue StandardError => e
+                    puts "[Skalp Error] Crash in Advanced Render Pipeline loop 1: #{e.message}"
+                    puts e.backtrace.join("\n")
                   end
                 end
               end
@@ -587,6 +443,8 @@ module Skalp
                            builder.add_face(outerloop,
                                             holes: innerloops)
                          end
+                  next unless face && face.valid?
+
                   face.set_attribute("Skalp", "from_object", section2d.node.value.top_parent.value.to_s)
                   face.set_attribute("Skalp", "from_sub_object", section2d.node.value.to_s)
                   materialname = section2d.hatch_by_style(type).to_s
@@ -599,36 +457,45 @@ module Skalp
                   if su_mat
                     raw_type = Skalp.skalp_material_info(su_mat, :pattern_type)
                     pattern_type = raw_type.to_s.strip
-                    puts "[Skalp Debug] Face #{face.object_id} -> Info raw: #{raw_type.inspect}, Stripped: #{pattern_type.inspect}"
+                    # puts "[Skalp Debug] Face #{face.object_id} -> Info raw: #{raw_type.inspect}, Stripped: #{pattern_type.inspect}"
+                    pattern_type = raw_type.to_s.split("_")[0]
+                    su_mat = materials[materialname] # Use materialname here, not mat_name
 
-                    if %w[cross insulation].include?(pattern_type)
-                      # Prevent overlapping patterns and Z-fighting
-                      # We create/use a dedicated base material that has the color but NO texture
-                      base_mat_name = "#{materialname}_Base"
-                      base_mat = Sketchup.active_model.materials[base_mat_name]
-                      base_mat ||= Sketchup.active_model.materials.add(base_mat_name)
+                    if su_mat
+                      pattern_type = Skalp.skalp_material_info(su_mat, :pattern_type)
+                      if %w[cross insulation].include?(pattern_type)
+                        # Clean Base Material Logic to prevent underlying texture
+                        base_mat_name = materialname + "_Base"
+                        base_mat = Skalp.create_su_material(base_mat_name)
+                        if base_mat
+                          # Fix: Use explicit Fill Color if available
+                          fill_c = Skalp.skalp_material_info(su_mat, :fill_color)
+                          # puts "[Skalp Debug] Setting base_mat.color with: #{fill_c.inspect}"
+                          base_mat.color = Skalp.string_to_color(fill_c && !fill_c.empty? ? fill_c : su_mat.color)
 
-                      # Always update properties to ensure it matches the source but WITHOUT texture
-                      fill_c = Skalp.skalp_material_info(su_mat, :fill_color)
-                      puts "[Skalp Debug] Setting base_mat.color with: #{fill_c.inspect}"
-                      base_mat.color = Skalp.string_to_color(fill_c && !fill_c.to_s.empty? ? fill_c : su_mat.color)
-                      base_mat.alpha = su_mat.alpha
-                      base_mat.texture = nil # Explicitly remove texture if it somehow got there
-
-                      face.material = base_mat
-                      face.back_material = base_mat
+                          base_mat.alpha = su_mat.alpha
+                          base_mat.texture = nil
+                          face.material = base_mat
+                        else
+                          face.material = su_mat
+                        end
+                      else
+                        face.material = su_mat
+                      end
                     end
 
-                    puts "[Skalp Debug] Face processed. ID: #{face.object_id}, Type: #{pattern_type}, Verts: #{face.outer_loop.vertices.size}"
+                    # puts "[Skalp Debug] Face processed. ID: #{face.object_id}, Type: #{pattern_type}, Verts: #{face.outer_loop.vertices.size}"
                     if pattern_type == "cross"
-                      puts "[Skalp Debug] --> DRAWING X-HATCH for Face #{face.object_id}"
-                      draw_procedural_cross_hatch(face, procedural_group, su_mat)
+                      # puts "[Skalp Debug] --> DRAWING X-HATCH for Face #{face.object_id} (Legacy)"
+                      draw_procedural_cross_hatch(face, procedural_group, su_mat, false)
                     elsif pattern_type == "insulation"
                       insulation_style = Skalp.skalp_material_info(su_mat, :insulation_style)
-                      draw_procedural_insulation(face, procedural_group, materialname, insulation_style)
+                      draw_procedural_insulation(face, procedural_group, materialname, insulation_style, false)
                     end
                   end
-                rescue ArgumentError
+                rescue StandardError => e
+                  puts "[Skalp Error] Crash in Legacy Render Pipeline: #{e.message}"
+                  puts e.backtrace.join("\n")
                 end
               end
             end
@@ -746,7 +613,7 @@ module Skalp
         place_lines_or_definition_in_model(active_page, target_group)
       elsif id == @model.hiddenlines.calculated[@skpModel]
         # Fallback: check if calculated for model (live section)
-        puts "[DEBUG] Match found for Model fallback"
+        # puts "[DEBUG] Match found for Model fallback"
         place_lines_or_definition_in_model(@skpModel, target_group)
       else
         found = false
@@ -759,7 +626,7 @@ module Skalp
           end
         end
         if found
-          puts "[DEBUG] Match found for other page: #{type.name}"
+          # puts "[DEBUG] Match found for other page: #{type.name}"
           place_lines_or_definition_in_model(type, target_group, true)
         else
           # puts "[DEBUG] No rear_view_definition found for current page (#{selected_page&.name || 'Model'})"
@@ -783,17 +650,15 @@ module Skalp
           elsif selected_page && @model.hiddenlines.rear_view_definitions[selected_page] &&
                 @model.hiddenlines.rear_view_definitions[selected_page].valid? &&
                 @model.hiddenlines.rear_view_definitions[selected_page].entities.size > 0
-            puts "[DEBUG] Using saved rear_view_definition for selected_page: #{selected_page.name}"
+            # puts "[DEBUG] Using saved rear_view_definition for selected_page: #{selected_page.name}"
             place_lines_or_definition_in_model(selected_page, target_group)
           elsif @model.hiddenlines.rear_view_definitions[@skpModel] &&
                 @model.hiddenlines.rear_view_definitions[@skpModel].valid? &&
                 @model.hiddenlines.rear_view_definitions[@skpModel].entities.size > 0
-            puts "[DEBUG] Using saved rear_view_definition for Model fallback"
+            # puts "[DEBUG] Using saved rear_view_definition for Model fallback"
             place_lines_or_definition_in_model(@skpModel, target_group)
           else
-            # No valid definition found for this page - don't use definitions from other pages!
-            # The lines will need to be recalculated for this page
-            puts "[DEBUG] No rear_view_definition found for current page (#{selected_page&.name || 'Model'})"
+            # puts "[DEBUG] No rear_view_definition found for current page (#{selected_page&.name || 'Model'})"
             # puts "[DEBUG] Available definitions are for: #{@model.hiddenlines.rear_view_definitions.keys.select do |k|
             #   k.is_a?(Sketchup::Page)
             # end.map(&:name).join(', ')}"
@@ -1405,13 +1270,8 @@ module Skalp
       end
     end
 
-    def draw_procedural_cross_hatch(face, parent, su_mat)
+    def draw_procedural_cross_hatch(face, parent, su_mat, use_lineweight = true)
       return unless face.valid?
-
-      # Get face vertices
-      vertices = face.outer_loop.vertices
-      num_verts = vertices.size
-      puts "[Skalp Debug] Face #{face.object_id}: cross-hatch check. Vertices: #{num_verts}"
 
       # Get face vertices and simplify (remove collinear points)
       raw_vertices = face.outer_loop.vertices
@@ -1426,26 +1286,29 @@ module Skalp
       end
 
       num_verts = vertices.size
-      puts "[Skalp Debug] Face #{face.object_id}: cross-hatch check. Simplified Vertices: #{num_verts} (Raw: #{raw_vertices.size})"
+      # puts "[Skalp Debug] Face #{face.object_id}: cross-hatch check. Simplified Vertices: #{num_verts} (Raw: #{raw_vertices.size})"
 
       # REQUIREMENT: Only draw cross-hatch if the face has exactly 4 corners
       if num_verts != 4
-        puts "[Skalp Debug] Face #{face.object_id}: SKIPPING (not a quad-like shape)"
+        # puts "[Skalp Debug] Face #{face.object_id}: SKIPPING (not a quad-like shape)"
         return
       end
 
       pattern_info = Skalp.get_pattern_info(su_mat)
       unless pattern_info
-        puts "[Skalp Debug] Face #{face.object_id}: NO pattern_info found!"
+        # puts "[Skalp Debug] Face #{face.object_id}: NO pattern_info found!"
         return
       end
 
       # Use dedicated hatch line width from pattern_info
       pen_str = pattern_info[:pen] || "0.18 mm"
       width = Skalp.mm_or_pts_to_inch(pen_str)
+      # Define type and scale for model_width calculation
       type = @page || @skpModel
       scale = Skalp.dialog.drawing_scale(type)
-      model_width = (width * scale)
+      # If lineweights (widths) are OFF, we draw simple black edges (model_width = 0.0)
+      # Otherwise we use the calculated pattern width
+      model_width = use_lineweight ? (width * scale) : 0.0
 
       line_mat = get_procedural_line_material(su_mat, pattern_info)
       normal = face.normal
@@ -1456,7 +1319,7 @@ module Skalp
       # This ensures perfect corner alignment for quads
       p0, p1, p2, p3 = vertices.map(&:position)
 
-      puts "[Skalp Debug] Face #{face.object_id}: Drawing diagonals v0-v2 and v1-v3"
+      # puts "[Skalp Debug] Face #{face.object_id}: Drawing diagonals v0-v2 and v1-v3"
 
       # Create ONE group for this face's cross
       group = parent.entities.add_group
@@ -1466,7 +1329,7 @@ module Skalp
       add_procedural_segment(group, p1, p3, model_width, normal, line_mat, layer, false)
     end
 
-    def draw_procedural_insulation(face, parent, mat_name, style)
+    def draw_procedural_insulation(face, parent, mat_name, style, use_lineweight = true)
       return unless face.valid?
 
       su_mat = Sketchup.active_model.materials[mat_name]
@@ -1480,7 +1343,7 @@ module Skalp
       width = Skalp.mm_or_pts_to_inch(pen_str)
       type = @page || @skpModel
       scale = Skalp.dialog.drawing_scale(type)
-      model_width = (width * scale)
+      model_width = use_lineweight ? (width * scale) : 0.0
 
       line_mat = get_procedural_line_material(su_mat, pattern_info)
       layer = face.layer
